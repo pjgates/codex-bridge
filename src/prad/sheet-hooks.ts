@@ -1,9 +1,9 @@
 /**
  * PRAD (Players Roll All Dice) — Unified Sheet Hook Dispatcher
  *
- * Registers a single `renderActorSheet` hook that dispatches to
- * NPC or PC sheet augmentation based on actor type. This halves
- * the hook overhead and provides a single entry point.
+ * Registers sheet render hooks that dispatch to NPC or PC sheet augmentation
+ * based on actor type. Foundry V14 uses ApplicationV2 sheet hooks while older
+ * local development builds may still emit the legacy ActorSheet hook.
  */
 
 import { MODULE_ID } from "../constants.js";
@@ -11,12 +11,13 @@ import { onRenderNpcSheet } from "./npc-sheet.js";
 import { onRenderPcSheet } from "./pc-sheet.js";
 
 /**
- * Register a single unified `renderActorSheet` hook for all PRAD
- * sheet augmentations.
+ * Register unified sheet augmentation hooks for both Foundry V14
+ * ApplicationV2 sheets and the legacy ActorSheet hook.
  */
 export function registerPradSheetHooks(): void {
+    Hooks.on("renderApplicationV2", onRenderActorSheet);
     Hooks.on("renderActorSheet", onRenderActorSheet);
-    console.log(`${MODULE_ID} | PRAD: Unified sheet augmentation hook registered`);
+    console.log(`${MODULE_ID} | PRAD: Unified sheet augmentation hooks registered`);
 }
 
 /**
@@ -24,7 +25,7 @@ export function registerPradSheetHooks(): void {
  */
 function onRenderActorSheet(
     sheet: object,
-    html: JQuery<HTMLElement>,
+    html: JQuery<HTMLElement> | HTMLElement,
     data: object,
 ): void {
     try {

@@ -76,7 +76,7 @@ export function activateTargetHelper(): void {
     // Wrap async render handler for Foundry's hook system (expects void return)
     const renderHook = (
         message: ChatMessage.Implementation,
-        html: JQuery<HTMLElement>,
+        html: JQuery<HTMLElement> | HTMLElement,
         data: object
     ): void => {
         void onRenderTargetHelper(message, html, data as Record<string, unknown>);
@@ -84,12 +84,16 @@ export function activateTargetHelper(): void {
 
     if (toolbeltTargetHelper) {
         console.log(`${MODULE_ID} | Target Helper: PF2e Toolbelt's Target Helper is active — only handling PRAD cards`);
-        // Only register for PRAD-specific rendering
+        // Only register for PRAD-specific rendering. Foundry V14 renders chat
+        // messages through renderChatMessageHTML; keep the legacy hook so local
+        // V13 development still exercises the same code path.
+        Hooks.on("renderChatMessageHTML", renderHook);
         Hooks.on("renderChatMessage", renderHook);
         Hooks.on("preCreateChatMessage", onPreCreatePradOnly);
     } else {
         console.log(`${MODULE_ID} | Target Helper: Registering all hooks`);
         Hooks.on("preCreateChatMessage", onPreCreateChatMessage);
+        Hooks.on("renderChatMessageHTML", renderHook);
         Hooks.on("renderChatMessage", renderHook);
     }
 

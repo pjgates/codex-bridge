@@ -9,7 +9,6 @@
  * without explicit imports.
  */
 
-/* eslint-disable @typescript-eslint/no-empty-object-type */
 
 declare global {
 
@@ -19,6 +18,7 @@ declare global {
         "sf2e-forge-custom.enableCustomRules": boolean;
         "sf2e-forge-custom.enableTargetHelper": boolean;
         "sf2e-forge-custom.playersRollAllDice": boolean;
+        "sf2e-forge-custom.pradStrictDCs": boolean;
     }
 
     // ─── Callback & Options Types ────────────────────────────────────────

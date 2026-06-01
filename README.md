@@ -25,7 +25,7 @@ Per-target save/check rows on chat cards for spells, area effects, and other tar
 
 | Requirement | Version |
 |---|---|
-| Foundry VTT | v13 |
+| Foundry VTT | v14 |
 | SF2e System | 0.0.4+ |
 
 ## Installation
