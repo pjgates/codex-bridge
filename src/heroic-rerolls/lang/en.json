@@ -1,0 +1,10 @@
+{
+    "sf2e-forge-custom": {
+        "settings": {
+            "heroicRerolls": {
+                "name": "Heroic Rerolls",
+                "hint": "When a Hero Point is used to reroll a d20, increase a die result below 10 to 10."
+            }
+        }
+    }
+}

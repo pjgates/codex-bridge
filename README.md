@@ -12,6 +12,10 @@ A variant rule that puts dice in the players' hands for every roll:
 - **NPC saves become player overcome checks** -- instead of the GM rolling saves for NPCs, the caster rolls an overcome check against each target's save DC.
 - **Sheet augmentation** -- NPC sheets display DCs, and PC sheets display corresponding modifiers, so the right numbers are always visible.
 
+### Heroic Rerolls
+
+An optional Hero Point variant rule: when a Hero Point rerolls a d20 below 10, the die result becomes 10.
+
 ### Target Helper
 
 Per-target save/check rows on chat cards for spells, area effects, and other targeted actions:
@@ -49,6 +53,7 @@ All settings are world-scoped (GM only) and found under **Module Settings > SF2e
 |---|---|---|
 | **Enable Custom Rules** | Master switch for the entire module. Requires reload. | On |
 | **Enable Target Helper** | Adds per-target rows to chat cards. Requires reload. | On |
+| **Heroic Rerolls** | Raises Hero Point d20 rerolls below 10 to 10. Requires reload. | Off |
 | **Players Roll All Dice** | Enables the PRAD variant. Requires Target Helper to be on. | Off |
 
 ## Development

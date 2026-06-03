@@ -6,12 +6,16 @@
 
 import { MODULE_ID } from "../constants.js";
 import { registerPradSettings, registerPradTemplates, registerAttackCardTemplate } from "../prad/index.js";
+import { registerHeroicRerollsSetting } from "../heroic-rerolls/index.js";
 import { initTargetHelper } from "../target-helper/index.js";
 import { resolveHtmlRoot } from "../shared/html.js";
 
 export function onInit(): void {
     // Register module settings (order matters for the settings UI)
     registerSettings();
+
+    // Register Heroic Rerolls variant setting
+    registerHeroicRerollsSetting();
 
     // Register PRAD (Players Roll All Dice) settings
     registerPradSettings();
@@ -98,6 +102,15 @@ function onRenderSettingsConfig(
         if (thInput && !masterEnabled) {
             thInput.disabled = true;
             thInput.closest(".form-group")?.classList.add("disabled");
+        }
+
+        // Find the Heroic Rerolls setting row and disable it if master is off
+        const heroicRerollsInput = root.querySelector<HTMLInputElement>(
+            `input[name="${MODULE_ID}.heroicRerolls"]`,
+        );
+        if (heroicRerollsInput && !masterEnabled) {
+            heroicRerollsInput.disabled = true;
+            heroicRerollsInput.closest(".form-group")?.classList.add("disabled");
         }
 
         // Disable the strict DC setting when PRAD is off
