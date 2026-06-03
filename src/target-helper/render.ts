@@ -152,6 +152,20 @@ async function renderPradAttackCard(
 // ─── Target Row Rendering ────────────────────────────────────────────────────
 
 /**
+ * Reserve the target rows container before rendering any asynchronous row
+ * templates. Foundry can emit both renderChatMessageHTML and renderChatMessage
+ * for the same card before either hook completes.
+ */
+export function reserveTargetRowsWrapper(parent: HTMLElement): HTMLDivElement | null {
+    if (parent.querySelector(".th-target-rows")) return null;
+
+    const rowsWrapper = document.createElement("div");
+    rowsWrapper.className = "th-target-rows";
+    parent.appendChild(rowsWrapper);
+    return rowsWrapper;
+}
+
+/**
  * Render per-target rows and append them to the message content.
  */
 async function addTargetRows(
@@ -216,9 +230,10 @@ async function addTargetRows(
         npcSaveDCs,
     };
 
-    // Create the rows wrapper
-    const rowsWrapper = document.createElement("div");
-    rowsWrapper.className = "th-target-rows";
+    // Reserve synchronously so overlapping Foundry render hooks cannot both
+    // render target rows for the same chat card.
+    const rowsWrapper = reserveTargetRowsWrapper(parent);
+    if (!rowsWrapper) return;
 
     for (const { token, data } of resolvedTokens) {
         // Pure function builds the row view model
@@ -260,7 +275,6 @@ async function addTargetRows(
         rowsWrapper.appendChild(rowDiv);
     }
 
-    parent.appendChild(rowsWrapper);
 }
 
 /**

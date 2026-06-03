@@ -24,6 +24,7 @@
         "eslint-plugin-boundaries": "^5.4.0",
         "fvtt-types": "github:League-of-Foundry-Developers/foundry-vtt-types#main",
         "gray-matter": "^4.0.3",
+        "happy-dom": "^20.9.0",
         "marked": "^17.0.1",
         "sass": "~1.83.0",
         "tsx": "^4.21.0",
