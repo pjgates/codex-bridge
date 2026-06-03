@@ -17,6 +17,7 @@ declare global {
     interface SettingConfig {
         "sf2e-forge-custom.enableCustomRules": boolean;
         "sf2e-forge-custom.enableTargetHelper": boolean;
+        "sf2e-forge-custom.heroicRerolls": boolean;
         "sf2e-forge-custom.playersRollAllDice": boolean;
         "sf2e-forge-custom.pradStrictDCs": boolean;
     }
@@ -264,6 +265,16 @@ declare global {
         readonly results?: ReadonlyArray<{ readonly result: number }>;
     }
 
+    /** Resource spent by the PF2e reroll hook. */
+    interface Sf2eRerollResource {
+        readonly slug: string;
+    }
+
+    /** Mutable PF2e reroll options exposed to hook consumers. */
+    interface Sf2eRerollHookOptions {
+        keep?: "new" | "higher" | "lower";
+    }
+
     // ─── Chat Message Flags ──────────────────────────────────────────────
 
     /** Typed shape for accessing `message.flags`. */
@@ -340,5 +351,18 @@ declare global {
     }
 
 } // end declare global
+
+declare module "fvtt-types/configuration" {
+    namespace Hooks {
+        interface HookConfig {
+            "pf2e.reroll": (
+                oldRoll: Roll,
+                newRoll: Roll,
+                resource: Sf2eRerollResource | null,
+                options: Sf2eRerollHookOptions,
+            ) => void;
+        }
+    }
+}
 
 export {};

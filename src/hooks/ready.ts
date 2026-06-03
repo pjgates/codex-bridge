@@ -4,6 +4,7 @@
  */
 
 import { MODULE_ID } from "../constants.js";
+import { activateHeroicRerolls, isHeroicRerollsEnabled } from "../heroic-rerolls/index.js";
 import { isPradEnabled, applyDCBaseSetting, registerAttackInterceptHook, registerPradSheetHooks } from "../prad/index.js";
 import { activateTargetHelper, setPradOvercomeEnabled } from "../target-helper/index.js";
 
@@ -16,6 +17,11 @@ export function onReady(): void {
     }
 
     console.log(`${MODULE_ID} | Custom rules are active.`);
+
+    // ─── Heroic Rerolls (Hero Point rerolls have a minimum d20 of 10) ───
+    if (isHeroicRerollsEnabled()) {
+        activateHeroicRerolls();
+    }
 
     const targetHelperEnabled = game.settings!.get(MODULE_ID, "enableTargetHelper") as boolean;
     const pradEnabled = isPradEnabled() && targetHelperEnabled;
