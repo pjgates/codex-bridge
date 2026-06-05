@@ -66,6 +66,11 @@ export async function createPradChatMessage(
     const npcEffectKeys = isArmorSave ? ARMOR_SAVE_NPC_EFFECT_KEYS : OVERCOME_NPC_EFFECT_KEYS;
     const npcEffectLabel = game.i18n!.localize(npcEffectKeys[result.npcDegree]);
     const playerDegreeLabel = game.i18n!.localize(DEGREE_LABEL_KEYS[result.playerDegree]);
+    const overcomeContext = isArmorSave ? undefined : game.i18n!.format("sf2e-forge-custom.prad.overcomeLabel", {
+        name: result.roller.name,
+        npcName: result.npc.name,
+        saveType: result.source,
+    });
 
     // Build template data
     const templateData = {
@@ -75,7 +80,7 @@ export async function createPradChatMessage(
 
         // Source context
         weaponName: result.source,
-        saveType: result.source,
+        overcomeContext,
 
         // Roll numbers
         dc: result.dc,

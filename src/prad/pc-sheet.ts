@@ -95,9 +95,16 @@ function injectArmorSave(root: HTMLElement, actor: Actor): void {
 function createModifierBadge(label: string, value: string): HTMLSpanElement {
     const badge = document.createElement("span");
     badge.className = "prad-modifier-badge";
-    badge.innerHTML =
-        `<span class="prad-badge-label">${label}</span>` +
-        `<span class="prad-badge-value">${value}</span>`;
+
+    const labelElement = document.createElement("span");
+    labelElement.className = "prad-badge-label";
+    labelElement.textContent = label;
+    badge.appendChild(labelElement);
+
+    const valueElement = document.createElement("span");
+    valueElement.className = "prad-badge-value";
+    valueElement.textContent = value;
+    badge.appendChild(valueElement);
     return badge;
 }
 

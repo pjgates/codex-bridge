@@ -16,7 +16,7 @@ export function parseEntity(
     const slug = filename.replace(/\.md$/, "");
     const { data, content } = matter(raw);
 
-    const frontmatter = normaliseFrontmatter(data);
+    const frontmatter = normaliseFrontmatter(filename, data);
     const { playerContent, gmContent } = splitContent(content);
 
     return {
@@ -30,18 +30,31 @@ export function parseEntity(
 /**
  * Normalise raw frontmatter data into a typed structure with defaults.
  */
-function normaliseFrontmatter(data: Record<string, unknown>): EntityFrontmatter {
+function normaliseFrontmatter(filename: string, data: Record<string, unknown>): EntityFrontmatter {
     return {
         title: String(data.title ?? "Untitled"),
         type: String(data.type ?? "Unknown"),
         tags: toStringArray(data.tags),
-        depth: Number(data.depth ?? 1),
+        depth: parseDepth(filename, data.depth),
         status: String(data.status ?? "active"),
         aliases: toStringArray(data.aliases),
         creation_date: String(data.creation_date ?? ""),
         campaign: toStringArray(data.campaign),
-        published: data.published !== false,
+        published: parsePublished(filename, data.published),
     };
+}
+
+function parseDepth(filename: string, value: unknown): number {
+    if (value == null) return 1;
+    const depth = typeof value === "number" || typeof value === "string" && value.trim() ? Number(value) : Number.NaN;
+    if (!Number.isInteger(depth)) throw new Error(`${filename}: depth: expected an integer`);
+    return depth;
+}
+
+function parsePublished(filename: string, value: unknown): boolean {
+    if (value == null) return true;
+    if (typeof value !== "boolean") throw new Error(`${filename}: published: expected a boolean`);
+    return value;
 }
 
 /**

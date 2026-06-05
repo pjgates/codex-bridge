@@ -6,12 +6,53 @@
  */
 
 import { MODULE_ID } from "../constants.js";
+import { getPublicSceneTokenUuids, isPublicSceneTokenUuid } from "../shared/token-uuid.js";
 import type {
     TargetHelperFlagData,
+    PersistedSaveResultData,
     SaveResultData,
 } from "./types.js";
+import { createTargetRevision, encodeTargetUuidSaveKey, getTargetTokenId, normalizeSaveResult, normalizeTargetHelperFlagData } from "./result-validation.js";
 
 const FLAG_KEY = "targetHelper";
+const MAX_TOKEN_ID_LENGTH = 128;
+const MAX_ENCODED_TARGET_UUID_KEY_LENGTH = 1 + 32 + 1 + 13 + 1 + (512 * 4);
+
+function isSafeTokenId(value: string): boolean {
+    return value.length > 0
+        && value.length <= MAX_TOKEN_ID_LENGTH
+        && /^[A-Za-z0-9_-]+$/.test(value)
+        && value !== "__proto__"
+        && value !== "constructor"
+        && value !== "prototype";
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isEncodedTargetUuidSaveKey(value: string): boolean {
+    return value.length <= MAX_ENCODED_TARGET_UUID_KEY_LENGTH
+        && /^r[0-9a-f]{32}g[0-9a-f]+u(?:[0-9a-f]{4})+$/.test(value);
+}
+
+function getRawFlagData(message: ChatMessage.Implementation): Record<string, unknown> | undefined {
+    const flags = message.flags as Sf2eMessageFlags;
+    const data = flags?.[MODULE_ID]?.[FLAG_KEY];
+    return isRecord(data) ? data : undefined;
+}
+
+function serializeFlagData(data: Partial<TargetHelperFlagData>): Record<string, unknown> {
+    const { saves, ...serialized } = data;
+    if (saves === undefined) return serialized;
+
+    const encodedSaves: Record<string, PersistedSaveResultData> = {};
+    for (const save of Object.values(saves)) {
+        encodedSaves[encodeTargetUuidSaveKey(save.targetUuid, save.generation, save.revision)] = save;
+    }
+    return { ...serialized, saves: encodedSaves };
+}
+
 
 // ─── Read Helpers ────────────────────────────────────────────────────────────
 
@@ -20,7 +61,7 @@ const FLAG_KEY = "targetHelper";
  */
 export function getFlagData(message: ChatMessage.Implementation): TargetHelperFlagData | undefined {
     const flags = message.flags as Sf2eMessageFlags;
-    return flags?.[MODULE_ID]?.[FLAG_KEY] as TargetHelperFlagData | undefined;
+    return normalizeTargetHelperFlagData(flags?.[MODULE_ID]?.[FLAG_KEY]);
 }
 
 /**
@@ -40,44 +81,67 @@ export function setSourceFlag(
     message: ChatMessage.Implementation,
     data: Partial<TargetHelperFlagData>
 ): void {
-    // Use updateSource to inject flags before the message is created
+    let publicData = data;
+    try {
+        if (data.targets) publicData = { ...data, targets: getPublicSceneTokenUuids(data.targets) };
+    } catch {
+        throw new Error("Invalid target-helper source flags");
+    }
+    const serialized = serializeFlagData({ ...publicData, revision: publicData.revision ?? createTargetRevision() });
+    const normalized = normalizeTargetHelperFlagData(serialized);
+    if (!normalized) throw new Error("Invalid target-helper source flags");
     (message as Sf2eChatMessage).updateSource({
-        [`flags.${MODULE_ID}.${FLAG_KEY}`]: data,
+        [`flags.${MODULE_ID}.${FLAG_KEY}`]: serializeFlagData(normalized),
     });
 }
 
-/**
- * Update the target helper flags on an existing message.
- * This persists to the database and triggers re-rendering.
- */
-export async function updateFlag(
-    message: ChatMessage.Implementation,
-    updates: Partial<TargetHelperFlagData>
-): Promise<void> {
-    const existing = getFlagData(message) ?? {} as TargetHelperFlagData;
-    const merged = foundry.utils.mergeObject(existing, updates, { inplace: false });
-    await (message as Sf2eChatMessage).update({
-        [`flags.${MODULE_ID}.${FLAG_KEY}`]: merged,
-    });
+/** Whether Foundry permits the current user to persist inline result flags. */
+export function canUpdateMessage(message: ChatMessage.Implementation): boolean {
+    const user = game.user;
+    if (!user) return false;
+
+    const chatMessage = message as Sf2eChatMessage;
+    const canUserModify = (message as unknown as {
+        canUserModify?: (user: typeof game.user, action: "update") => boolean;
+    }).canUserModify;
+    return canUserModify ? canUserModify.call(message, user, "update") : !!chatMessage.isAuthor;
 }
 
+const targetUpdateQueues = new WeakMap<object, Promise<void>>();
+
+
 /**
- * Update save results for specific targets on an existing message.
- * Merges new saves into existing saves without overwriting others.
+ * Persist save-result leaves without rewriting concurrently-updated siblings.
+ * The parent ChatMessage update is the Foundry authorization boundary.
  */
 export async function updateSaves(
     message: ChatMessage.Implementation,
-    saves: Record<string, SaveResultData>
-): Promise<void> {
-    const existing = getFlagData(message);
-    if (!existing) return;
+    saves: Record<string, SaveResultData | PersistedSaveResultData>
+): Promise<boolean> {
+    const flagData = getFlagData(message);
+    if (!flagData?.save) throw new Error("Cannot persist saves without target-helper save flags");
 
-    const existingSaves = existing.saves ?? {};
-    const mergedSaves = { ...existingSaves, ...saves };
+    const targetUuidsByTokenId = new Map<string, string>();
+    for (const uuid of flagData.targets) {
+        const tokenId = getTargetTokenId(uuid);
+        if (tokenId !== null) targetUuidsByTokenId.set(tokenId, uuid);
+    }
 
-    await (message as Sf2eChatMessage).update({
-        [`flags.${MODULE_ID}.${FLAG_KEY}.saves`]: mergedSaves,
-    });
+    const updates: Record<string, PersistedSaveResultData> = {};
+    for (const [tokenId, value] of Object.entries(saves)) {
+        if (!isSafeTokenId(tokenId)) {
+            throw new Error(`Invalid target token ID: ${tokenId}`);
+        }
+        const normalized = normalizeSaveResult(value, flagData.save.statistic);
+        if (!normalized) throw new Error(`Invalid save result for target token: ${tokenId}`);
+        if (normalized.targetUuid !== targetUuidsByTokenId.get(tokenId)) continue;
+        if (normalized.generation !== flagData.generation || normalized.revision !== flagData.revision) continue;
+        updates[`flags.${MODULE_ID}.${FLAG_KEY}.saves.${encodeTargetUuidSaveKey(normalized.targetUuid, normalized.generation, normalized.revision)}`] = normalized;
+    }
+
+    if (Object.keys(updates).length === 0) return false;
+    await (message as Sf2eChatMessage).update(updates);
+    return true;
 }
 
 /**
@@ -87,9 +151,44 @@ export async function updateTargets(
     message: ChatMessage.Implementation,
     targets: string[]
 ): Promise<void> {
-    await (message as Sf2eChatMessage).update({
-        [`flags.${MODULE_ID}.${FLAG_KEY}.targets`]: targets,
-    });
+    const previous = targetUpdateQueues.get(message) ?? Promise.resolve();
+    const current = previous.catch(() => undefined).then(() => persistTargets(message, targets));
+    targetUpdateQueues.set(message, current);
+    try {
+        await current;
+    } finally {
+        if (targetUpdateQueues.get(message) === current) targetUpdateQueues.delete(message);
+    }
+}
+
+async function persistTargets(message: ChatMessage.Implementation, targets: string[]): Promise<void> {
+    const existing = getFlagData(message);
+    if (!existing) throw new Error("Cannot persist targets without target-helper flags");
+    if (existing.generation === Number.MAX_SAFE_INTEGER) throw new Error("Cannot increment target-helper generation");
+    let publicTargets: string[];
+    try {
+        publicTargets = getPublicSceneTokenUuids(targets);
+    } catch {
+        throw new Error("Invalid target-helper targets");
+    }
+    const normalized = normalizeTargetHelperFlagData(serializeFlagData({ ...existing, targets: publicTargets, generation: existing.generation + 1, revision: createTargetRevision() }));
+    if (!normalized) throw new Error("Invalid target-helper targets");
+
+    const updates: Record<string, unknown> = {
+        [`flags.${MODULE_ID}.${FLAG_KEY}.targets`]: normalized.targets,
+        [`flags.${MODULE_ID}.${FLAG_KEY}.generation`]: normalized.generation,
+        [`flags.${MODULE_ID}.${FLAG_KEY}.revision`]: normalized.revision,
+    };
+    const rawSaves = getRawFlagData(message)?.saves;
+    if (isRecord(rawSaves)) {
+        for (const rawKey of Object.keys(rawSaves)) {
+            if (isEncodedTargetUuidSaveKey(rawKey) || isSafeTokenId(rawKey)) {
+                updates[`flags.${MODULE_ID}.${FLAG_KEY}.saves.-=${rawKey}`] = null;
+            }
+        }
+    }
+
+    await (message as Sf2eChatMessage).update(updates);
 }
 
 // ─── Utility ─────────────────────────────────────────────────────────────────
@@ -106,7 +205,8 @@ export function getCurrentTargetUUIDs(): string[] {
     for (const token of targets) {
         const actor = token.actor;
         if (actor && ["creature", "npc", "character", "hazard", "vehicle"].includes(actor.type as string)) {
-            uuids.push(token.document?.uuid ?? token.uuid);
+            const uuid = token.document?.uuid ?? token.uuid;
+            if (isPublicSceneTokenUuid(uuid)) uuids.push(uuid);
         }
     }
     return uuids;

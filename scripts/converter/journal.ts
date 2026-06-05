@@ -29,7 +29,7 @@ export function buildJournalEntry(entity: ConvertedEntity): Record<string, unkno
         },
         title: { level: 1, show: true },
         sort: 100000,
-        ownership: { default: 0 },
+        ownership: { default: 2 },
     });
 
     // Page 2: GM-only content (if %%Secret%% section existed)
@@ -46,7 +46,7 @@ export function buildJournalEntry(entity: ConvertedEntity): Record<string, unkno
             },
             title: { level: 1, show: true },
             sort: 200000,
-            ownership: { default: -1 },
+            ownership: { default: 0 },
         });
     }
 
@@ -55,7 +55,7 @@ export function buildJournalEntry(entity: ConvertedEntity): Record<string, unkno
         _key: `!journal!${journalId}`,
         name: entity.name,
         pages,
-        ownership: { default: 0 },
+        ownership: { default: 2 },
         folder: entity.folderId,
         flags: {
             [MODULE_ID]: {

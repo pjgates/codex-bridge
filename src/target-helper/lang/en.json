@@ -6,6 +6,7 @@
             "rollOvercomeAll": "Roll Overcome (All)",
             "rollSave": "Roll Save",
             "notInTargetList": "Your token is not in the target list for this effect.",
+            "cannotPersist": "This chat message cannot be updated by your user. Use the native SF2e save control or ask the message author or GM to roll the save.",
             "pingToken": "Ping Token"
         }
     }

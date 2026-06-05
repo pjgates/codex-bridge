@@ -14,6 +14,12 @@
                         {{save.value}}
                     </span>
                 </span>
+            {{else if save.isHiddenResult}}
+                {{! ── Private roll completed: shared flags intentionally contain no result details ── }}
+                <span data-tooltip-content="true">
+                    <i class="th-save-icon {{save.icon}}"></i>
+                    <i class="fa-solid fa-eye-slash th-unknown"></i>
+                </span>
             {{else if save.canRoll}}
                 {{! ── Can roll: show d20 button ── }}
                 <a data-action="th-roll-save" data-tooltip-content="true">
@@ -29,7 +35,7 @@
             {{/if}}
             <hr class="th-divider">
         {{/if}}
-        <a data-action="th-ping" title="Ping Token">
+        <a data-action="th-ping" title="{{localize 'sf2e-forge-custom.targetHelper.pingToken'}}">
             <i class="fa-solid fa-fw fa-signal-stream"></i>
         </a>
     </span>

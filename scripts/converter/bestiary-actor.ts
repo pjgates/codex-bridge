@@ -1,5 +1,6 @@
 import { generateId } from "./ids.js";
 import { enrichDescription } from "./enrich.js";
+import { sanitizeFoundryHtml } from "./sanitize.js";
 import type {
     AbilityEntry,
     CreatureStatblock,
@@ -60,11 +61,12 @@ export function buildActorDocument(creature: ParsedCreature): Record<string, unk
     const sb = creature.statblock;
     const actorId = generateId(creature.slug);
     const items: Record<string, unknown>[] = [];
+    const embeddedIds = new Set<string>();
     let sortCounter = 100000;
 
     // Strikes → melee items
     for (const strike of sb.strikes) {
-        items.push(buildMeleeItem(strike, creature.slug, actorId, sortCounter));
+        appendEmbeddedItem(items, embeddedIds, buildMeleeItem(strike, creature.slug, actorId, sortCounter), creature.slug);
         sortCounter += 100000;
     }
 
@@ -75,14 +77,14 @@ export function buildActorDocument(creature: ParsedCreature): Record<string, unk
         ...sb.abilities_bot,
     ];
     for (const ability of allAbilities) {
-        items.push(buildActionItem(ability, creature.slug, actorId, sortCounter));
+        appendEmbeddedItem(items, embeddedIds, buildActionItem(ability, creature.slug, actorId, sortCounter), creature.slug);
         sortCounter += 100000;
     }
 
     // Spellcasting entries
     if (sb.spellcasting) {
         for (const entry of sb.spellcasting) {
-            items.push(buildSpellcastingItem(entry, creature.slug, actorId, sortCounter));
+            appendEmbeddedItem(items, embeddedIds, buildSpellcastingItem(entry, creature.slug, actorId, sortCounter), creature.slug);
             sortCounter += 100000;
         }
     }
@@ -90,7 +92,7 @@ export function buildActorDocument(creature: ParsedCreature): Record<string, unk
     // Lore skills
     if (sb.lore) {
         for (const lore of sb.lore) {
-            items.push(buildLoreItem(lore, creature.slug, actorId, sortCounter));
+            appendEmbeddedItem(items, embeddedIds, buildLoreItem(lore, creature.slug, actorId, sortCounter), creature.slug);
             sortCounter += 100000;
         }
     }
@@ -110,6 +112,13 @@ export function buildActorDocument(creature: ParsedCreature): Record<string, unk
             },
         },
     };
+}
+
+function appendEmbeddedItem(items: Record<string, unknown>[], ids: Set<string>, item: Record<string, unknown>, creatureSlug: string): void {
+    if (typeof item._id !== "string") throw new Error(`${creatureSlug}: embedded item is missing its deterministic _id`);
+    if (ids.has(item._id)) throw new Error(`${creatureSlug}: duplicate embedded item ID ${item._id}; names must be unique within each embedded item type`);
+    ids.add(item._id);
+    items.push(item);
 }
 
 // ---------------------------------------------------------------------------
@@ -138,6 +147,7 @@ function buildSystemData(sb: CreatureStatblock): Record<string, unknown> {
             speed: {
                 value: sb.speed.land,
                 otherSpeeds: buildOtherSpeeds(sb.speed),
+                details: sb.speed.note ?? "",
             },
         },
         details: {
@@ -148,7 +158,7 @@ function buildSystemData(sb: CreatureStatblock): Record<string, unknown> {
             },
             level: { value: sb.level },
             privateNotes: "",
-            publicNotes: "",
+            publicNotes: sanitizeFoundryHtml(sb.items ?? ""),
             publication: {
                 license: "OGL",
                 remaster: false,
@@ -168,7 +178,7 @@ function buildSystemData(sb: CreatureStatblock): Record<string, unknown> {
                 return sense;
             }),
         },
-        resources: {},
+        resources: buildResources(sb),
         saves: {
             fortitude: {
                 value: sb.saves.fort,
@@ -190,6 +200,11 @@ function buildSystemData(sb: CreatureStatblock): Record<string, unknown> {
             value: sb.traits,
         },
     };
+}
+
+function buildResources(sb: CreatureStatblock): Record<string, unknown> {
+    const focusPoints = sb.spellcasting?.reduce((maximum, entry) => Math.max(maximum, entry.fp ?? 0), 0) ?? 0;
+    return focusPoints > 0 ? { focus: { value: focusPoints, max: focusPoints } } : {};
 }
 
 function buildSkills(skills: Record<string, number>): Record<string, { base: number }> {
@@ -253,6 +268,7 @@ function buildMeleeItem(
 
     const slug = strike.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
     const itemId = generateId(`${creatureSlug}-strike-${strike.name}`);
+    const bonusValue = strike.action === "area-fire" || strike.action === "auto-fire" ? strike.dc - 10 : strike.bonus;
 
     const item: Record<string, unknown> = {
         _id: itemId,
@@ -265,7 +281,7 @@ function buildMeleeItem(
             action: strike.action ?? "strike",
             area: strike.area ? { type: strike.area.type, value: strike.area.value } : null,
             attackEffects: { value: strike.effects ?? [] },
-            bonus: { value: strike.bonus },
+            bonus: { value: bonusValue },
             damageRolls,
             description: { value: "" },
             publication: { license: "OGL", remaster: false, title: "" },
@@ -274,7 +290,7 @@ function buildMeleeItem(
                 : null,
             rules: [],
             slug,
-            traits: { value: strike.traits },
+            traits: { value: strike.traits, otherTags: strike.otherTags ?? [] },
         },
     };
 
@@ -290,7 +306,6 @@ function buildActionItem(
     // Parse action icons from the name
     const { cleanName, actionType, actions } = parseActionFromName(ability.name);
 
-    // Enrich description with PF2e inline enrichers and structure as HTML
     const htmlDesc = enrichDescription(ability.desc);
 
     const itemId = generateId(`${creatureSlug}-ability-${cleanName}`);
@@ -326,7 +341,6 @@ function buildSpellcastingItem(
     const tradition = inferTradition(nameLower);
     const preparedType = inferPreparedType(nameLower);
 
-    // Enrich description with PF2e inline enrichers
     const htmlDesc = entry.desc ? enrichDescription(entry.desc) : "";
 
     const itemId = generateId(`${creatureSlug}-spellcasting-${entry.name}`);

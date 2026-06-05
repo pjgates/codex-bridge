@@ -49,7 +49,7 @@ attacks:
     desc: "(agile, finesse, razing, unarmed)"
     damage: "1d4+2 slashing"
   - name: "__Ranged__ ⬻ Frag Grenade"
-    bonus: 3
+    dc: 13
     desc: "(area-fire, consumable, burst 5 ft., range 70 ft.)"
     damage: "1d8 piercing"
 

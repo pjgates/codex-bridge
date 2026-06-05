@@ -199,14 +199,34 @@ describe("buildActorDocument", () => {
         expect(rollValues[0].damageType).toBe("bludgeoning");
     });
 
-    it("generates melee items for area attacks with range", () => {
+
+    it("serializes persistent damage with its underlying type", () => {
+        const creature = minimalCreature({
+            strikes: [
+                {
+                    name: "Burning Claw",
+                    type: "melee",
+                    bonus: 9,
+                    traits: [],
+                    damage: [{ formula: "1d6", type: "fire", category: "persistent" }],
+                },
+            ],
+        });
+        const actor = buildActorDocument(creature) as Record<string, unknown>;
+        const item = (actor.items as Record<string, unknown>[])[0];
+        const system = item.system as Record<string, unknown>;
+        const rolls = Object.values(system.damageRolls as Record<string, unknown>);
+
+        expect(rolls).toEqual([{ damage: "1d6", damageType: "fire", category: "persistent" }]);
+    });
+    it.each(["area-fire", "auto-fire"] as const)("serializes %s save DC for SF2e display", (action) => {
         const creature = minimalCreature({
             strikes: [
                 {
                     name: "Grenade",
                     type: "ranged",
-                    action: "area-fire",
-                    bonus: 3,
+                    action,
+                    dc: 24,
                     traits: ["consumable"],
                     damage: [{ formula: "1d8", type: "piercing" }],
                     area: { type: "burst", value: 5 },
@@ -219,9 +239,26 @@ describe("buildActorDocument", () => {
         const melee = items[0];
 
         const system = melee.system as Record<string, unknown>;
-        expect(system.action).toBe("area-fire");
+        expect(system.action).toBe(action);
         expect(system.area).toEqual({ type: "burst", value: 5 });
         expect(system.range).toEqual({ increment: null, max: 70 });
+        const storedValue = (system.bonus as { value: number }).value;
+        expect(storedValue).toBe(14);
+        expect(storedValue + 10).toBe(24);
+    });
+
+    it("serializes normalized glossary attack-effect slugs", () => {
+        const actor = buildActorDocument(minimalCreature({ strikes: [{
+            name: "Claw",
+            type: "melee",
+            bonus: 9,
+            traits: [],
+            damage: [{ formula: "1d6", type: "slashing" }],
+            effects: ["grab"],
+        }] })) as Record<string, unknown>;
+        const strike = (actor.items as Array<{ system: { attackEffects: { value: string[] } } }>)[0];
+
+        expect(strike.system.attackEffects.value).toEqual(["grab"]);
     });
 
     it("generates action items from abilities", () => {
@@ -317,6 +354,67 @@ describe("buildActorDocument", () => {
         expect((scSys.spelldc as { dc: number; value: number }).dc).toBe(20);
         expect((scSys.spelldc as { value: number }).value).toBe(12);
         expect((scSys.description as { value: string }).value).toContain("detect magic");
+    });
+
+    it("serializes authored speed notes, item notes, and focus points", () => {
+        const actor = buildActorDocument(minimalCreature({
+            speed: { land: 25, note: "ignores difficult terrain" },
+            items: "plasma rifle, armor",
+            spellcasting: [{ name: "Focus Spells", fp: 2, desc: "focus spell" }],
+        })) as Record<string, unknown>;
+        const system = actor.system as Record<string, unknown>;
+        const attrs = system.attributes as { speed: { details: string } };
+        const details = system.details as { publicNotes: string };
+
+        expect(attrs.speed.details).toBe("ignores difficult terrain");
+        expect(details.publicNotes).toBe("plasma rifle, armor");
+        expect(system.resources).toEqual({ focus: { value: 2, max: 2 } });
+    });
+
+    it("sanitizes authored NPC public notes while preserving reviewed HTML", () => {
+        const actor = buildActorDocument(minimalCreature({
+            items: '<strong class="loot">plasma rifle</strong><img src="gear.png" onerror="alert(1)"><script>alert(2)</script>',
+        })) as Record<string, unknown>;
+        const system = actor.system as Record<string, unknown>;
+        const details = system.details as { publicNotes: string };
+
+        expect(details.publicNotes).toBe('<strong class="loot">plasma rifle</strong><img src="gear.png">');
+    });
+
+    it("scrubs encoded Foundry enricher labels in NPC public notes", () => {
+        const actor = buildActorDocument(minimalCreature({
+            items: "@Check[reflex|dc:10]{&lt;img src=x onerror=alert(1)&gt;}",
+        })) as Record<string, unknown>;
+        const system = actor.system as Record<string, unknown>;
+        const details = system.details as { publicNotes: string };
+
+        expect(details.publicNotes).toBe("@Check[reflex|dc:10]{}");
+    });
+
+    it("scrubs public-note labels behind entity-encoded Foundry syntax delimiters", () => {
+        const actor = buildActorDocument(minimalCreature({
+            items: "&#64;Check&#91;reflex|dc:10&#93;&#123;&lt;img src=x onerror=alert(1)&gt;&#125;",
+        })) as Record<string, unknown>;
+        const system = actor.system as Record<string, unknown>;
+        const details = system.details as { publicNotes: string };
+
+        expect(details.publicNotes).toBe("@Check[reflex|dc:10]{}");
+    });
+
+    it("scrubs encoded flavored inline-roll labels in NPC public notes", () => {
+        const actor = buildActorDocument(minimalCreature({
+            items: "[[/r 1d6[fire]]]{&lt;img src=x onerror=alert(1)&gt;}",
+        })) as Record<string, unknown>;
+        const system = actor.system as Record<string, unknown>;
+        const details = system.details as { publicNotes: string };
+
+        expect(details.publicNotes).toBe("[[/r 1d6[fire]]]{}");
+    });
+
+    it("rejects duplicate embedded item IDs", () => {
+        const strike = minimalCreature().statblock.strikes[0];
+        expect(() => buildActorDocument(minimalCreature({ strikes: [strike, strike] })))
+            .toThrow("duplicate embedded item ID");
     });
 
     it("generates deterministic IDs", () => {

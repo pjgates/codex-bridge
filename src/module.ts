@@ -8,6 +8,7 @@
 
 import { onInit } from "./hooks/init.js";
 import { onReady } from "./hooks/ready.js";
+import { installRuntimeApi } from "./api.js";
 
 // Import styles so Vite bundles them into dist/module.css
 import "../styles/module.scss";
@@ -18,6 +19,7 @@ import { MODULE_ID } from "./constants.js";
 
 Hooks.once("init", () => {
     console.log(`${MODULE_ID} | Initializing SF2e Forge Custom Rules`);
+    installRuntimeApi();
     onInit();
 });
 

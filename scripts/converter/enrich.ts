@@ -1,3 +1,4 @@
+import { sanitizeFoundryHtml } from "./sanitize.js";
 /**
  * PF2e inline enricher post-processor.
  *
@@ -31,6 +32,7 @@ const DAMAGE_TYPES = [
     "poison",
     "bleed",
     "vitality",
+    "spirit",
     "void",
 ] as const;
 
@@ -129,8 +131,7 @@ export function enrichDescription(raw: string): string {
     enriched = enrichTemplates(enriched);
     enriched = enrichConditions(enriched);
 
-    // 2. Structural formatting + paragraph wrapping
-    return formatHtml(enriched);
+    return sanitizeFoundryHtml(formatHtml(enriched).replace(/\*\*([^*\n]+)\*\*/g, "<strong>$1</strong>"));
 }
 
 // ---------------------------------------------------------------------------

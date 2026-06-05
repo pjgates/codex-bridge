@@ -7,15 +7,12 @@
     </header>
 
     <div class="prad-context">
-        <span class="prad-pc-name">{{rollerName}}</span>
-        rolls to overcome
-        <span class="prad-npc-name">{{npcName}}</span>'s
-        <strong>{{saveType}}</strong> save
+        {{overcomeContext}}
     </div>
 
     <div class="prad-roll-details">
         <div class="prad-roll-row">
-            <span class="prad-label">Overcome</span>
+            <span class="prad-label">{{localize "sf2e-forge-custom.prad.overcome"}}</span>
             <span class="prad-formula">
                 <span class="prad-die prad-die-{{dieClass}}">{{dieResult}}</span>
                 + {{modifier}} = <strong>{{total}}</strong>

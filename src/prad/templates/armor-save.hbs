@@ -8,14 +8,14 @@
 
     <div class="prad-context">
         <span class="prad-npc-name">{{npcName}}</span>
-        attacks
+        {{localize "sf2e-forge-custom.prad.attacks"}}
         <span class="prad-pc-name">{{rollerName}}</span>
-        with <strong>{{weaponName}}</strong>
+        {{localize "sf2e-forge-custom.prad.with"}} <strong>{{weaponName}}</strong>
     </div>
 
     <div class="prad-roll-details">
         <div class="prad-roll-row">
-            <span class="prad-label">Armor Save</span>
+            <span class="prad-label">{{localize "sf2e-forge-custom.prad.armorSave"}}</span>
             <span class="prad-formula">
                 <span class="prad-die prad-die-{{dieClass}}">{{dieResult}}</span>
                 + {{modifier}} = <strong>{{total}}</strong>

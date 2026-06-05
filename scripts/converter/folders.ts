@@ -2,14 +2,14 @@ import { generateId } from "./ids.js";
 import type { CompendiumFolder, ParsedEntity } from "./types.js";
 
 /** Canonical sort order for known entity types. Unknown types sort last. */
-const TYPE_SORT_ORDER: Record<string, number> = {
-    Character: 100000,
-    Location: 200000,
-    Faction: 300000,
-    Reference: 400000,
-    Event: 500000,
-    Item: 600000,
-};
+const TYPE_SORT_ORDER = new Map<string, number>([
+    ["Character", 100000],
+    ["Location", 200000],
+    ["Faction", 300000],
+    ["Reference", 400000],
+    ["Event", 500000],
+    ["Item", 600000],
+]);
 
 /**
  * Build compendium folder entries from the distinct entity types.
@@ -24,7 +24,7 @@ export function buildFolders(entities: ParsedEntity[]): CompendiumFolder[] {
 
     const folders: CompendiumFolder[] = [];
     for (const type of [...types].sort()) {
-        const sort = TYPE_SORT_ORDER[type] ?? (fallbackSort += 100000);
+        const sort = TYPE_SORT_ORDER.get(type) ?? (fallbackSort += 100000);
         const _id = generateId(`folder-${type}`);
         folders.push({
             _id,
