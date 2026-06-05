@@ -116,7 +116,9 @@ describe("Scrap Rat end-to-end conversion", () => {
         expect(sys.action).toBe("area-fire");
         expect(sys.area).toEqual({ type: "burst", value: 5 });
         expect(sys.range).toEqual({ increment: null, max: 70 });
-        expect((sys.bonus as { value: number }).value).toBe(3);
+        const storedValue = (sys.bonus as { value: number }).value;
+        expect(storedValue).toBe(3);
+        expect(storedValue + 10).toBe(13);
     });
 
     it("produces correct ability actions", () => {

@@ -11,7 +11,7 @@
 // Re-export shared types so Target Helper consumers can import from here
 export type { DegreeOfSuccessString, SaveType } from "../shared/types.js";
 export { SAVE_TYPES } from "../shared/types.js";
-export type { SaveInfo, SaveResultData, SaveDisplayInfo } from "../shared/types.js";
+export type { SaveInfo, SaveResultData, PersistedSaveResultData, SaveDisplayInfo } from "../shared/types.js";
 export { SAVE_DETAILS } from "../shared/types.js";
 
 // Re-export shared degree inversion (string-based)
@@ -19,7 +19,7 @@ export { invertDegreeString as invertDegree } from "../shared/degree.js";
 
 // ─── Import shared types for use within this file ────────────────────────────
 
-import type { SaveInfo, SaveResultData } from "../shared/types.js";
+import type { SaveInfo, PersistedSaveResultData } from "../shared/types.js";
 
 // ─── Flag Data (stored on ChatMessage flags) ─────────────────────────────────
 
@@ -36,14 +36,20 @@ export interface TargetHelperFlagData {
     /** Token document UUIDs of targeted tokens. */
     targets: string[];
 
+    /** Monotonically increasing generation retained for diagnostics and leaf keys. */
+    generation: number;
+
+    /** Globally unique identity minted for every target-list revision. */
+    revision: string;
+
     /** Save info — the save DC, statistic, and whether it's basic. */
     save?: SaveInfo;
 
     /**
-     * Per-target save results, keyed by token ID.
-     * Populated as players/GM roll saves.
+     * Normalized in-memory per-target save results, keyed by token ID.
+     * Raw persisted leaves use an encoded exact provenance key.
      */
-    saves?: Record<string, SaveResultData>;
+    saves?: Record<string, PersistedSaveResultData>;
 
     /** Actor UUID of the message author (caster). */
     author?: string;
@@ -54,6 +60,15 @@ export interface TargetHelperFlagData {
     /** Extra roll options (e.g. "damaging-effect"). */
     options?: string[];
 
+    /** Trusted resolved AC for the exact target of an intercepted native attack. */
+    contextualTargetAc?: {
+        targetUuid: string;
+        value: number;
+    };
+
+    /** True only for a card produced by cancelling a native attack roll. */
+    interceptedAttack?: boolean;
+
     /**
      * PRAD Overcome Mode (Inversion 2).
      * When true, the flow is inverted: the PC caster rolls an "Overcome Check"
@@ -63,13 +78,3 @@ export interface TargetHelperFlagData {
     pradOvercome?: boolean;
 }
 
-// ─── Socket Message Types ────────────────────────────────────────────────────
-
-export interface SocketUpdateSaves {
-    action: "updateSaves";
-    messageId: string;
-    saves: Record<string, SaveResultData>;
-    userId: string;
-}
-
-export type SocketMessage = SocketUpdateSaves;

@@ -5,7 +5,7 @@
  * No Foundry API calls, no DOM access — just data in, data out.
  */
 
-import type { DegreeOfSuccessString, SaveInfo, SaveResultData, SaveDisplayInfo } from "./types.js";
+import type { DegreeOfSuccessString, PersistedSaveResultData, SaveInfo, SaveDisplayInfo } from "./types.js";
 
 // ─── View Model Types ────────────────────────────────────────────────────────
 
@@ -24,7 +24,7 @@ export interface RowRenderContext {
     isPradOvercome: boolean;
     isCasterOwner: boolean;
     saveInfo: SaveInfo | undefined;
-    existingSaves: Record<string, SaveResultData>;
+    existingSaves: Record<string, PersistedSaveResultData>;
     saveDisplay: SaveDisplayInfo | undefined;
     /** Pre-computed per-target NPC save DC for overcome mode, keyed by token ID. */
     npcSaveDCs?: Record<string, number>;
@@ -43,6 +43,7 @@ export interface TargetRowViewModel {
         icon: string;
         dc: number;
         hasResult: boolean;
+        isHiddenResult: boolean;
         value?: number;
         die?: number;
         success?: DegreeOfSuccessString;
@@ -72,6 +73,7 @@ export function buildTargetRowViewModel(
 
     const targetSave = ctx.existingSaves[token.id];
     const saveInfo = ctx.saveInfo;
+    const visibleTargetSave = targetSave && !targetSave.private ? targetSave : undefined;
 
     if (ctx.isPradOvercome && saveInfo) {
         const npcSaveDC = ctx.npcSaveDCs?.[token.id] ?? saveInfo.dc;
@@ -86,11 +88,14 @@ export function buildTargetRowViewModel(
                 statistic: saveInfo.statistic,
                 icon: ctx.saveDisplay?.icon ?? "fa-solid fa-dice-d20",
                 dc: npcSaveDC,
-                hasResult: !!targetSave,
-                value: targetSave?.value,
-                die: targetSave?.die,
-                success: targetSave?.success,
-                successLabel: targetSave ? getSuccessLabel(targetSave.success) : "",
+                hasResult: !!visibleTargetSave,
+                isHiddenResult: !!targetSave?.private,
+                ...(visibleTargetSave ? {
+                    value: visibleTargetSave.value,
+                    die: visibleTargetSave.die,
+                    success: visibleTargetSave.success,
+                    successLabel: getSuccessLabel(visibleTargetSave.success),
+                } : { successLabel: "" }),
                 canRoll: ctx.isCasterOwner && !targetSave,
             },
         };
@@ -106,11 +111,14 @@ export function buildTargetRowViewModel(
             statistic: saveInfo.statistic,
             icon: ctx.saveDisplay?.icon ?? "fa-solid fa-dice-d20",
             dc: saveInfo.dc,
-            hasResult: !!targetSave,
-            value: targetSave?.value,
-            die: targetSave?.die,
-            success: targetSave?.success,
-            successLabel: targetSave ? getSuccessLabel(targetSave.success) : "",
+            hasResult: !!visibleTargetSave,
+            isHiddenResult: !!targetSave?.private,
+            ...(visibleTargetSave ? {
+                value: visibleTargetSave.value,
+                die: visibleTargetSave.die,
+                success: visibleTargetSave.success,
+                successLabel: getSuccessLabel(visibleTargetSave.success),
+            } : { successLabel: "" }),
             canRoll: token.isOwner && !targetSave,
         } : undefined,
     };

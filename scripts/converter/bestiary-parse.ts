@@ -1,6 +1,7 @@
 import matter from "gray-matter";
 import type {
     AbilityEntry,
+    AreaAttackData,
     AbilityScores,
     CreatureStatblock,
     DamageRollData,
@@ -13,6 +14,10 @@ import type {
     SpellcastingEntry,
     StrikeData,
 } from "./bestiary-types.js";
+import { SF2E_ACTION_TRAITS, SF2E_CREATURE_TRAITS, SF2E_NPC_ATTACK_TRAITS } from "./sf2e-traits.js";
+
+/** Reviewed campaign-specific creature traits that are intentionally outside SF2e's vocabulary. */
+const PROJECT_CREATURE_TRAITS: Record<string, true> = { aurelian: true };
 
 /**
  * Parse a bestiary creature markdown file into structured data.
@@ -32,11 +37,10 @@ export function parseCreature(
     const slug = filename.replace(/\.md$/, "");
     const { data } = matter(raw);
 
-    if (data.statblock !== true) {
-        return null;
-    }
+    if (data.statblock == null || data.statblock === false) return null;
+    if (data.statblock !== true) fail(filename, "statblock", "expected a boolean");
 
-    const statblock = normaliseStatblock(data);
+    const statblock = normaliseStatblock(data, filename);
     return { slug, statblock };
 }
 
@@ -44,44 +48,57 @@ export function parseCreature(
 // Top-level normalisation
 // ---------------------------------------------------------------------------
 
-function normaliseStatblock(data: Record<string, unknown>): CreatureStatblock {
-    const { skills, lore } = normaliseSkillsArray(data.skills);
+const STATBLOCK_FIELDS: Record<string, true> = {
+    abilities_bot: true, abilities_mid: true, abilities_top: true, ac: true, acNote: true,
+    attacks: true, attributes: true, hp: true, hpNote: true, immunities: true, items: true,
+    languages: true, layout: true, level: true, modifier: true, name: true, published: true,
+    rarity: true, resistances: true, saves: true, senses: true, size: true, skills: true,
+    source: true, speed: true, spellcasting: true, statblock: true, traits: true, weaknesses: true,
+};
+
+function hasOwn(record: object, key: PropertyKey): boolean {
+    return Object.prototype.hasOwnProperty.call(record, key);
+}
+
+function normaliseStatblock(data: Record<string, unknown>, filename: string): CreatureStatblock {
+    for (const key of Object.keys(data)) if (!hasOwn(STATBLOCK_FIELDS, key)) fail(filename, key, "unknown statblock field");
+    const { skills, lore } = normaliseSkillsArray(data.skills, filename, "skills");
 
     return {
         statblock: true,
-        layout: String(data.layout ?? "Pathfinder 2e Creature Layout"),
-        name: String(data.name ?? "Unnamed Creature"),
-        level: parseLevel(data.level),
-        rarity: normaliseEnum(data.rarity, ["common", "uncommon", "rare", "unique"], "common"),
-        size: normaliseSize(data.size),
-        traits: toStringArray(data.traits),
-        published: data.published !== false,
-        source: data.source ? String(data.source) : undefined,
+        layout: optionalString(data.layout, filename, "layout") ?? "Pathfinder 2e Creature Layout",
+        name: requiredString(data.name, filename, "name"),
+        level: parseLevel(data.level, filename, "level"),
+        rarity: normaliseEnum(data.rarity, ["common", "uncommon", "rare", "unique"], "common", filename, "rarity"),
+        size: normaliseSize(data.size, filename, "size"),
+        traits: normaliseCreatureTraits(data.traits, filename, "traits"),
+        published: normalisePublished(data.published, filename),
+        source: optionalString(data.source, filename, "source"),
 
-        abilities: normaliseAttributes(data.attributes),
-        perception: normalisePerception(data.modifier, data.senses),
-        languages: normaliseLanguages(data.languages),
+        abilities: normaliseAttributes(data.attributes, filename, "attributes"),
+        perception: normalisePerception(data.modifier, data.senses, filename),
+        languages: normaliseLanguages(data.languages, filename, "languages"),
         skills,
 
-        ac: Number(data.ac ?? 10),
-        acNote: data.acNote ? String(data.acNote) : undefined,
-        saves: normaliseSaves(data.saves),
-        hp: Number(data.hp ?? 1),
-        hpNote: data.hpNote ? String(data.hpNote) : undefined,
-        immunities: normaliseString(data.immunities),
-        resistances: normaliseString(data.resistances),
-        weaknesses: normaliseString(data.weaknesses),
+        ac: nonNegativeInteger(data.ac, filename, "ac"),
+        acNote: optionalString(data.acNote, filename, "acNote"),
+        saves: normaliseSaves(data.saves, filename, "saves"),
+        hp: nonNegativeInteger(data.hp, filename, "hp"),
+        hpNote: optionalString(data.hpNote, filename, "hpNote"),
+        immunities: normaliseString(data.immunities, filename, "immunities"),
+        resistances: normaliseString(data.resistances, filename, "resistances"),
+        weaknesses: normaliseString(data.weaknesses, filename, "weaknesses"),
 
-        speed: normaliseSpeed(data.speed),
-        strikes: normaliseAttacks(data.attacks),
+        speed: normaliseSpeed(data.speed, filename, "speed"),
+        strikes: normaliseAttacks(data.attacks, filename, "attacks"),
 
-        abilities_top: normaliseAbilityList(data.abilities_top),
-        abilities_mid: normaliseAbilityList(data.abilities_mid),
-        abilities_bot: normaliseAbilityList(data.abilities_bot),
+        abilities_top: normaliseAbilityList(data.abilities_top, filename, "abilities_top"),
+        abilities_mid: normaliseAbilityList(data.abilities_mid, filename, "abilities_mid"),
+        abilities_bot: normaliseAbilityList(data.abilities_bot, filename, "abilities_bot"),
 
-        spellcasting: data.spellcasting ? normaliseSpellcasting(data.spellcasting) : undefined,
+        spellcasting: data.spellcasting == null ? undefined : normaliseSpellcasting(data.spellcasting, filename, "spellcasting"),
         lore: lore.length > 0 ? lore : undefined,
-        items: data.items ? String(data.items) : undefined,
+        items: optionalString(data.items, filename, "items"),
     };
 }
 
@@ -89,12 +106,12 @@ function normaliseStatblock(data: Record<string, unknown>): CreatureStatblock {
 // Level: "Creature -1" → -1
 // ---------------------------------------------------------------------------
 
-function parseLevel(raw: unknown): number {
-    if (typeof raw === "number") return raw;
-    const str = String(raw ?? "0");
-    // Handle "Creature -1", "Creature 5", etc.
-    const match = str.match(/(-?\d+)/);
-    return match ? Number(match[1]) : 0;
+function parseLevel(raw: unknown, filename: string, path: string): number {
+    if (typeof raw === "number") return finiteNumber(raw, filename, path);
+    if (typeof raw !== "string") fail(filename, path, "expected a number or a string like \"Creature 5\"");
+    const match = raw.trim().match(/^(?:creature\s+)?(-?\d+)$/i);
+    if (!match) fail(filename, path, "expected a number or a string like \"Creature 5\"");
+    return finiteNumber(match[1], filename, path);
 }
 
 // ---------------------------------------------------------------------------
@@ -114,38 +131,46 @@ const SIZE_MAP: Record<string, CreatureStatblock["size"]> = {
     grg: "grg",
 };
 
-function normaliseSize(raw: unknown): CreatureStatblock["size"] {
-    const str = String(raw ?? "medium").toLowerCase();
-    return SIZE_MAP[str] ?? "med";
+function normaliseSize(raw: unknown, filename: string, path: string): CreatureStatblock["size"] {
+    if (raw == null) return "med";
+    if (typeof raw !== "string") fail(filename, path, "expected a size string");
+    const key = raw.toLowerCase();
+    if (!hasOwn(SIZE_MAP, key)) fail(filename, path, `expected one of ${Object.keys(SIZE_MAP).join(", ")}`);
+    const normalised = SIZE_MAP[key];
+    return normalised;
 }
 
 // ---------------------------------------------------------------------------
 // Attributes: [{str: 2}, {dex: 3}, ...] → AbilityScores
 // ---------------------------------------------------------------------------
 
-function normaliseAttributes(raw: unknown): AbilityScores {
+function normaliseAttributes(raw: unknown, filename: string, path: string): AbilityScores {
     const result: AbilityScores = { str: 0, dex: 0, con: 0, int: 0, wis: 0, cha: 0 };
+    if (raw == null) fail(filename, path, "missing required ability modifiers");
+
+    const seen = new Set<keyof AbilityScores>();
+    const assign = (key: string, value: unknown, entryPath: string): void => {
+        const normalised = key.toLowerCase() as keyof AbilityScores;
+        if (!hasOwn(result, normalised)) fail(filename, entryPath, `unknown ability category ${JSON.stringify(key)}`);
+        if (seen.has(normalised)) fail(filename, entryPath, `duplicate ability category ${JSON.stringify(key)}`);
+        result[normalised] = finiteNumber(value, filename, entryPath);
+        seen.add(normalised);
+    };
 
     if (Array.isArray(raw)) {
-        // Layout format: array of single-key objects
-        for (const entry of raw) {
-            if (entry && typeof entry === "object") {
-                for (const [key, val] of Object.entries(entry as Record<string, unknown>)) {
-                    const k = key.toLowerCase() as keyof AbilityScores;
-                    if (k in result) {
-                        result[k] = Number(val ?? 0);
-                    }
-                }
-            }
-        }
-    } else if (raw && typeof raw === "object") {
-        // Legacy format: {str: 2, dex: 3, ...}
-        const obj = raw as Record<string, unknown>;
-        for (const k of ["str", "dex", "con", "int", "wis", "cha"] as const) {
-            if (obj[k] != null) result[k] = Number(obj[k]);
-        }
+        raw.forEach((entry, index) => {
+            const obj = record(entry, filename, `${path}[${index}]`);
+            const entries = Object.entries(obj);
+            if (entries.length !== 1) fail(filename, `${path}[${index}]`, "expected exactly one ability category");
+            assign(entries[0][0], entries[0][1], `${path}[${index}].${entries[0][0]}`);
+        });
+    } else {
+        for (const [key, value] of Object.entries(record(raw, filename, path))) assign(key, value, `${path}.${key}`);
     }
 
+    for (const ability of ["str", "dex", "con", "int", "wis", "cha"] as const) {
+        if (!seen.has(ability)) fail(filename, `${path}.${ability}`, "missing required ability modifier");
+    }
     return result;
 }
 
@@ -153,117 +178,158 @@ function normaliseAttributes(raw: unknown): AbilityScores {
 // Perception: modifier + senses string → PerceptionData
 // ---------------------------------------------------------------------------
 
-function normalisePerception(modifier: unknown, sensesRaw: unknown): PerceptionData {
+const SENSE_TYPES = new Set([
+    "bloodsense", "darkvision", "echolocation", "electromagnetic-sense", "greater-darkvision",
+    "infrared-vision", "lifesense", "low-light-vision", "magicsense", "motion-sense", "scent",
+    "see-invisibility", "spiritsense", "thoughtsense", "tremorsense", "truesight", "wavesense",
+]);
+
+const MANDATORY_SENSE_ACUITIES = new Map<string, NonNullable<SenseData["acuity"]>>([
+    ["darkvision", "precise"],
+    ["echolocation", "precise"],
+    ["greater-darkvision", "precise"],
+    ["infrared-vision", "precise"],
+    ["low-light-vision", "precise"],
+    ["see-invisibility", "precise"],
+    ["truesight", "precise"],
+]);
+const UNLIMITED_RANGE_SENSES = new Set([
+    "darkvision", "greater-darkvision", "low-light-vision", "see-invisibility",
+]);
+
+function validateSenseType(type: string, filename: string, path: string): string {
+    if (!SENSE_TYPES.has(type)) fail(filename, path, `unknown sense type ${JSON.stringify(type)}`);
+    return type;
+}
+
+function validateSenseMechanics(sense: SenseData, filename: string, path: string): SenseData {
+    const mandatoryAcuity = MANDATORY_SENSE_ACUITIES.get(sense.type);
+    if (sense.acuity != null && mandatoryAcuity != null && sense.acuity !== mandatoryAcuity) {
+        fail(filename, `${path}.acuity`, `${sense.type} must have ${mandatoryAcuity} acuity`);
+    }
+    if (UNLIMITED_RANGE_SENSES.has(sense.type)) {
+        if (sense.range != null) fail(filename, `${path}.range`, `${sense.type} has unlimited range; omit the authored range`);
+        return { type: sense.type };
+    }
+
+    const acuity = sense.acuity ?? mandatoryAcuity;
+    if (acuity == null) fail(filename, `${path}.acuity`, `${sense.type} requires an authored acuity`);
+    const range = sense.range ?? (sense.type === "truesight" ? 60 : undefined);
+    if (range == null) fail(filename, `${path}.range`, `${sense.type} requires an authored range`);
+    return { type: sense.type, acuity, range };
+}
+
+function normalisePerception(modifier: unknown, sensesRaw: unknown, filename: string): PerceptionData {
     return {
-        mod: Number(modifier ?? 0),
-        senses: parseSensesString(sensesRaw),
+        mod: finiteNumber(modifier, filename, "modifier"),
+        senses: parseSensesString(sensesRaw, filename, "senses"),
     };
 }
 
-/**
- * Parse a senses string like "low-light vision, scent (imprecise) 30 feet"
- * into structured SenseData[].
- */
-export function parseSensesString(raw: unknown): SenseData[] {
+/** Parse a senses string like "low-light vision, scent (imprecise) 30 feet". */
+export function parseSensesString(raw: unknown, filename = "<input>", path = "senses"): SenseData[] {
     if (raw == null) return [];
 
-    // If it's already an array, handle each element
     if (Array.isArray(raw)) {
-        return raw.flatMap((item) => {
-            if (typeof item === "string") return parseSingleSense(item);
-            if (item && typeof item === "object") {
-                const obj = item as Record<string, unknown>;
-                const sense: SenseData = { type: String(obj.type ?? "") };
-                if (obj.acuity) sense.acuity = String(obj.acuity) as SenseData["acuity"];
-                if (obj.range != null) sense.range = Number(obj.range);
-                return [sense];
+        return raw.map((item, index) => {
+            const itemPath = `${path}[${index}]`;
+            if (typeof item === "string") return parseSingleSense(item, filename, itemPath);
+            const obj = record(item, filename, itemPath);
+            for (const key of Object.keys(obj)) {
+                if (key !== "type" && key !== "acuity" && key !== "range") fail(filename, `${itemPath}.${key}`, "unknown sense field");
             }
-            return [];
+            if (typeof obj.type !== "string" || !obj.type.trim()) fail(filename, `${itemPath}.type`, "expected a non-empty string");
+            const type = validateSenseType(slugify(obj.type), filename, `${itemPath}.type`);
+            const sense: SenseData = { type };
+            if (obj.acuity != null) sense.acuity = senseAcuity(obj.acuity, filename, `${itemPath}.acuity`);
+            if (obj.range != null) sense.range = positiveInteger(obj.range, filename, `${itemPath}.range`);
+            return validateSenseMechanics(sense, filename, itemPath);
         });
     }
 
-    const str = String(raw).trim();
+    if (typeof raw !== "string") fail(filename, path, "expected a string or an array of senses");
+    const str = raw.trim();
     if (!str) return [];
-
-    // Split on commas, parse each sense
-    return str.split(/,\s*/).map(parseSingleSense);
+    return str.split(/,\s*/).map((sense, index) => parseSingleSense(sense, filename, `${path}[${index}]`));
 }
 
-/**
- * Parse a single sense string like:
- * - "low-light vision"
- * - "scent (imprecise) 30 feet"
- * - "darkvision 60 feet"
- * - "tremorsense (precise) 30 feet"
- */
-function parseSingleSense(raw: string): SenseData {
+function parseSingleSense(raw: string, filename: string, path: string): SenseData {
     const str = raw.trim();
+    const match = str.match(/^(.+?)\s*(?:\(([^)]+)\))?\s*(?:(\d+)\s*(?:feet|ft\.?))?$/i);
+    if (!match) fail(filename, path, "expected a sense like \"scent (imprecise) 30 feet\"");
+    if (/[()]/.test(str) && !match[2]) fail(filename, path, "expected a sense like \"scent (imprecise) 30 feet\"");
+    const type = validateSenseType(slugify(match[1].trim()), filename, `${path}.type`);
+    const sense: SenseData = { type };
+    if (match[2]) sense.acuity = senseAcuity(match[2], filename, `${path}.acuity`);
+    if (match[3]) sense.range = positiveInteger(match[3], filename, `${path}.range`);
+    return validateSenseMechanics(sense, filename, path);
+}
 
-    // Pattern: type (acuity) range feet
-    const match = str.match(
-        /^(.+?)\s*(?:\((precise|imprecise|vague)\))?\s*(?:(\d+)\s*(?:feet|ft\.?))?$/i,
-    );
-
-    if (!match) {
-        return { type: slugify(str) };
-    }
-
-    const sense: SenseData = { type: slugify(match[1].trim()) };
-    if (match[2]) sense.acuity = match[2].toLowerCase() as SenseData["acuity"];
-    if (match[3]) sense.range = Number(match[3]);
-    return sense;
+function senseAcuity(raw: unknown, filename: string, path: string): SenseData["acuity"] {
+    if (typeof raw !== "string") fail(filename, path, "expected precise, imprecise, or vague");
+    const value = raw.toLowerCase();
+    if (value !== "precise" && value !== "imprecise" && value !== "vague") fail(filename, path, "expected precise, imprecise, or vague");
+    return value;
 }
 
 // ---------------------------------------------------------------------------
 // Languages: string or array → string[]
 // ---------------------------------------------------------------------------
 
-function normaliseLanguages(raw: unknown): string[] {
-    if (Array.isArray(raw)) return raw.filter((l) => typeof l === "string" && l.trim());
+function normaliseLanguages(raw: unknown, filename: string, path: string): string[] {
+    if (raw == null) return [];
+    if (Array.isArray(raw)) return raw.map((language, index) => requiredString(language, filename, `${path}[${index}]`));
     if (typeof raw === "string") {
         const trimmed = raw.trim();
         if (!trimmed) return [];
         return trimmed.split(/[,;]\s*/).filter(Boolean);
     }
-    return [];
+    fail(filename, path, "expected a string or an array of strings");
 }
 
 // ---------------------------------------------------------------------------
 // Skills: [{Acrobatics: 4}, ...] → Record<string, number> + LoreSkillData[]
 // ---------------------------------------------------------------------------
 
+const STANDARD_SKILLS: Record<string, true> = {
+    acrobatics: true, arcana: true, athletics: true, computers: true, crafting: true, deception: true,
+    diplomacy: true, intimidation: true, medicine: true, nature: true, occultism: true,
+    performance: true, piloting: true, religion: true, society: true, stealth: true, survival: true, thievery: true,
+};
+
 function normaliseSkillsArray(
     raw: unknown,
+    filename: string,
+    path: string,
 ): { skills: Record<string, number>; lore: LoreSkillData[] } {
     const skills: Record<string, number> = {};
     const lore: LoreSkillData[] = [];
+    if (raw == null) return { skills, lore };
+
+    const assign = (key: string, value: unknown, entryPath: string): void => {
+        const name = key.trim();
+        if (!name) fail(filename, entryPath, "expected a non-empty skill name");
+        const mod = finiteNumber(value, filename, entryPath);
+        const loreMatch = name.match(/^(.+?)\s+Lore$/i) || name.match(/^Lore:\s*(.+)$/i);
+        if (loreMatch) lore.push({ name: `${loreMatch[1].trim()} Lore`, mod });
+        else {
+            const slug = name.toLowerCase().replace(/\s+/g, "-");
+            if (!hasOwn(STANDARD_SKILLS, slug)) fail(filename, entryPath, `unknown standard skill ${JSON.stringify(name)}`);
+            if (skills[slug] != null) fail(filename, entryPath, `duplicate standard skill ${JSON.stringify(name)}`);
+            skills[slug] = mod;
+        }
+    };
 
     if (Array.isArray(raw)) {
-        // Layout format: array of single-key objects
-        for (const entry of raw) {
-            if (entry && typeof entry === "object") {
-                for (const [key, val] of Object.entries(entry as Record<string, unknown>)) {
-                    const name = key.trim();
-                    const mod = Number(val ?? 0);
-
-                    // Detect Lore skills: "Something Lore" or "Lore: Something"
-                    const loreMatch = name.match(/^(.+?)\s+Lore$/i) || name.match(/^Lore:\s*(.+)$/i);
-                    if (loreMatch) {
-                        lore.push({ name: `${loreMatch[1].trim()} Lore`, mod });
-                    } else {
-                        // Normalise to lowercase slug for standard skills
-                        skills[name.toLowerCase()] = mod;
-                    }
-                }
-            }
-        }
-    } else if (raw && typeof raw === "object") {
-        // Legacy format: {acrobatics: 4, ...}
-        for (const [key, val] of Object.entries(raw as Record<string, unknown>)) {
-            skills[key.toLowerCase()] = Number(val ?? 0);
-        }
+        raw.forEach((entry, index) => {
+            const obj = record(entry, filename, `${path}[${index}]`);
+            const entries = Object.entries(obj);
+            if (entries.length !== 1) fail(filename, `${path}[${index}]`, "expected exactly one skill");
+            assign(entries[0][0], entries[0][1], `${path}[${index}].${entries[0][0]}`);
+        });
+    } else {
+        for (const [key, value] of Object.entries(record(raw, filename, path))) assign(key, value, `${path}.${key}`);
     }
-
     return { skills, lore };
 }
 
@@ -271,31 +337,34 @@ function normaliseSkillsArray(
 // Saves: [{fort: 5}, {ref: 8}, {will: 2}] → SavesData
 // ---------------------------------------------------------------------------
 
-function normaliseSaves(raw: unknown): SavesData {
+function normaliseSaves(raw: unknown, filename: string, path: string): SavesData {
     const result: SavesData = { fort: 0, ref: 0, will: 0 };
+    if (raw == null) fail(filename, path, "missing required saves");
+    const seen = new Set<"fort" | "ref" | "will">();
+    const assign = (key: string, value: unknown, entryPath: string): void => {
+        const normalised = key.toLowerCase();
+        if (normalised === "note") {
+            result.note = requiredString(value, filename, entryPath);
+            return;
+        }
+        const save = normalised === "fortitude" ? "fort" : normalised === "reflex" ? "ref" : normalised;
+        if (save !== "fort" && save !== "ref" && save !== "will") fail(filename, entryPath, `unknown save ${JSON.stringify(key)}`);
+        if (seen.has(save)) fail(filename, entryPath, `duplicate save ${JSON.stringify(key)}`);
+        result[save] = finiteNumber(value, filename, entryPath);
+        seen.add(save);
+    };
 
     if (Array.isArray(raw)) {
-        // Layout format: array of single-key objects
-        for (const entry of raw) {
-            if (entry && typeof entry === "object") {
-                for (const [key, val] of Object.entries(entry as Record<string, unknown>)) {
-                    const k = key.toLowerCase();
-                    if (k === "fort" || k === "fortitude") result.fort = Number(val ?? 0);
-                    else if (k === "ref" || k === "reflex") result.ref = Number(val ?? 0);
-                    else if (k === "will") result.will = Number(val ?? 0);
-                    else if (k === "note") result.note = String(val);
-                }
-            }
-        }
-    } else if (raw && typeof raw === "object") {
-        // Legacy format: {fort: 5, ref: 8, will: 2}
-        const obj = raw as Record<string, unknown>;
-        result.fort = Number(obj.fort ?? 0);
-        result.ref = Number(obj.ref ?? 0);
-        result.will = Number(obj.will ?? 0);
-        if (obj.note) result.note = String(obj.note);
+        raw.forEach((entry, index) => {
+            const obj = record(entry, filename, `${path}[${index}]`);
+            const entries = Object.entries(obj);
+            if (entries.length !== 1) fail(filename, `${path}[${index}]`, "expected exactly one save or note");
+            assign(entries[0][0], entries[0][1], `${path}[${index}].${entries[0][0]}`);
+        });
+    } else {
+        for (const [key, value] of Object.entries(record(raw, filename, path))) assign(key, value, `${path}.${key}`);
     }
-
+    for (const save of ["fort", "ref", "will"] as const) if (!seen.has(save)) fail(filename, `${path}.${save}`, "missing required save");
     return result;
 }
 
@@ -307,50 +376,49 @@ function normaliseSaves(raw: unknown): SavesData {
  * Parse a speed string like "25 feet, fly 60 feet, swim 30 feet"
  * into structured SpeedData.
  */
-export function parseSpeedString(raw: unknown): SpeedData {
-    if (typeof raw === "number") return { land: raw };
+export function parseSpeedString(raw: unknown, filename = "<input>", path = "speed"): SpeedData {
+    if (raw == null || raw === "") fail(filename, path, "missing required speed");
+    if (typeof raw === "number") return { land: nonNegativeInteger(raw, filename, path) };
 
-    if (raw && typeof raw === "object" && !Array.isArray(raw)) {
-        // Legacy format: {land: 25, fly: 60}
-        const obj = raw as Record<string, unknown>;
-        const speed: SpeedData = { land: Number(obj.land ?? 0) };
-        if (obj.fly != null) speed.fly = Number(obj.fly);
-        if (obj.swim != null) speed.swim = Number(obj.swim);
-        if (obj.climb != null) speed.climb = Number(obj.climb);
-        if (obj.burrow != null) speed.burrow = Number(obj.burrow);
-        if (obj.note) speed.note = String(obj.note);
+    if (typeof raw === "object" && !Array.isArray(raw)) {
+        const obj = record(raw, filename, path);
+        const allowed: Record<string, true> = { land: true, fly: true, swim: true, climb: true, burrow: true, note: true };
+        for (const key of Object.keys(obj)) if (!hasOwn(allowed, key)) fail(filename, `${path}.${key}`, "unknown speed field");
+        const speed: SpeedData = { land: obj.land == null ? 0 : nonNegativeInteger(obj.land, filename, `${path}.land`) };
+        for (const type of ["fly", "swim", "climb", "burrow"] as const) {
+            if (obj[type] != null) speed[type] = nonNegativeInteger(obj[type], filename, `${path}.${type}`);
+        }
+        if (obj.note != null) speed.note = requiredString(obj.note, filename, `${path}.note`);
         return speed;
     }
 
-    const str = String(raw ?? "0").trim();
-    if (!str) return { land: 0 };
-
+    if (typeof raw !== "string") fail(filename, path, "expected a speed string, number, or object");
+    const str = raw.trim();
+    if (!str) fail(filename, path, "missing required speed");
     const speed: SpeedData = { land: 0 };
-    const parts = str.split(/,\s*/);
-
-    for (const part of parts) {
+    const seen = new Set<string>();
+    for (const [index, part] of str.split(/,\s*/).entries()) {
+        const partPath = `${path}[${index}]`;
         const trimmed = part.trim().toLowerCase();
-
-        // "fly 60 feet", "swim 30 feet", etc.
-        const match = trimmed.match(/^(fly|swim|climb|burrow)\s+(\d+)\s*(?:feet|ft\.?)?$/);
-        if (match) {
-            const type = match[1] as "fly" | "swim" | "climb" | "burrow";
-            speed[type] = Number(match[2]);
-            continue;
-        }
-
-        // "25 feet" — land speed (first bare number)
-        const landMatch = trimmed.match(/^(\d+)\s*(?:feet|ft\.?)?$/);
-        if (landMatch) {
-            speed.land = Number(landMatch[1]);
-        }
+        const typed = trimmed.match(/^(fly|swim|climb|burrow)\s+(\d+)\s*(?:feet|ft\.?)?$/);
+        const land = trimmed.match(/^(\d+)\s*(?:feet|ft\.?)?$/);
+        const type = typed?.[1] ?? (land ? "land" : undefined);
+        const value = typed?.[2] ?? land?.[1];
+        if (!type || value == null) fail(filename, partPath, "expected a speed like \"25 feet\" or \"fly 60 feet\"");
+        if (seen.has(type)) fail(filename, partPath, `duplicate ${type} speed`);
+        const numericValue = nonNegativeInteger(value, filename, partPath);
+        if (type === "land") speed.land = numericValue;
+        else if (type === "fly") speed.fly = numericValue;
+        else if (type === "swim") speed.swim = numericValue;
+        else if (type === "climb") speed.climb = numericValue;
+        else speed.burrow = numericValue;
+        seen.add(type);
     }
-
     return speed;
 }
 
-function normaliseSpeed(raw: unknown): SpeedData {
-    return parseSpeedString(raw);
+function normaliseSpeed(raw: unknown, filename: string, path: string): SpeedData {
+    return parseSpeedString(raw, filename, path);
 }
 
 // ---------------------------------------------------------------------------
@@ -368,29 +436,40 @@ function normaliseSpeed(raw: unknown): SpeedData {
  *   damage: "1d4+2 piercing"
  * ```
  */
-function normaliseAttacks(raw: unknown): StrikeData[] {
-    if (!Array.isArray(raw)) return [];
+function normaliseAttacks(raw: unknown, filename: string, path: string): StrikeData[] {
+    if (raw == null) return [];
+    if (!Array.isArray(raw)) fail(filename, path, "expected an array of strikes");
 
-    return raw.map((entry) => {
-        const obj = entry as Record<string, unknown>;
-        const rawName = String(obj.name ?? "Strike");
+    return raw.map((entry, index) => {
+        const entryPath = `${path}[${index}]`;
+        const obj = record(entry, filename, entryPath);
+        for (const key of Object.keys(obj)) {
+            if (key !== "name" && key !== "bonus" && key !== "dc" && key !== "desc" && key !== "damage") fail(filename, `${entryPath}.${key}`, "unknown strike field");
+        }
+        const rawName = requiredString(obj.name, filename, `${entryPath}.name`);
+        const prefix = rawName.match(/^__(\w+)__/);
+        if (prefix && prefix[1].toLowerCase() !== "melee" && prefix[1].toLowerCase() !== "ranged") fail(filename, `${entryPath}.name`, "strike prefix must be __Melee__ or __Ranged__");
         const { type, name } = parseAttackName(rawName);
-        const { traits, action, area, range } = parseAttackDesc(String(obj.desc ?? ""));
-        const { damage, effects } = parseDamageString(String(obj.damage ?? ""));
-
-        const strike: StrikeData = {
-            name,
-            type,
-            bonus: Number(obj.bonus ?? 0),
-            traits,
-            damage,
-        };
-
+        if (!name) fail(filename, `${entryPath}.name`, "expected a non-empty strike name");
+        const desc = obj.desc == null ? "" : requiredString(obj.desc, filename, `${entryPath}.desc`, true);
+        const rawDamage = requiredString(obj.damage, filename, `${entryPath}.damage`);
+        const { traits, otherTags, action, area, range } = parseAttackDesc(desc, filename, `${entryPath}.desc`);
+        const { damage, effects } = parseDamageString(rawDamage, filename, `${entryPath}.damage`);
+        if (type === "ranged" && !range) fail(filename, `${entryPath}.desc`, "ranged strikes require range metadata");
+        if (type === "melee" && range) fail(filename, `${entryPath}.desc`, "melee strikes must not include range metadata");
+        const shared = { name, type, traits, damage };
+        let strike: StrikeData;
+        if (action) {
+            if (hasOwn(obj, "bonus")) fail(filename, `${entryPath}.bonus`, `${action} attacks must use dc instead of bonus`);
+            if (!area) fail(filename, `${entryPath}.desc`, `${action} requires area metadata`);
+            strike = { ...shared, action, area, dc: positiveInteger(obj.dc, filename, `${entryPath}.dc`) };
+        } else {
+            if (hasOwn(obj, "dc")) fail(filename, `${entryPath}.dc`, "ordinary strikes must use bonus instead of dc");
+            strike = { ...shared, bonus: finiteNumber(obj.bonus, filename, `${entryPath}.bonus`) };
+        }
+        if (otherTags) strike.otherTags = otherTags;
         if (effects.length > 0) strike.effects = effects;
-        if (action) strike.action = action;
-        if (area) strike.area = area;
         if (range) strike.range = range;
-
         return strike;
     });
 }
@@ -401,113 +480,104 @@ function normaliseAttacks(raw: unknown): StrikeData[] {
 export function parseAttackName(raw: string): { type: "melee" | "ranged"; name: string } {
     let type: "melee" | "ranged" = "melee";
     let name = raw;
-
-    // Remove __Melee__ or __Ranged__ prefix
     const typeMatch = name.match(/^__(\w+)__\s*/);
     if (typeMatch) {
         type = typeMatch[1].toLowerCase() === "ranged" ? "ranged" : "melee";
         name = name.slice(typeMatch[0].length);
     }
-
-    // Remove action icons (⬻ ⬺ ⬽ ⬲ ⭓)
     name = name.replace(/^[⬻⬺⬽⬲⭓]\s*/, "").trim();
-
     return { type, name };
 }
 
-/**
- * Parse attack desc: "(finesse, unarmed)" → traits + optional SF2e extras.
- *
- * Recognises special tokens in the trait list:
- * - "area-fire" / "auto-fire" → action type
- * - "burst N ft." / "cone N ft." / "line N ft." → area
- * - "range N ft." / "range increment N ft." → range
- */
-export function parseAttackDesc(raw: string): {
+/** Parse attack description traits and SF2e extras. */
+
+export function parseAttackDesc(raw: string, filename = "<attack description>", path = "trait"): {
     traits: string[];
-    action?: StrikeData["action"];
+    otherTags?: string[];
+    action?: AreaAttackData["action"];
     area?: { type: string; value: number };
     range?: { increment?: number; max?: number };
 } {
-    const str = raw.trim();
-    // Strip outer parentheses
-    const inner = str.replace(/^\(/, "").replace(/\)$/, "").trim();
+    const inner = raw.trim().replace(/^\(/, "").replace(/\)$/, "").trim();
     if (!inner) return { traits: [] };
-
     const traits: string[] = [];
-    let action: StrikeData["action"] | undefined;
+    const otherTags: string[] = [];
+    let action: AreaAttackData["action"] | undefined;
     let area: { type: string; value: number } | undefined;
     let range: { increment?: number; max?: number } | undefined;
-
-    const parts = inner.split(/,\s*/);
-    for (const part of parts) {
+    for (const [index, part] of inner.split(/,\s*/).entries()) {
         const lower = part.trim().toLowerCase();
-
-        // SF2e action types
         if (lower === "area-fire" || lower === "auto-fire") {
-            action = lower as StrikeData["action"];
+            if (action) fail(filename, `${path}[${index}]`, "duplicate attack action");
+            action = lower;
             continue;
         }
-
-        // Area: "burst 5 ft.", "cone 30 ft.", "line 60 ft."
         const areaMatch = lower.match(/^(burst|cone|line|emanation)\s+(\d+)\s*(?:ft\.?|feet)?$/);
         if (areaMatch) {
-            area = { type: areaMatch[1], value: Number(areaMatch[2]) };
+            if (area) fail(filename, `${path}[${index}]`, "duplicate attack area");
+            const value = Number(areaMatch[2]);
+            if (value < 5 || value > 50 || value % 5 !== 0) fail(filename, `${path}[${index}]`, "area distance must be a multiple of 5 from 5 to 50 feet");
+            area = { type: areaMatch[1], value };
             continue;
         }
-
-        // Range: "range 70 ft.", "range increment 30 ft."
         const rangeMatch = lower.match(/^range\s+(?:increment\s+)?(\d+)\s*(?:ft\.?|feet)?$/);
         if (rangeMatch) {
-            const isIncrement = lower.includes("increment");
-            range = isIncrement
-                ? { increment: Number(rangeMatch[1]) }
-                : { max: Number(rangeMatch[1]) };
+            const type = lower.includes("increment") ? "increment" : "max";
+            const value = Number(rangeMatch[1]);
+            if (value < 5 || value > 500 || value % 5 !== 0) fail(filename, `${path}[${index}]`, "range must be a multiple of 5 from 5 to 500 feet");
+            if (range?.[type] != null) fail(filename, `${path}[${index}]`, `duplicate range ${type}`);
+            range ??= {};
+            range[type] = value;
             continue;
         }
-
-        traits.push(part.trim().toLowerCase());
+        const trait = lower.replace(/\s+ft\.?$/, "").replace(/\+/g, "").replace(/\s+/g, "-").replace(/^boost-d/, "boost-1d");
+        if (/^mag-\d+$/.test(trait)) otherTags.push(trait);
+        else if (hasOwn(SF2E_NPC_ATTACK_TRAITS, trait)) traits.push(trait);
+        else fail(filename, `${path}[${index}]`, `unknown NPC attack trait ${JSON.stringify(part.trim())}`);
     }
-
-    return { traits, action, area, range };
+    if (action && !area) fail(filename, path, `${action} requires area metadata`);
+    if (!action && area) fail(filename, path, "ordinary strikes must not include area metadata");
+    return otherTags.length > 0 ? { traits, otherTags, action, area, range } : { traits, action, area, range };
 }
 
-/**
- * Parse a damage string like "1d4+2 piercing plus 1d6 fire plus Grab".
- *
- * Returns structured damage rolls and effects (named abilities like Grab).
- */
-export function parseDamageString(raw: string): {
+/** Damage types reviewed against the PF2e/SF2e strike damage vocabulary. */
+const STRIKE_DAMAGE_TYPES: Record<string, true> = {
+    acid: true, bleed: true, bludgeoning: true, cold: true, electricity: true, fire: true,
+    force: true, mental: true, piercing: true, poison: true, slashing: true, sonic: true,
+    spirit: true, untyped: true, vitality: true, void: true,
+};
+
+/** Parse a damage string like "1d4+2 piercing plus 1d6 persistent fire plus Grab". */
+export function parseDamageString(raw: string, filename = "<input>", path = "damage"): {
     damage: DamageRollData[];
     effects: string[];
 } {
     const str = raw.trim();
     if (!str) return { damage: [], effects: [] };
-
     const damage: DamageRollData[] = [];
     const effects: string[] = [];
 
-    // Split on " plus " (case-insensitive)
-    const parts = str.split(/\s+plus\s+/i);
-
-    for (const part of parts) {
+    for (const [index, part] of str.split(/\s+plus\s+/i).entries()) {
         const trimmed = part.trim();
-        // Match dice formula: "1d4+2 piercing", "2d6 fire", "1d6 persistent fire"
-        const match = trimmed.match(/^(\d+d\d+(?:[+-]\d+)?)\s+(.+)$/);
+        const match = trimmed.match(/^((?:\d+d\d+(?:[+-]\d+)?)|\d+)\s+(.+)$/);
         if (match) {
-            damage.push({
-                formula: match[1],
-                type: match[2].trim().toLowerCase(),
-            });
-        } else if (/^\d+d\d+/.test(trimmed)) {
-            // Bare dice like "1d6" with no type
-            damage.push({ formula: trimmed, type: "untyped" });
+            const rawType = match[2].trim().toLowerCase();
+            const persistent = rawType.match(/^persistent\s+(.+)$/);
+            const type = persistent?.[1] ?? rawType;
+            if (!hasOwn(STRIKE_DAMAGE_TYPES, type)) fail(filename, `${path}[${index}].type`, `unknown strike damage type ${JSON.stringify(type)}`);
+            const roll: DamageRollData = { formula: validateDamageFormula(match[1], filename, `${path}[${index}].formula`), type };
+            if (persistent) roll.category = "persistent";
+            damage.push(roll);
+        } else if (/^(?:\d+d\d+(?:[+-]\d+)?|\d+)$/.test(trimmed)) {
+            damage.push({ formula: validateDamageFormula(trimmed, filename, `${path}[${index}].formula`), type: "untyped" });
+        } else if (/^[+-]?(?:\d+d\d+|\d+)/i.test(trimmed)) {
+            fail(filename, `${path}[${index}]`, "expected damage like \"1d6 fire\"");
         } else {
-            // Not a dice formula — it's an effect (e.g. "Grab", "Knockdown")
-            effects.push(trimmed);
+            const effect = slugify(trimmed);
+            if (!effect) fail(filename, `${path}[${index}]`, "expected a named attack effect");
+            effects.push(effect);
         }
     }
-
     return { damage, effects };
 }
 
@@ -515,16 +585,30 @@ export function parseDamageString(raw: string): {
 // Abilities: [{name, desc, ...}] → AbilityEntry[]
 // ---------------------------------------------------------------------------
 
-function normaliseAbilityList(raw: unknown): AbilityEntry[] {
-    if (!Array.isArray(raw)) return [];
-    return raw.map((a) => {
-        const obj = a as Record<string, unknown>;
+
+function normaliseAbilityList(raw: unknown, filename: string, path: string): AbilityEntry[] {
+    if (raw == null) return [];
+    if (!Array.isArray(raw)) fail(filename, path, "expected an array of abilities");
+    return raw.map((ability, index) => {
+        const entryPath = `${path}[${index}]`;
+        const obj = record(ability, filename, entryPath);
+        for (const key of Object.keys(obj)) {
+            if (key !== "name" && key !== "desc" && key !== "description" && key !== "traits" && key !== "category") fail(filename, `${entryPath}.${key}`, "unknown ability field");
+        }
         const entry: AbilityEntry = {
-            name: String(obj.name ?? "Unnamed"),
-            desc: String(obj.desc ?? obj.description ?? ""),
+            name: obj.name == null ? "Unnamed" : requiredString(obj.name, filename, `${entryPath}.name`),
+            desc: obj.desc == null && obj.description == null ? "" : requiredString(obj.desc ?? obj.description, filename, `${entryPath}.desc`, true),
         };
-        if (obj.traits) entry.traits = toStringArray(obj.traits);
-        if (obj.category) entry.category = String(obj.category) as AbilityEntry["category"];
+        if (obj.traits != null) entry.traits = toStringArray(obj.traits, filename, `${entryPath}.traits`).map((trait, traitIndex) => {
+            const slug = trait.trim().toLowerCase().replace(/\s+/g, "-");
+            if (!hasOwn(SF2E_ACTION_TRAITS, slug)) fail(filename, `${entryPath}.traits[${traitIndex}]`, `unknown action trait ${JSON.stringify(trait)}`);
+            return slug;
+        });
+        if (obj.category != null) {
+            const category = requiredString(obj.category, filename, `${entryPath}.category`);
+            if (category !== "offensive" && category !== "defensive" && category !== "interaction") fail(filename, `${entryPath}.category`, "expected offensive, defensive, or interaction");
+            entry.category = category;
+        }
         return entry;
     });
 }
@@ -533,17 +617,21 @@ function normaliseAbilityList(raw: unknown): AbilityEntry[] {
 // Spellcasting: layout format → SpellcastingEntry[]
 // ---------------------------------------------------------------------------
 
-function normaliseSpellcasting(raw: unknown): SpellcastingEntry[] | undefined {
-    if (!Array.isArray(raw)) return undefined;
-    return raw.map((entry) => {
-        const obj = entry as Record<string, unknown>;
+function normaliseSpellcasting(raw: unknown, filename: string, path: string): SpellcastingEntry[] {
+    if (!Array.isArray(raw)) fail(filename, path, "expected an array of spellcasting entries");
+    return raw.map((entry, index) => {
+        const entryPath = `${path}[${index}]`;
+        const obj = record(entry, filename, entryPath);
+        for (const key of Object.keys(obj)) {
+            if (key !== "name" && key !== "desc" && key !== "dc" && key !== "bonus" && key !== "fp") fail(filename, `${entryPath}.${key}`, "unknown spellcasting field");
+        }
         const result: SpellcastingEntry = {
-            name: String(obj.name ?? "Spells"),
-            desc: String(obj.desc ?? ""),
+            name: obj.name == null ? "Spells" : requiredString(obj.name, filename, `${entryPath}.name`),
+            desc: obj.desc == null ? "" : requiredString(obj.desc, filename, `${entryPath}.desc`, true),
         };
-        if (obj.dc != null) result.dc = Number(obj.dc);
-        if (obj.bonus != null) result.bonus = Number(obj.bonus);
-        if (obj.fp != null) result.fp = Number(obj.fp);
+        if (obj.dc != null) result.dc = finiteNumber(obj.dc, filename, `${entryPath}.dc`);
+        if (obj.bonus != null) result.bonus = finiteNumber(obj.bonus, filename, `${entryPath}.bonus`);
+        if (obj.fp != null) result.fp = nonNegativeInteger(obj.fp, filename, `${entryPath}.fp`);
         return result;
     });
 }
@@ -552,22 +640,84 @@ function normaliseSpellcasting(raw: unknown): SpellcastingEntry[] | undefined {
 // Utilities
 // ---------------------------------------------------------------------------
 
-function normaliseString(raw: unknown): string {
+function normaliseString(raw: unknown, filename: string, path: string): string {
     if (raw == null) return "";
-    if (Array.isArray(raw)) return raw.filter(Boolean).join(", ");
-    const str = String(raw).trim();
-    return str;
+    if (Array.isArray(raw)) return raw.map((value, index) => requiredString(value, filename, `${path}[${index}]`)).join(", ");
+    return requiredString(raw, filename, path, true).trim();
 }
 
-function toStringArray(value: unknown): string[] {
-    if (Array.isArray(value)) return value.map(String);
+function normaliseCreatureTraits(raw: unknown, filename: string, path: string): string[] {
+    return toStringArray(raw, filename, path).map((trait, index) => {
+        const slug = slugify(trait.trim());
+        if (!hasOwn(SF2E_CREATURE_TRAITS, slug) && !hasOwn(PROJECT_CREATURE_TRAITS, slug)) fail(filename, `${path}[${index}]`, `unknown creature trait ${JSON.stringify(trait)}`);
+        return slug;
+    });
+}
+
+function toStringArray(value: unknown, filename: string, path: string): string[] {
+    if (value == null) return [];
+    if (Array.isArray(value)) return value.map((entry, index) => requiredString(entry, filename, `${path}[${index}]`));
     if (typeof value === "string") return value.trim() ? [value] : [];
-    return [];
+    fail(filename, path, "expected a string or an array of strings");
 }
 
-function normaliseEnum<T extends string>(value: unknown, allowed: T[], fallback: T): T {
-    const str = String(value ?? "").toLowerCase();
-    return allowed.includes(str as T) ? (str as T) : fallback;
+function normaliseEnum<T extends string>(value: unknown, allowed: readonly T[], fallback: T, filename: string, path: string): T {
+    if (value == null) return fallback;
+    if (typeof value !== "string") fail(filename, path, `expected one of ${allowed.join(", ")}`);
+    const normalised = value.toLowerCase();
+    if (!allowed.includes(normalised as T)) fail(filename, path, `expected one of ${allowed.join(", ")}`);
+    return normalised as T;
+}
+
+function normalisePublished(raw: unknown, filename: string): boolean {
+    if (raw == null) return true;
+    if (typeof raw !== "boolean") fail(filename, "published", "expected a boolean");
+    return raw;
+}
+
+function finiteNumber(raw: unknown, filename: string, path: string, fallback?: number): number {
+    if (raw == null && fallback != null) return fallback;
+    if ((typeof raw !== "number" && typeof raw !== "string") || (typeof raw === "string" && !raw.trim())) fail(filename, path, "expected a finite number");
+    const value = Number(raw);
+    if (!Number.isFinite(value) || !Number.isInteger(value)) fail(filename, path, "expected a finite number");
+    return value;
+}
+
+function validateDamageFormula(formula: string, filename: string, path: string): string {
+    const dice = formula.match(/^(\d+)d(\d+)(?:[+-]\d+)?$/);
+    if (dice && (Number(dice[1]) < 1 || Number(dice[2]) < 1)) fail(filename, path, "dice count and sides must be positive integers");
+    return formula;
+}
+
+function positiveInteger(raw: unknown, filename: string, path: string): number {
+    if ((typeof raw !== "number" && typeof raw !== "string") || (typeof raw === "string" && !raw.trim())) fail(filename, path, "expected a positive integer");
+    const value = Number(raw);
+    if (!Number.isFinite(value) || !Number.isInteger(value) || value <= 0) fail(filename, path, "expected a positive integer");
+    return value;
+}
+
+function nonNegativeInteger(raw: unknown, filename: string, path: string): number {
+    const value = finiteNumber(raw, filename, path);
+    if (!Number.isInteger(value) || value < 0) fail(filename, path, "expected a non-negative integer");
+    return value;
+}
+
+function optionalString(raw: unknown, filename: string, path: string): string | undefined {
+    return raw == null ? undefined : requiredString(raw, filename, path, true);
+}
+
+function requiredString(raw: unknown, filename: string, path: string, allowEmpty = false): string {
+    if (typeof raw !== "string" || (!allowEmpty && !raw.trim())) fail(filename, path, allowEmpty ? "expected a string" : "expected a non-empty string");
+    return raw;
+}
+
+function record(raw: unknown, filename: string, path: string): Record<string, unknown> {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) fail(filename, path, "expected an object");
+    return raw as Record<string, unknown>;
+}
+
+function fail(filename: string, path: string, message: string): never {
+    throw new Error(`${filename}: ${path}: ${message}`);
 }
 
 /** Convert a display name to a slug: "Low-Light Vision" → "low-light-vision". */

@@ -7,5 +7,13 @@
 
 export { registerPradSettings, isPradEnabled, applyDCBaseSetting } from "./settings.js";
 export { registerPradTemplates } from "./chat-cards.js";
-export { registerAttackCardTemplate, registerAttackInterceptHook } from "./intercept-attack.js";
+export {
+    postAttackCard,
+    registerAttackCardTemplate,
+    registerAttackInterceptHook,
+    resolveAttackCardProvenance,
+    rollAttackCardArmorSaves,
+    rollWeaponDamage,
+} from "./intercept-attack.js";
+export type { AttackCardParams, AttackCardProvenance } from "./intercept-attack.js";
 export { registerPradSheetHooks } from "./sheet-hooks.js";

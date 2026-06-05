@@ -66,10 +66,16 @@ export interface SaveResultData {
     success: DegreeOfSuccessString;
     /** Modifiers that contributed to the roll. */
     modifiers: { label: string; modifier: number }[];
-    /** Whether the roll was private/GM-only. */
+    /** Whether the roll was whispered and must be redacted before persistence. */
     private: boolean;
     /** The statistic used for the roll. */
     statistic: string;
+    /** Exact Token document UUID rolled for this result. Required before persistence. */
+    targetUuid?: string;
+    /** Target-list generation captured when the roll began. Required before persistence. */
+    generation?: number;
+    /** Globally unique target-list revision captured when the roll began. Required before persistence. */
+    revision?: string;
 
     // ─── PRAD Overcome extras ────────────────────────────────────────
     /** If from a PRAD overcome roll: the NPC's Save DC rolled against. */
@@ -77,6 +83,26 @@ export interface SaveResultData {
     /** If from a PRAD overcome roll: the PC's raw degree of success (before inversion). */
     overcomeSuccess?: DegreeOfSuccessString;
 }
+
+/** Validated public save result with provenance required for inline flag persistence. */
+export interface PersistedPublicSaveResultData extends SaveResultData {
+    private: false;
+    targetUuid: string;
+    generation: number;
+    revision: string;
+}
+
+/** Redacted completion marker for a private inline save. */
+export interface PersistedPrivateSaveResultData {
+    private: true;
+    statistic: string;
+    targetUuid: string;
+    generation: number;
+    revision: string;
+}
+
+/** Validated save result or redacted private completion marker stored in shared chat flags. */
+export type PersistedSaveResultData = PersistedPublicSaveResultData | PersistedPrivateSaveResultData;
 
 /** Display info for a save type (icon + i18n label key). */
 export interface SaveDisplayInfo {
@@ -100,10 +126,12 @@ export const SAVE_DETAILS: Record<string, SaveDisplayInfo> = {
 export interface Sf2eChatMessageFlags {
     /** The type of check: "attack-roll", "saving-throw", "spell-attack-roll", etc. */
     type?: string;
-    /** The origin (rolling) actor's UUID */
+    /** The originating item's SF2e chat flag payload. */
     origin?: {
         actor?: string;
-        item?: string;
+        uuid?: string;
+        type?: string;
+        rollOptions?: string[];
     };
     /** The target actor's UUID(s) */
     target?: {
@@ -122,7 +150,7 @@ export interface Sf2eChatMessageFlags {
         };
         origin?: {
             actor?: string;
-            item?: string;
+            token?: string;
         };
     };
     /** Modifiers applied to the roll */

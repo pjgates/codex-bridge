@@ -1,13 +1,14 @@
 /**
  * Target Helper — Chat Message Rendering
  *
- * Handles the `renderChatMessage` hook to inject per-target rows
+ * Handles the V14 `renderChatMessageHTML` hook to inject per-target rows
  * and replace save buttons with custom ones.
  *
  * Ported from PF2e Toolbelt's Target Helper rendering logic.
  */
 
 import { MODULE_ID } from "../constants.js";
+import { isCurrentUserDesignatedTargetRoller } from "../shared/authorized-roller.js";
 import { getNpcSaveModifier, getSaveDC } from "../shared/dc.js";
 import { resolveHtmlRoot } from "../shared/html.js";
 import {
@@ -15,8 +16,9 @@ import {
     type RowRenderContext,
     type TargetTokenData,
 } from "../shared/render-logic.js";
-import { getCurrentTargetUUIDs, getFlagData, updateTargets } from "./flags.js";
+import { canUpdateMessage, getCurrentTargetUUIDs, getFlagData, updateTargets } from "./flags.js";
 import {
+    canRollOvercomeAsCurrentUser,
     rollNpcSaves,
     rollOvercomeAll, rollOvercomeForActiveTokens,
     rollOvercomeForTargets,
@@ -44,7 +46,7 @@ export function registerTargetHelperTemplates(): void {
 // ─── Main Render Hook ────────────────────────────────────────────────────────
 
 /**
- * Hook handler for `renderChatMessage`.
+ * Hook handler for `renderChatMessageHTML`.
  * Reads flag data and injects target rows into the chat card.
  */
 export async function onRenderTargetHelper(
@@ -61,23 +63,36 @@ export async function onRenderTargetHelper(
     const msgContent = root.querySelector<HTMLElement>(".message-content");
     if (!msgContent) return;
 
-    // Check if we've already rendered target rows (avoid duplicates)
-    if (msgContent.querySelector(".th-target-rows")) return;
+    // Reserve synchronously so overlapping Foundry render hooks cannot both
+    // render controls for the same chat card, including zero-target cards.
+    const rowsWrapper = reserveTargetRowsWrapper(msgContent);
+    if (!rowsWrapper) return;
 
     try {
         if (flagData.type === "spell") {
-            await renderSpellCard(message, msgContent, flagData);
+            await renderSpellCard(message, msgContent, rowsWrapper, flagData);
         } else if (flagData.type === "area") {
-            await renderAreaCard(message, msgContent, flagData);
+            await renderAreaCard(message, msgContent, rowsWrapper, flagData);
         } else if (flagData.type === "check") {
-            await renderCheckCard(message, msgContent, flagData);
+            await renderCheckCard(message, msgContent, rowsWrapper, flagData);
         } else if (flagData.type === "action") {
-            await renderActionCard(message, msgContent, flagData);
+            await renderActionCard(message, msgContent, rowsWrapper, flagData);
         } else if (flagData.type === "prad-attack") {
-            await renderPradAttackCard(message, msgContent, flagData);
+            await renderPradAttackCard(message, msgContent, rowsWrapper, flagData);
+        } else {
+            rowsWrapper.remove();
         }
     } catch (err) {
+        cleanupFailedRender(msgContent, rowsWrapper);
         console.error(`${MODULE_ID} | Target Helper: Error rendering target rows`, err);
+    }
+}
+
+function cleanupFailedRender(msgContent: HTMLElement, rowsWrapper: HTMLElement): void {
+    rowsWrapper.remove();
+    for (const wrapper of msgContent.querySelectorAll(".th-buttons")) wrapper.remove();
+    for (const button of msgContent.querySelectorAll(".th-original-hidden")) {
+        button.classList.remove("hidden", "th-original-hidden");
     }
 }
 
@@ -86,11 +101,12 @@ export async function onRenderTargetHelper(
 async function renderSpellCard(
     message: ChatMessage.Implementation,
     msgContent: HTMLElement,
+    rowsWrapper: HTMLElement,
     flagData: TargetHelperFlagData
 ): Promise<void> {
     if (!flagData.save) return;
 
-    await addTargetRows(message, msgContent, flagData);
+    await addTargetRows(message, rowsWrapper, flagData);
     await replaceButton(
         message, msgContent, flagData,
         'button[data-action="spell-save"]'
@@ -100,11 +116,12 @@ async function renderSpellCard(
 async function renderAreaCard(
     message: ChatMessage.Implementation,
     msgContent: HTMLElement,
+    rowsWrapper: HTMLElement,
     flagData: TargetHelperFlagData
 ): Promise<void> {
     if (!flagData.save) return;
 
-    await addTargetRows(message, msgContent, flagData);
+    await addTargetRows(message, rowsWrapper, flagData);
     await replaceButton(
         message, msgContent, flagData,
         'button[data-action="roll-area-save"]'
@@ -114,11 +131,12 @@ async function renderAreaCard(
 async function renderCheckCard(
     message: ChatMessage.Implementation,
     msgContent: HTMLElement,
+    rowsWrapper: HTMLElement,
     flagData: TargetHelperFlagData
 ): Promise<void> {
     if (!flagData.save) return;
 
-    await addTargetRows(message, msgContent, flagData);
+    await addTargetRows(message, rowsWrapper, flagData);
     // For inline checks, the save link IS the button — we add custom buttons
     await addCheckButtons(message, msgContent, flagData);
 }
@@ -126,11 +144,12 @@ async function renderCheckCard(
 async function renderActionCard(
     message: ChatMessage.Implementation,
     msgContent: HTMLElement,
+    rowsWrapper: HTMLElement,
     flagData: TargetHelperFlagData
 ): Promise<void> {
     if (!flagData.save) return;
 
-    await addTargetRows(message, msgContent, flagData);
+    await addTargetRows(message, rowsWrapper, flagData);
     // Add set targets and roll saves buttons to the action card
     await addActionButtons(message, msgContent, flagData);
 }
@@ -138,11 +157,12 @@ async function renderActionCard(
 async function renderPradAttackCard(
     message: ChatMessage.Implementation,
     msgContent: HTMLElement,
+    rowsWrapper: HTMLElement,
     flagData: TargetHelperFlagData
 ): Promise<void> {
     if (!flagData.save) return;
 
-    await addTargetRows(message, msgContent, flagData);
+    await addTargetRows(message, rowsWrapper, flagData);
     await replaceButton(
         message, msgContent, flagData,
         'button[data-action="prad-armor-save"]'
@@ -152,9 +172,8 @@ async function renderPradAttackCard(
 // ─── Target Row Rendering ────────────────────────────────────────────────────
 
 /**
- * Reserve the target rows container before rendering any asynchronous row
- * templates. Foundry can emit both renderChatMessageHTML and renderChatMessage
- * for the same card before either hook completes.
+ * templates. Foundry can emit repeated renderChatMessageHTML hooks for the
+ * same card before an earlier hook completes.
  */
 export function reserveTargetRowsWrapper(parent: HTMLElement): HTMLDivElement | null {
     if (parent.querySelector(".th-target-rows")) return null;
@@ -170,24 +189,20 @@ export function reserveTargetRowsWrapper(parent: HTMLElement): HTMLDivElement | 
  */
 async function addTargetRows(
     message: ChatMessage.Implementation,
-    parent: HTMLElement,
+    rowsWrapper: HTMLElement,
     flagData: TargetHelperFlagData,
 ): Promise<void> {
     if (!flagData.targets?.length) return;
 
     const isGM = !!game.user?.isGM;
+    const canPersist = canUpdateMessage(message);
     const saves = flagData.saves ?? {};
     const saveInfo = flagData.save;
     const isPradOvercome = !!flagData.pradOvercome;
 
-    // In PRAD Overcome mode, resolve whether the current user is the caster
-    let isCasterOwner = false;
-    if (isPradOvercome && flagData.author) {
-        const casterActor = fromUuidSync(flagData.author) as Sf2eActor | null;
-        isCasterOwner = isGM || !!(casterActor as { isOwner?: boolean } | null)?.isOwner;
-    } else if (isPradOvercome) {
-        isCasterOwner = isGM || !!(message as Sf2eChatMessage).isAuthor;
-    }
+    const isCasterOwner = isPradOvercome
+        ? canRollOvercomeAsCurrentUser(message, flagData.author)
+        : isGM;
 
     const saveDisplay = saveInfo
         ? SAVE_DETAILS[saveInfo.statistic] ?? SAVE_DETAILS.reflex
@@ -230,35 +245,39 @@ async function addTargetRows(
         npcSaveDCs,
     };
 
-    // Reserve synchronously so overlapping Foundry render hooks cannot both
-    // render target rows for the same chat card.
-    const rowsWrapper = reserveTargetRowsWrapper(parent);
-    if (!rowsWrapper) return;
 
     for (const { token, data } of resolvedTokens) {
         // Pure function builds the row view model
         const viewModel = buildTargetRowViewModel(data, ctx, getSuccessLabel);
         if (!viewModel) continue;
 
-        // Augment with tooltip (Foundry-coupled HTML — not in the pure layer)
         const targetSave = saves[data.id];
+        const visibleTargetSave = targetSave && !targetSave.private ? targetSave : undefined;
+        if (viewModel.save) {
+            const isDesignatedRoller = isPradOvercome
+                ? canRollOvercomeAsCurrentUser(message, flagData.author)
+                : isCurrentUserDesignatedTargetRoller(message, token);
+            viewModel.save.canRoll = viewModel.save.canRoll && canPersist && isDesignatedRoller;
+        }
+
+        // Augment with tooltip (Foundry-coupled HTML — not in the pure layer)
         let tooltip: string | undefined;
-        if (viewModel.save && saveInfo) {
+        if (viewModel.save && saveInfo && !targetSave?.private) {
             if (isPradOvercome) {
                 const dc = npcSaveDCs[data.id] ?? saveInfo.dc;
-                tooltip = targetSave
-                    ? buildOvercomeTooltipHtml(saveInfo.statistic, dc, targetSave, ctx.isGM || ctx.isCasterOwner)
+                tooltip = visibleTargetSave
+                    ? buildOvercomeTooltipHtml(saveInfo.statistic, dc, visibleTargetSave, ctx.isGM || ctx.isCasterOwner)
                     : buildOvercomePreRollTooltip(saveInfo.statistic, dc);
             } else {
-                tooltip = targetSave
-                    ? buildTooltipHtml(saveInfo.statistic, saveInfo.dc, targetSave, ctx.isGM || data.isOwner)
+                tooltip = visibleTargetSave
+                    ? buildTooltipHtml(saveInfo.statistic, saveInfo.dc, visibleTargetSave, ctx.isGM || data.isOwner)
                     : buildPreRollTooltip(saveInfo.statistic, saveInfo.dc);
             }
         }
 
         const rowHtml = await foundry.applications.handlebars.renderTemplate(TEMPLATE_TARGET_ROW, { ...viewModel } as Record<string, unknown>);
         const rowDiv = document.createElement("div");
-        rowDiv.className = "target-row";
+        rowDiv.className = "th-target-row";
         if (isPradOvercome) rowDiv.classList.add("th-overcome");
         rowDiv.innerHTML = rowHtml;
 
@@ -280,6 +299,19 @@ async function addTargetRows(
 /**
  * Attach interactivity to a target row element.
  */
+function canControlTargetHelperMessage(message: ChatMessage.Implementation, flagData: TargetHelperFlagData): boolean {
+    if (game.user?.isGM) return true;
+    if (!flagData.pradOvercome) return !!(message as Sf2eChatMessage).isAuthor;
+    return canRollOvercomeAsCurrentUser(message, flagData.author);
+}
+
+function handleTargetHelperAction(label: string, operation: Promise<unknown>): void {
+    void operation.catch((error: unknown) => {
+        console.error(`${MODULE_ID} | Target Helper: ${label} failed`, error);
+        ui.notifications!.error(game.i18n!.localize("sf2e-forge-custom.targetHelper.cannotPersist"));
+    });
+}
+
 function attachRowListeners(
     row: HTMLElement,
     token: Sf2eTokenDocument,
@@ -315,9 +347,9 @@ function attachRowListeners(
         rollBtn.addEventListener("click", (event) => {
             event.stopPropagation();
             if (isPradOvercome) {
-                rollOvercomeForTargets(event as MouseEvent, message, [token]);
+                handleTargetHelperAction("Overcome roll", rollOvercomeForTargets(event as MouseEvent, message, [token]));
             } else {
-                rollSavesForTargets(event as MouseEvent, message, [token]);
+                handleTargetHelperAction("Save roll", rollSavesForTargets(event as MouseEvent, message, [token]));
             }
         });
     }
@@ -350,14 +382,15 @@ async function replaceButton(
 ): Promise<void> {
     const saveBtn = msgContent.querySelector<HTMLButtonElement>(selector);
     if (!saveBtn) return;
+    if (!canUpdateMessage(message)) return;
 
     const isPradOvercome = !!flagData.pradOvercome;
+    if (isPradOvercome && !canControlTargetHelperMessage(message, flagData)) return;
 
     // Create a button wrapper
     const wrapper = document.createElement("div");
     wrapper.className = "th-buttons";
 
-    // Clone the save button as our "fake" button
     const fakeBtn = saveBtn.cloneNode(true) as HTMLButtonElement;
     fakeBtn.removeAttribute("data-action");
     fakeBtn.classList.add("th-save-btn");
@@ -368,8 +401,7 @@ async function replaceButton(
         fakeBtn.classList.add("th-overcome-btn");
     }
 
-    // Hide the original button
-    saveBtn.classList.add("hidden");
+    saveBtn.classList.add("hidden", "th-original-hidden");
     saveBtn.after(wrapper);
 
     // Add button click handler
@@ -377,16 +409,16 @@ async function replaceButton(
         event.preventDefault();
         event.stopPropagation();
         if (isPradOvercome) {
-            rollOvercomeForActiveTokens(event, message);
+            handleTargetHelperAction("Active-token overcome roll", rollOvercomeForActiveTokens(event, message));
         } else {
-            rollSaveForActiveTokens(event, message);
+            handleTargetHelperAction("Active-token save roll", rollSaveForActiveTokens(event, message));
         }
     });
 
     wrapper.appendChild(fakeBtn);
 
     // Only message owners (GM or author) get the extra buttons
-    const isOwner = game.user?.isGM || (message as Sf2eChatMessage).isAuthor;
+    const isOwner = canControlTargetHelperMessage(message, flagData);
     if (!isOwner) return;
 
     // Set Targets button
@@ -394,10 +426,10 @@ async function replaceButton(
     setTargetsBtn.className = "th-set-targets";
     setTargetsBtn.title = game.i18n!.localize("sf2e-forge-custom.targetHelper.setTargets");
     setTargetsBtn.innerHTML = '<i class="fa-solid fa-bullseye-arrow"></i>';
-    setTargetsBtn.addEventListener("click", async (event) => {
+    setTargetsBtn.addEventListener("click", (event) => {
         event.stopPropagation();
         const targets = getCurrentTargetUUIDs();
-        await updateTargets(message, targets);
+        handleTargetHelperAction("Target update", updateTargets(message, targets));
     });
     wrapper.prepend(setTargetsBtn);
 
@@ -410,7 +442,7 @@ async function replaceButton(
             rollAllBtn.innerHTML = '<i class="fa-duotone fa-solid fa-dice-d20"></i>';
             rollAllBtn.addEventListener("click", (event) => {
                 event.stopPropagation();
-                rollOvercomeAll(event, message);
+                handleTargetHelperAction("Roll-all overcome", rollOvercomeAll(event, message));
             });
             wrapper.appendChild(rollAllBtn);
         }
@@ -423,7 +455,7 @@ async function replaceButton(
             rollNpcBtn.innerHTML = '<i class="fa-duotone fa-solid fa-dice-d20"></i>';
             rollNpcBtn.addEventListener("click", (event) => {
                 event.stopPropagation();
-                rollNpcSaves(event, message);
+                handleTargetHelperAction("NPC saves", rollNpcSaves(event, message));
             });
             wrapper.appendChild(rollNpcBtn);
         }
@@ -439,10 +471,11 @@ async function addActionButtons(
     msgContent: HTMLElement,
     flagData: TargetHelperFlagData
 ): Promise<void> {
-    const isOwner = game.user?.isGM || (message as Sf2eChatMessage).isAuthor;
+    if (!canUpdateMessage(message)) return;
+    const isPradOvercome = !!flagData.pradOvercome;
+    const isOwner = canControlTargetHelperMessage(message, flagData);
     if (!isOwner) return;
 
-    const isPradOvercome = !!flagData.pradOvercome;
     const chatCard = msgContent.querySelector(".chat-card");
     const insertPoint = chatCard ?? msgContent;
 
@@ -453,10 +486,10 @@ async function addActionButtons(
     setTargetsBtn.className = "th-set-targets";
     setTargetsBtn.title = game.i18n!.localize("sf2e-forge-custom.targetHelper.setTargets");
     setTargetsBtn.innerHTML = '<i class="fa-solid fa-bullseye-arrow"></i>';
-    setTargetsBtn.addEventListener("click", async (event) => {
+    setTargetsBtn.addEventListener("click", (event) => {
         event.stopPropagation();
         const targets = getCurrentTargetUUIDs();
-        await updateTargets(message, targets);
+        handleTargetHelperAction("Target update", updateTargets(message, targets));
     });
     wrapper.appendChild(setTargetsBtn);
 
@@ -468,7 +501,7 @@ async function addActionButtons(
             rollAllBtn.innerHTML = '<i class="fa-duotone fa-solid fa-dice-d20"></i>';
             rollAllBtn.addEventListener("click", (event) => {
                 event.stopPropagation();
-                rollOvercomeAll(event, message);
+                handleTargetHelperAction("Roll-all overcome", rollOvercomeAll(event, message));
             });
             wrapper.appendChild(rollAllBtn);
         }
@@ -479,12 +512,18 @@ async function addActionButtons(
         rollNpcBtn.innerHTML = '<i class="fa-duotone fa-solid fa-dice-d20"></i>';
         rollNpcBtn.addEventListener("click", (event) => {
             event.stopPropagation();
-            rollNpcSaves(event, message);
+            handleTargetHelperAction("NPC saves", rollNpcSaves(event, message));
         });
         wrapper.appendChild(rollNpcBtn);
     }
 
     insertPoint.appendChild(wrapper);
+}
+
+function appendIconAndText(button: HTMLButtonElement, iconClass: string, text: string): void {
+    const icon = document.createElement("i");
+    icon.className = iconClass;
+    button.append(icon, document.createTextNode(` ${text}`));
 }
 
 /**
@@ -495,8 +534,9 @@ async function addCheckButtons(
     msgContent: HTMLElement,
     flagData: TargetHelperFlagData
 ): Promise<void> {
-    const isOwner = game.user?.isGM || (message as Sf2eChatMessage).isAuthor;
+    if (!canUpdateMessage(message)) return;
     const isPradOvercome = !!flagData.pradOvercome;
+    const isOwner = canControlTargetHelperMessage(message, flagData);
 
     const wrapper = document.createElement("div");
     wrapper.className = "th-buttons th-check-buttons";
@@ -506,38 +546,36 @@ async function addCheckButtons(
         setTargetsBtn.className = "th-set-targets";
         setTargetsBtn.title = game.i18n!.localize("sf2e-forge-custom.targetHelper.setTargets");
         setTargetsBtn.innerHTML = '<i class="fa-solid fa-bullseye-arrow"></i>';
-        setTargetsBtn.addEventListener("click", async (event) => {
+        setTargetsBtn.addEventListener("click", (event) => {
             event.stopPropagation();
             const targets = getCurrentTargetUUIDs();
-            await updateTargets(message, targets);
+            handleTargetHelperAction("Target update", updateTargets(message, targets));
         });
         wrapper.appendChild(setTargetsBtn);
     }
 
     if (flagData.save) {
-        if (isPradOvercome) {
+        if (isPradOvercome && isOwner) {
             // Overcome button (caster rolls against all targets)
             const overcomeBtn = document.createElement("button");
             overcomeBtn.className = "th-save-btn th-overcome-btn";
-            overcomeBtn.innerHTML = `<i class="fa-solid fa-burst"></i> ${
-                game.i18n!.localize("sf2e-forge-custom.prad.rollOvercome")
-            }`;
+            appendIconAndText(overcomeBtn, "fa-solid fa-burst", game.i18n!.localize("sf2e-forge-custom.prad.rollOvercome"));
             overcomeBtn.addEventListener("click", (event) => {
                 event.preventDefault();
                 event.stopPropagation();
-                rollOvercomeForActiveTokens(event, message);
+                handleTargetHelperAction("Active-token overcome roll", rollOvercomeForActiveTokens(event, message));
             });
             wrapper.appendChild(overcomeBtn);
-        } else {
+        } else if (!isPradOvercome) {
             // Save button for player's own tokens
             const saveBtn = document.createElement("button");
             saveBtn.className = "th-save-btn";
             const saveDisplay = SAVE_DETAILS[flagData.save.statistic] ?? SAVE_DETAILS.reflex;
-            saveBtn.innerHTML = `<i class="${saveDisplay.icon}"></i> ${game.i18n!.localize("sf2e-forge-custom.targetHelper.rollSave")}`;
+            appendIconAndText(saveBtn, saveDisplay.icon, game.i18n!.localize("sf2e-forge-custom.targetHelper.rollSave"));
             saveBtn.addEventListener("click", (event) => {
                 event.preventDefault();
                 event.stopPropagation();
-                rollSaveForActiveTokens(event, message);
+                handleTargetHelperAction("Active-token save roll", rollSaveForActiveTokens(event, message));
             });
             wrapper.appendChild(saveBtn);
         }
@@ -551,7 +589,7 @@ async function addCheckButtons(
             rollAllBtn.innerHTML = '<i class="fa-duotone fa-solid fa-dice-d20"></i>';
             rollAllBtn.addEventListener("click", (event) => {
                 event.stopPropagation();
-                rollOvercomeAll(event, message);
+                handleTargetHelperAction("Roll-all overcome", rollOvercomeAll(event, message));
             });
             wrapper.appendChild(rollAllBtn);
         }
@@ -562,7 +600,7 @@ async function addCheckButtons(
         rollNpcBtn.innerHTML = '<i class="fa-duotone fa-solid fa-dice-d20"></i>';
         rollNpcBtn.addEventListener("click", (event) => {
             event.stopPropagation();
-            rollNpcSaves(event, message);
+            handleTargetHelperAction("NPC saves", rollNpcSaves(event, message));
         });
         wrapper.appendChild(rollNpcBtn);
     }
@@ -602,7 +640,6 @@ function hasUnrolledTargets(flagData: TargetHelperFlagData): boolean {
     }
     return false;
 }
-
 function getSuccessLabel(success: DegreeOfSuccessString): string {
     const i18nKeys: Record<DegreeOfSuccessString, string> = {
         criticalSuccess: "sf2e-forge-custom.degree.criticalSuccess",
@@ -613,29 +650,37 @@ function getSuccessLabel(success: DegreeOfSuccessString): string {
     return game.i18n!.localize(i18nKeys[success]) ?? success;
 }
 
-function buildTooltipHtml(
+export function escapeTooltipText(value: unknown): string {
+    return String(value).replace(/[&<>"']/g, (character) => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;",
+    })[character]!);
+}
+
+export function buildTooltipHtml(
     statistic: string,
     dc: number,
     save: SaveResultData,
     canSeeDetails: boolean
 ): string {
-    const saveLabel = statistic.charAt(0).toUpperCase() + statistic.slice(1);
+    const saveLabel = escapeTooltipText(statistic.charAt(0).toUpperCase() + statistic.slice(1));
     let html = `<div class="th-tooltip">`;
-    html += `<div>${saveLabel} Save DC ${dc}</div>`;
+    html += `<div>${saveLabel} Save DC ${escapeTooltipText(dc)}</div>`;
 
     if (canSeeDetails) {
         const offset = save.value - dc;
         const offsetStr = offset >= 0 ? `+${offset}` : `${offset}`;
         html += `<div class="th-tooltip-result">`;
-        html += `Result: (<i class="fa-solid fa-dice-d20"></i> ${save.die}) `;
-        html += `${getSuccessLabel(save.success)} by ${offsetStr}`;
+        html += `Result: (<i class="fa-solid fa-dice-d20"></i> ${escapeTooltipText(save.die)}) `;
+        html += `${escapeTooltipText(getSuccessLabel(save.success))} by ${escapeTooltipText(offsetStr)}`;
         html += `</div>`;
 
-        if (save.modifiers?.length) {
-            for (const mod of save.modifiers) {
-                const sign = mod.modifier >= 0 ? "+" : "";
-                html += `<div>${mod.label} ${sign}${mod.modifier}</div>`;
-            }
+        for (const mod of save.modifiers) {
+            const sign = mod.modifier >= 0 ? "+" : "";
+            html += `<div>${escapeTooltipText(mod.label)} ${sign}${escapeTooltipText(mod.modifier)}</div>`;
         }
     }
 
@@ -644,8 +689,8 @@ function buildTooltipHtml(
 }
 
 function buildPreRollTooltip(statistic: string, dc: number): string {
-    const saveLabel = statistic.charAt(0).toUpperCase() + statistic.slice(1);
-    return `<div class="th-tooltip"><div>${saveLabel} Save DC ${dc}</div></div>`;
+    const saveLabel = escapeTooltipText(statistic.charAt(0).toUpperCase() + statistic.slice(1));
+    return `<div class="th-tooltip"><div>${saveLabel} Save DC ${escapeTooltipText(dc)}</div></div>`;
 }
 
 // ─── PRAD Overcome Tooltips ──────────────────────────────────────────────────
@@ -656,28 +701,23 @@ function buildOvercomeTooltipHtml(
     save: SaveResultData,
     canSeeDetails: boolean
 ): string {
-    const saveLabel = statistic.charAt(0).toUpperCase() + statistic.slice(1);
+    const saveLabel = escapeTooltipText(statistic.charAt(0).toUpperCase() + statistic.slice(1));
     let html = `<div class="th-tooltip">`;
-    html += `<div>Overcome vs ${saveLabel} DC ${npcSaveDC}</div>`;
+    html += `<div>Overcome vs ${saveLabel} DC ${escapeTooltipText(npcSaveDC)}</div>`;
 
     if (canSeeDetails) {
-        // Show the PC's roll details
         const pcDegree = save.overcomeSuccess ?? save.success;
-        const pcDegreeLabel = getSuccessLabel(pcDegree);
         html += `<div class="th-tooltip-result">`;
-        html += `Roll: (<i class="fa-solid fa-dice-d20"></i> ${save.die}) = ${save.value}`;
+        html += `Roll: (<i class="fa-solid fa-dice-d20"></i> ${escapeTooltipText(save.die)}) = ${escapeTooltipText(save.value)}`;
         html += `</div>`;
-        html += `<div>PC: ${pcDegreeLabel}</div>`;
+        html += `<div>PC: ${escapeTooltipText(getSuccessLabel(pcDegree))}</div>`;
+        html += `<div>Target Save: ${escapeTooltipText(getSuccessLabel(save.success))}</div>`;
 
-        // Show the effective NPC save result
-        const npcDegreeLabel = getSuccessLabel(save.success);
-        html += `<div>Target Save: ${npcDegreeLabel}</div>`;
-
-        if (save.modifiers?.length) {
+        if (save.modifiers.length) {
             html += `<hr style="margin: 2px 0">`;
             for (const mod of save.modifiers) {
                 const sign = mod.modifier >= 0 ? "+" : "";
-                html += `<div>${mod.label} ${sign}${mod.modifier}</div>`;
+                html += `<div>${escapeTooltipText(mod.label)} ${sign}${escapeTooltipText(mod.modifier)}</div>`;
             }
         }
     }
@@ -687,6 +727,6 @@ function buildOvercomeTooltipHtml(
 }
 
 function buildOvercomePreRollTooltip(statistic: string, npcSaveDC: number): string {
-    const saveLabel = statistic.charAt(0).toUpperCase() + statistic.slice(1);
-    return `<div class="th-tooltip"><div>Overcome vs ${saveLabel} DC ${npcSaveDC}</div></div>`;
+    const saveLabel = escapeTooltipText(statistic.charAt(0).toUpperCase() + statistic.slice(1));
+    return `<div class="th-tooltip"><div>Overcome vs ${saveLabel} DC ${escapeTooltipText(npcSaveDC)}</div></div>`;
 }

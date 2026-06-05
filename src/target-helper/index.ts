@@ -7,7 +7,7 @@
  *
  * Architecture:
  *   1. preCreateChatMessage: detect message type → store targets + save data in flags
- *   2. renderChatMessage: read flags → inject per-target rows + custom buttons
+ *   2. renderChatMessageHTML: read flags → inject per-target rows + custom buttons
  *   3. Player clicks save → roll with createMessage:false → store result in flags
  *   4. Flag update → message re-renders → inline results appear
  */
@@ -21,7 +21,6 @@ import {
     isActionMessage, prepareActionMessage,
 } from "./detect.js";
 import { registerTargetHelperTemplates, onRenderTargetHelper } from "./render.js";
-import { registerSocketListener } from "./socket.js";
 import type { TargetHelperFlagData } from "./types.js";
 
 // ─── Module-scoped PRAD state (set by ready.ts, not imported from prad/) ─────
@@ -84,21 +83,14 @@ export function activateTargetHelper(): void {
 
     if (toolbeltTargetHelper) {
         console.log(`${MODULE_ID} | Target Helper: PF2e Toolbelt's Target Helper is active — only handling PRAD cards`);
-        // Only register for PRAD-specific rendering. Foundry V14 renders chat
-        // messages through renderChatMessageHTML; keep the legacy hook so local
-        // V13 development still exercises the same code path.
+        // Foundry V14 renders chat messages through renderChatMessageHTML.
         Hooks.on("renderChatMessageHTML", renderHook);
-        Hooks.on("renderChatMessage", renderHook);
         Hooks.on("preCreateChatMessage", onPreCreatePradOnly);
     } else {
         console.log(`${MODULE_ID} | Target Helper: Registering all hooks`);
         Hooks.on("preCreateChatMessage", onPreCreateChatMessage);
         Hooks.on("renderChatMessageHTML", renderHook);
-        Hooks.on("renderChatMessage", renderHook);
     }
-
-    // Socket listener for cross-client save updates
-    registerSocketListener();
 
     console.log(`${MODULE_ID} | Target Helper: Hooks activated`);
 }
@@ -179,7 +171,9 @@ function onPreCreatePradOnly(
         // Skip if already has target helper data
         if (getFlagData(message)) return;
 
-        const targets = getCurrentTargetUUIDs();
+        // Legacy cards without embedded target-helper data must not snapshot
+        // ambient targets after creation; only explicitly captured targets are safe.
+        const targets: string[] = [];
 
         const flagData: Partial<TargetHelperFlagData> = {
             type: "prad-attack",
@@ -189,7 +183,7 @@ function onPreCreatePradOnly(
                 dc: pradFlags.attackDC as number,
                 basic: false,
             },
-            author: pradFlags.attackerId as string,
+            author: typeof pradFlags.attackerId === "string" ? game.actors?.get(pradFlags.attackerId)?.uuid : undefined,
         };
 
         setSourceFlag(message, flagData);
@@ -201,4 +195,15 @@ function onPreCreatePradOnly(
 // ─── Re-exports ──────────────────────────────────────────────────────────────
 
 export { registerTargetHelperTemplates } from "./render.js";
+export { canUpdateMessage, getCurrentTargetUUIDs, getFlagData, updateTargets } from "./flags.js";
+export { createTargetRevision, normalizeTargetHelperFlagData } from "./result-validation.js";
+export {
+    rollArmorSave,
+    rollNpcSaves,
+    rollOvercomeAll,
+    rollOvercomeForActiveTokens,
+    rollOvercomeForTargets,
+    rollSaveForActiveTokens,
+    rollSavesForTargets,
+} from "./save-roll.js";
 export type { TargetHelperFlagData, SaveResultData } from "./types.js";

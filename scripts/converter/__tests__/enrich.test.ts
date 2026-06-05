@@ -89,7 +89,7 @@ describe("enrichDamage", () => {
         for (const type of [
             "piercing", "slashing", "bludgeoning", "fire", "cold",
             "electricity", "acid", "sonic", "force", "mental",
-            "poison", "bleed", "vitality", "void",
+            "poison", "bleed", "vitality", "spirit", "void",
         ]) {
             expect(enrichDamage(`1d6 ${type} damage`)).toBe(
                 `@Damage[1d6[${type}]] damage`,
@@ -219,6 +219,12 @@ describe("enrichDescription", () => {
         );
     });
 
+    it("scrubs labels behind entity-encoded Foundry syntax delimiters", () => {
+        const input = "&#64;Check&#91;reflex|dc:10&#93;&#123;&lt;img src=x onerror=alert(1)&gt;&#125;";
+
+        expect(enrichDescription(input)).toBe("<p>@Check[reflex|dc:10]{}</p>");
+    });
+
     it("splits paragraphs on double newlines", () => {
         expect(enrichDescription("First paragraph.\n\nSecond paragraph.")).toBe(
             "<p>First paragraph.</p>\n<p>Second paragraph.</p>",
@@ -249,14 +255,14 @@ describe("enrichDescription", () => {
         expect(result).toContain("Compendium.sf2e.conditions.Item.Off-Guard]{off-guard}");
 
         // Check structure: preamble + hr + degrees
-        expect(result).toContain("<hr />");
+        expect(result).toContain("<hr>");
         expect(result).toContain("<strong>Critical Success</strong>");
         expect(result).toContain("<strong>Success</strong>");
         expect(result).toContain("<strong>Failure</strong>");
         expect(result).toContain("<strong>Critical Failure</strong>");
 
         // Degrees are separate paragraphs
-        expect(result).toMatch(/<\/p>\n<hr \/>\n<p><strong>Critical Success<\/strong>/);
+        expect(result).toMatch(/<\/p>\n<hr>\n<p><strong>Critical Success<\/strong>/);
     });
 
     it("enriches a basic save ability", () => {
@@ -281,10 +287,14 @@ describe("enrichDescription", () => {
         const result = enrichDescription(input);
 
         expect(result).toContain("<strong>Trigger</strong>");
-        expect(result).toContain("<hr />");
+        expect(result).toContain("<hr>");
         expect(result).toContain("<strong>Effect</strong>");
         expect(result).toContain("@Check[reflex|dc:20]");
         expect(result).toContain("@Damage[2d6[piercing]]");
+    });
+
+    it("renders ordinary reviewed bold markdown", () => {
+        expect(enrichDescription("**3rd** discharge")).toBe("<p><strong>3rd</strong> discharge</p>");
     });
 
     it("handles a passive ability with no enrichable patterns", () => {

@@ -36,6 +36,10 @@ declare global {
         dc?: { value: number; label?: string };
         origin?: Actor.Implementation | null;
         target?: Actor.Implementation | null;
+        item?: Sf2eItem | null;
+        token?: Sf2eTokenDocument;
+        extraRollOptions?: string[];
+        event?: Event;
         title?: string;
         skipDialog?: boolean;
         createMessage?: boolean;
@@ -47,6 +51,9 @@ declare global {
         dc?: { value: number; label?: string };
         origin?: Actor.Implementation | null;
         target?: Actor.Implementation | null;
+        token?: Sf2eTokenDocument;
+        item?: Sf2eItem | null;
+        extraRollOptions?: string[];
         title?: string;
         skipDialog?: boolean;
         createMessage?: boolean;
@@ -62,7 +69,7 @@ declare global {
         dc?: { value: number };
         check?: {
             mod?: number;
-            roll: (options: Sf2eCheckRollOptions) => Promise<Roll>;
+            roll: (options: Sf2eCheckRollOptions) => Promise<Roll | null>;
         };
         mod?: number;
         roll?: (options: Sf2eStatisticRollOptions) => Promise<Roll>;
@@ -81,6 +88,42 @@ declare global {
         modifiers: Sf2eModifier[];
     }
 
+    /** Structured origin accepted by the raw `game.pf2e.Check.roll()` API. */
+    interface Sf2eRawRollOrigin {
+        actor: Actor.Implementation | null;
+        token: Sf2eTokenDocument | null;
+        statistic: Sf2eStatistic | null;
+        self: boolean;
+        item: Sf2eItem | null;
+        modifiers: Sf2eModifier[];
+    }
+
+    /** Structured target accepted by the raw `game.pf2e.Check.roll()` API. */
+    interface Sf2eRawRollTarget {
+        actor: Actor.Implementation | null;
+        token: Sf2eTokenDocument | null;
+        statistic: Sf2eStatistic | null;
+        self: boolean;
+        item: Sf2eItem | null;
+        distance: number | null;
+        rangeIncrement: number | null;
+    }
+
+    /** Context accepted by the raw `game.pf2e.Check.roll()` API. */
+    interface Sf2eRawCheckRollContext {
+        actor?: Actor.Implementation;
+        token?: Sf2eTokenDocument | null;
+        origin?: Sf2eRawRollOrigin | null;
+        target?: Sf2eRawRollTarget | null;
+        item?: Sf2eItem | null;
+        type?: "attack-roll" | "check" | "counteract-check" | "flat-check" | "initiative" | "perception-check" | "saving-throw" | "skill-check";
+        title?: string;
+        dc?: { value: number; label?: string } | null;
+        options?: Set<string>;
+        skipDialog?: boolean;
+        createMessage?: boolean;
+    }
+
     /** A spellcasting entry on an actor. */
     interface Sf2eSpellcastingEntry {
         readonly statistic?: Sf2eStatistic;
@@ -94,6 +137,8 @@ declare global {
         readonly embeddedSpell?: Sf2eItem & {
             readonly spellcasting?: { statistic?: Sf2eStatistic };
         };
+        getRollOptions?(domain: string): string[];
+        getOriginData?(): { readonly rollOptions?: string[] };
     }
 
     /** An Item with SF2e system extensions. */
@@ -124,7 +169,7 @@ declare global {
 
     /** SF2e-specific properties on Actor documents. */
     interface Sf2eActorExtensions {
-        readonly armorClass?: { parent?: Sf2eStatistic };
+        readonly armorClass?: { value?: number; parent?: Sf2eStatistic };
         getStatistic?(slug: string): Sf2eStatistic | undefined;
         getActiveTokens?(linked?: boolean, linked2?: boolean): Sf2eTokenDocument[];
         readonly spellcasting?: { contents: Sf2eSpellcastingEntry[] };
@@ -151,6 +196,7 @@ declare global {
         readonly actor: Sf2eActor | null;
         readonly isOwner: boolean;
         readonly hidden: boolean;
+        readonly documentName: "Token";
         /** The rendered PlaceableObject on the canvas, if any. */
         readonly object: Sf2eCanvasToken | null;
     }
@@ -198,11 +244,6 @@ declare global {
 
     // ─── Game & Socket Types ─────────────────────────────────────────────
 
-    /** Socket.io socket interface for module communication. */
-    interface Sf2eSocket {
-        on(event: string, callback: (data: unknown) => void): void;
-        emit(event: string, data: unknown): void;
-    }
 
     /** A token from `game.user.targets` (canvas-layer target set). */
     interface Sf2eUserTargetToken {
@@ -212,10 +253,32 @@ declare global {
         readonly id?: string;
     }
 
+    /** UUID-resolvable document types accepted by the public runtime API. */
+    type Sf2eResolvedUuidDocumentName = "Actor" | "ChatMessage" | "Item" | "Token";
+
+    type Sf2eResolvedUuidDocument =
+        | (Actor.Implementation & { readonly documentName: "Actor" })
+        | (ChatMessage.Implementation & { readonly documentName: "ChatMessage" })
+        | (Item.Implementation & { readonly documentName: "Item" })
+        | Sf2eTokenDocument;
+
+    /** API attached to this module's Foundry package entry during init. */
+    type Sf2eForgeCustomApi = import("../api.js").Sf2eForgeCustomApi;
+
+    interface Sf2eGameModule {
+        readonly active: boolean;
+        api?: Sf2eForgeCustomApi;
+    }
+
     /** SF2e game.pf2e / game.sf2e namespace. */
     interface Sf2eGameNamespace {
         Check: {
-            roll: (check: Sf2eCheckModifierInstance, options: Record<string, unknown>) => Promise<Roll>;
+            roll: (
+                check: Sf2eCheckModifierInstance,
+                context?: Sf2eRawCheckRollContext,
+                event?: Event | null,
+                callback?: Sf2eRollCallback,
+            ) => Promise<Roll | null>;
         };
         CheckModifier: new (
             name: string,
@@ -232,14 +295,13 @@ declare global {
      */
     interface Sf2eGame {
         pf2e?: Sf2eGameNamespace;
-        socket?: Sf2eSocket;
         user?: {
             readonly isGM: boolean;
             readonly id: string;
             targets?: Iterable<Sf2eUserTargetToken>;
             getActiveTokens?(): Sf2eActiveToken[];
         } | null;
-        modules?: ReadonlyMap<string, { active: boolean }>;
+        modules?: ReadonlyMap<string, Sf2eGameModule>;
         users?: {
             get(id: string): { isGM: boolean } | undefined;
         };
@@ -290,7 +352,10 @@ declare global {
             classDC?: { value?: number };
         };
         actions?: Array<{
+            type?: string;
             item?: Item.Implementation;
+            totalModifier?: number;
+            variants?: Array<{ penalty?: number }>;
             statistic?: Sf2eStatistic;
             altUsages?: Array<{ statistic?: Sf2eStatistic }>;
         }>;
@@ -336,13 +401,15 @@ declare global {
             };
             origin?: {
                 actor?: string;
-                item?: string;
+                uuid?: string;
+                token?: string;
             };
         };
         type?: string;
         origin?: {
             actor?: string;
-            item?: string;
+            uuid?: string;
+            rollOptions?: string[];
         };
         target?: {
             actor?: string | { id?: string };
@@ -353,6 +420,12 @@ declare global {
 } // end declare global
 
 declare module "fvtt-types/configuration" {
+    interface ModuleConfig {
+        "sf2e-forge-custom": {
+            api: Sf2eForgeCustomApi;
+        };
+    }
+
     namespace Hooks {
         interface HookConfig {
             "pf2e.reroll": (

@@ -37,7 +37,7 @@ const AREA_TYPES = [
  * @param contextType - the `flags.context.type` string from the message
  */
 export function isAreaContextType(contextType: string): boolean {
-    return AREA_TYPES.some((t) => contextType.includes(t));
+    return contextType === "area-fire" || AREA_TYPES.some((t) => contextType.includes(t));
 }
 
 // ─── Spell Classification ────────────────────────────────────────────────────

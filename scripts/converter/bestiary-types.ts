@@ -124,26 +124,40 @@ export interface SpeedData {
     note?: string;
 }
 
-export interface StrikeData {
+interface StrikeBase {
     name: string;
     type: "melee" | "ranged";
-    bonus: number;
     traits: string[];
     damage: DamageRollData[];
+    /** Non-mechanical authored attack metadata retained for display. */
+    otherTags?: string[];
     /** Attack effects (e.g. "Grab", "Knockdown"). */
     effects?: string[];
-    /** Defaults to "strike"; can be "area-fire" or "auto-fire" for SF2e. */
-    action?: "strike" | "area-fire" | "auto-fire";
-    /** Area for area attacks. */
-    area?: { type: string; value: number };
     /** Range for ranged attacks. */
     range?: { increment?: number; max?: number };
 }
 
+export interface OrdinaryStrikeData extends StrikeBase {
+    action?: "strike";
+    bonus: number;
+    dc?: never;
+    area?: never;
+}
+
+export interface AreaAttackData extends StrikeBase {
+    action: "area-fire" | "auto-fire";
+    dc: number;
+    bonus?: never;
+    area: { type: string; value: number };
+}
+
+export type StrikeData = OrdinaryStrikeData | AreaAttackData;
+
 export interface DamageRollData {
     formula: string;
     type: string;
-    category?: string;
+    /** Persistent damage is serialized separately from its underlying type. */
+    category?: "persistent";
 }
 
 /**

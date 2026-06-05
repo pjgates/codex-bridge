@@ -1,6 +1,6 @@
 {
     "name": "sf2e-forge-custom",
-    "version": "0.1.1",
+    "version": "0.1.2",
     "description": "Custom rules module for Starfinder 2e in Foundry VTT",
     "type": "module",
     "scripts": {
@@ -11,11 +11,16 @@
         "watch": "vite build --watch",
         "test": "vitest run",
         "lint": "eslint src/",
+        "typecheck:runtime": "tsc --noEmit -p tsconfig.json",
+        "typecheck:scripts": "tsc --noEmit -p tsconfig.scripts.json",
+        "typecheck": "npm run typecheck:runtime && npm run typecheck:scripts",
+        "verify": "npm run typecheck && npm run lint && npm test && npm run build",
         "clean": "rm -rf dist packs/the-forge-entities packs/the-forge-bestiary",
         "link": "echo 'Symlink to your Foundry modules folder: ln -s $(pwd) <foundryData>/Data/modules/sf2e-forge-custom'"
     },
     "devDependencies": {
         "@foundryvtt/foundryvtt-cli": "^3.0.3",
+        "@types/node": "^22.10.0",
         "@typescript-eslint/eslint-plugin": "^8.54.0",
         "@typescript-eslint/parser": "^8.54.0",
         "commander": "^14.0.3",

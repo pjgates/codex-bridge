@@ -1,4 +1,5 @@
 import { Marked } from "marked";
+import { sanitizeFoundryHtml } from "./sanitize.js";
 
 /**
  * A pre-configured Marked instance for converting vault markdown to HTML.
@@ -25,5 +26,5 @@ export function markdownToHtml(markdown: string): string {
     if (typeof html !== "string") {
         throw new Error("Unexpected async result from marked.parse()");
     }
-    return html.trim();
+    return sanitizeFoundryHtml(html.trim());
 }

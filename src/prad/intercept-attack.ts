@@ -12,12 +12,27 @@
  */
 
 import { MODULE_ID } from "../constants.js";
+import { isCurrentUserDesignatedTargetRollCreator } from "../shared/authorized-roller.js";
 import { getSystemFlags } from "../shared/flags.js";
 import { resolveHtmlRoot } from "../shared/html.js";
+import { getPublicSceneTokenUuids, getSceneTokenId, isSceneTokenUuid } from "../shared/token-uuid.js";
+import { createTargetRevision, normalizeTargetHelperFlagData, rollArmorSave } from "../target-helper/index.js";
 import { getAttackDC, getAttackModifierFromStrike } from "./dc.js";
 
-/** Tracks whether we are currently creating a PRAD message (to avoid re-interception). */
-let _pradRollInProgress = false;
+const RESTORE_ORIGINAL_OPTION = "pradRestoreOriginal";
+
+function resolveUuidSync<T>(uuid: string): T | null {
+    try {
+        return fromUuidSync(uuid) as T | null;
+    } catch {
+        return null;
+    }
+}
+
+/** SF2e/PF2e represents NPC melee, ranged, and area-fire strike items with the `melee` document type. */
+function isNpcStrikeItem(item: Item.Implementation | undefined): item is Item.Implementation {
+    return (item?.type as string | undefined) === "melee";
+}
 
 // ─── Template path ───────────────────────────────────────────────────────────
 
@@ -33,11 +48,12 @@ export function registerAttackCardTemplate(): void {
 // ─── Hook Registration ───────────────────────────────────────────────────────
 
 /**
- * Register the `preCreateChatMessage` hook for intercepting NPC attacks,
- * and the `renderChatMessage` hook for listening to armor save button clicks.
+ * Register attack interception and both Foundry V14 and legacy render hooks.
+ * DOM binding is idempotent because Foundry can deliver both render hooks.
  */
 export function registerAttackInterceptHook(): void {
     Hooks.on("preCreateChatMessage", onPreCreateChatMessage);
+    Hooks.on("renderChatMessageHTML", onRenderAttackCard);
     Hooks.on("renderChatMessage", onRenderAttackCard);
     console.log(`${MODULE_ID} | PRAD: Attack interception hook registered`);
 }
@@ -47,133 +63,159 @@ export function registerAttackInterceptHook(): void {
 function onPreCreateChatMessage(
     message: ChatMessage.Implementation,
     _data: object,
-    _options: object,
+    options: Record<string, unknown> | undefined,
     _userId: string
 ): boolean | void {
     try {
+        if (options?.[RESTORE_ORIGINAL_OPTION] === true) return;
         return _onPreCreateChatMessage(message);
     } catch (err) {
         console.error(`${MODULE_ID} | PRAD: Error in preCreateChatMessage hook`, err);
     }
 }
 
-function _onPreCreateChatMessage(
+interface InterceptedAttack {
+    readonly attacker: Actor.Implementation;
+    readonly attackDC: number;
+    readonly attackerTokenUUID?: string;
+    readonly weaponItem: Item.Implementation;
+    readonly weaponRollOptions?: readonly string[];
+    readonly targetTokenUUIDs: readonly string[];
+    readonly contextualTargetAc: ContextualTargetAc;
+    readonly interceptedAttack: true;
+}
+
+export interface ContextualTargetAc {
+    readonly targetUuid: string;
+    readonly value: number;
+}
+
+/**
+ * Classify an NPC-to-PC SF2e attack before its native message is cancelled.
+ * SF2e stores the embedded strike UUID at `origin.uuid` and the authoritative
+ * target TokenDocument UUID at `context.target.token`.
+ */
+export function classifyInterceptedAttack(
     message: ChatMessage.Implementation,
-): boolean | void {
-    // Don't intercept our own PRAD messages
-    if (_pradRollInProgress) return;
-
-    // Only intercept on the GM's client to avoid duplicate processing
+): InterceptedAttack | undefined {
     if (!game.user?.isGM) return;
+    const visibility = message as ChatMessage.Implementation & { readonly blind?: unknown; readonly whisper?: unknown };
+    if (visibility.blind === true || (Array.isArray(visibility.whisper) && visibility.whisper.length > 0)) return;
 
-    // Check if this is an attack roll from the sf2e system
     const flags = getSystemFlags(message);
-    if (!flags) return;
+    const context = flags?.context;
+    if (context?.type !== "attack-roll") return;
 
-    const context = flags.context;
-    if (!context) return;
-
-    const rollType = context.type;
-    if (rollType !== "attack-roll") return;
-
-    // Identify the attacker actor
     const speakerActorId = message.speaker?.actor;
     if (!speakerActorId) return;
 
-    const attacker = game.actors!.get(speakerActorId as string);
-    if (!attacker) return;
+    const originTokenUUID = context.origin?.token;
+    const speakerSceneId = message.speaker?.scene;
+    const speakerTokenId = message.speaker?.token;
+    const speakerTokenUUID = typeof speakerSceneId === "string" && typeof speakerTokenId === "string"
+        ? `Scene.${speakerSceneId}.Token.${speakerTokenId}`
+        : undefined;
+    const attackerTokenUUID = isSceneTokenUuid(originTokenUUID)
+        ? originTokenUUID
+        : isSceneTokenUuid(speakerTokenUUID) ? speakerTokenUUID : undefined;
+    const attackerToken = attackerTokenUUID ? resolveUuidSync<Sf2eTokenDocument>(attackerTokenUUID) : null;
+    const attacker = attackerToken && attackerToken.uuid === attackerTokenUUID && attackerToken.actor?.id === speakerActorId
+        ? attackerToken.actor
+        : undefined;
+    if (!attacker || (attacker.type as string) !== "npc") return;
+    const targetTokenUUID = context.target?.token;
+    const contextualTargetAc = context.dc?.value;
+    if (!isSceneTokenUuid(targetTokenUUID) || typeof contextualTargetAc !== "number" || !Number.isFinite(contextualTargetAc)) return;
 
-    // Only intercept NPC attacks
-    if ((attacker.type as string) !== "npc") return;
+    const targetToken = resolveUuidSync<{ uuid?: string; actor?: Actor.Implementation }>(targetTokenUUID);
+    const targetActor = targetToken?.actor;
+    if (targetToken?.uuid !== targetTokenUUID || !targetActor || (targetActor.type as string) !== "character") return;
 
-    // Identify the target
-    const targetInfo = flags.target ?? context.target;
-    if (!targetInfo) return;
+    const originItemUUID = flags?.origin?.uuid;
+    if (!originItemUUID) return;
 
-    const rawTargetActor = targetInfo.actor;
-    const targetActorId: string | undefined =
-        typeof rawTargetActor === "string"
-            ? rawTargetActor
-            : rawTargetActor?.id;
-    if (!targetActorId) return;
+    const resolvedItem = resolveUuidSync<Item.Implementation>(originItemUUID);
+    const itemId = resolvedItem?.id;
+    if (!resolvedItem || !itemId || !isNpcStrikeItem(resolvedItem) || attacker.items.get(itemId) !== resolvedItem) return;
 
-    // Resolve the target actor — try UUID first, then world actors
-    let targetActor: Actor.Implementation | undefined;
-    if (typeof targetActorId === "string" && targetActorId.includes(".")) {
-        const resolved = fromUuidSync(targetActorId);
-        if (resolved && "type" in resolved) targetActor = resolved as unknown as Actor.Implementation;
-    }
-    if (!targetActor) {
-        targetActor = game.actors!.get(targetActorId) ?? undefined;
-    }
-    if (!targetActor) return;
+    const enabledModifiers = flags?.modifiers?.filter((modifier) => modifier.enabled);
+    let attackModifier = enabledModifiers?.length
+        ? enabledModifiers.reduce((sum, modifier) => sum + modifier.modifier, 0)
+        : getAttackModifierFromStrike(resolvedItem);
 
-    // Only intercept attacks against PCs (characters), not NPC vs NPC
-    if ((targetActor.type as string) !== "character") return;
-
-    // Extract the NPC's attack modifier and weapon item from the striking item
-    const originItemId = flags.origin?.item ?? context.origin?.item;
-    let attackModifier = 0;
-    let weaponName = "Strike";
-    let weaponItem: Item.Implementation | undefined;
-
-    if (originItemId) {
-        const itemId =
-            typeof originItemId === "string" && originItemId.includes(".")
-                ? originItemId.split(".").pop()!
-                : originItemId;
-        const strikeItem = attacker.items.get(itemId);
-        if (strikeItem) {
-            weaponItem = strikeItem;
-            weaponName = strikeItem.name ?? "Strike";
-            attackModifier = getAttackModifierFromStrike(strikeItem);
-        }
-    }
-
-    if (attackModifier === 0 && flags.modifiers) {
-        const totalMod = flags.modifiers
-            .filter((m) => m.enabled)
-            .reduce((sum: number, m) => sum + m.modifier, 0);
-        if (totalMod !== 0) attackModifier = totalMod;
-    }
-
-    if (attackModifier === 0 && message.rolls?.length > 0) {
+    if (!enabledModifiers?.length && attackModifier === 0 && message.rolls?.length > 0) {
         const roll = message.rolls[0];
         if (roll.total != null) {
             const dieTerm = roll.terms?.[0] as Sf2eRollDieTerm | undefined;
             const dieValue: number = dieTerm?.results?.[0]?.result ?? 0;
-            attackModifier = (roll.total ?? 0) - dieValue;
+            attackModifier = roll.total - dieValue;
         }
     }
 
-    const attackDC = getAttackDC(attackModifier);
+    return {
+        attacker,
+        attackDC: getAttackDC(attackModifier),
+        ...(attackerToken?.actor === attacker && attackerTokenUUID ? { attackerTokenUUID } : {}),
+        weaponItem: resolvedItem,
+        ...(flags?.origin?.rollOptions ? { weaponRollOptions: flags.origin.rollOptions } : {}),
+        targetTokenUUIDs: [targetTokenUUID],
+        contextualTargetAc: { targetUuid: targetTokenUUID, value: contextualTargetAc },
+        interceptedAttack: true,
+    };
+}
 
+function _onPreCreateChatMessage(
+    message: ChatMessage.Implementation,
+): boolean | void {
+    const intercepted = classifyInterceptedAttack(message);
+    if (!intercepted) return;
+
+    const originalSource = message.toObject() as Record<string, unknown>;
     console.log(
-        `${MODULE_ID} | PRAD: Intercepting ${attacker.name}'s attack (DC ${attackDC}) → posting attack card`
+        `${MODULE_ID} | PRAD: Intercepting ${intercepted.attacker.name}'s attack (DC ${intercepted.attackDC}) → posting attack card`
     );
 
-    // Post the attack card instead of auto-rolling
-    postAttackCard({
-        attacker,
-        weaponName,
-        attackDC,
-        attackerTokenId: message.speaker?.token ?? undefined,
-        weaponItem,
+    let restored = false;
+    void postAttackCard(intercepted).catch(async (err: unknown) => {
+        console.error(`${MODULE_ID} | PRAD: Error posting intercepted attack card`, err);
+        try {
+            ui.notifications!.error(game.i18n!.localize("sf2e-forge-custom.prad.attackRestored"));
+        } catch (notificationError) {
+            console.error(`${MODULE_ID} | PRAD: Failed to notify GM about intercepted attack restoration`, notificationError);
+        }
+        if (restored) return;
+        restored = true;
+        try {
+            const restoredMessage = await (ChatMessage as unknown as {
+                create: (data: Record<string, unknown>, options?: Record<string, unknown>) => Promise<unknown>;
+            }).create(originalSource, { [RESTORE_ORIGINAL_OPTION]: true });
+            if (!restoredMessage) throw new Error("Restoring the intercepted attack returned no chat message");
+        } catch (restoreError) {
+            console.error(`${MODULE_ID} | PRAD: Failed to restore intercepted attack`, restoreError);
+            ui.notifications!.error(game.i18n!.localize("sf2e-forge-custom.prad.attackRestoreFailed"));
+        }
     });
 
-    // Cancel the original NPC attack message
     return false;
 }
 
 // ─── Attack Card (posted to chat) ────────────────────────────────────────────
 
-interface AttackCardParams {
+export interface AttackCardParams {
     attacker: Actor.Implementation;
-    weaponName: string;
     attackDC: number;
-    attackerTokenId?: string;
-    /** The NPC's melee/ranged weapon item, used to enrich the card with traits, range, damage. */
-    weaponItem?: Item.Implementation;
+    /** Exact TokenDocument UUID for a synthetic/token attacker. */
+    attackerTokenUUID?: string;
+    /** The exact TokenDocument UUIDs represented by this card. */
+    targetTokenUUIDs: readonly string[];
+    /** The NPC-owned strike item used to derive card and damage data. */
+    weaponItem: Item.Implementation;
+    /** Validated originating strike roll options, when captured from a native attack. */
+    weaponRollOptions?: readonly string[];
+    /** Trusted resolved AC for the exact target of an intercepted native attack. */
+    contextualTargetAc?: ContextualTargetAc;
+    /** True only when this replaces a cancelled native attack. */
+    interceptedAttack?: true;
 }
 
 // ─── Weapon Data Extraction ──────────────────────────────────────────────────
@@ -181,6 +223,8 @@ interface AttackCardParams {
 interface DamageRollEntry {
     formula: string;
     damageType: string;
+    displayDamageType: string;
+    category?: string;
 }
 
 interface WeaponDisplayData {
@@ -194,53 +238,65 @@ interface WeaponDisplayData {
     areaLabel: string;
     hasArea: boolean;
     hasRangeOrArea: boolean;
-    damageFormula: string;
+    damageRolls: DamageRollEntry[];
     hasDamage: boolean;
     hasDetails: boolean;
-    damageRolls: DamageRollEntry[];
     weaponItemId: string;
 }
 
 /**
- * Extract display-friendly weapon data from an NPC melee/ranged item.
+ * Extract display-friendly weapon data from an NPC strike item.
  */
 function extractWeaponData(weaponItem: Item.Implementation): WeaponDisplayData {
-    const sys = weaponItem.system as Record<string, unknown>;
+    const sys = weaponItem.system && typeof weaponItem.system === "object"
+        ? weaponItem.system as Record<string, unknown>
+        : {};
 
     // Image
-    const weaponImg = (weaponItem as unknown as { img?: string }).img ?? "icons/svg/sword.svg";
+    const weaponImg = typeof (weaponItem as unknown as { img?: unknown }).img === "string"
+        ? (weaponItem as unknown as { img: string }).img
+        : "icons/svg/sword.svg";
 
     // Action glyph: strikes are 1 action, area-fire is 2 actions
-    const action = (sys.action as string) ?? "strike";
+    const action = typeof sys.action === "string" ? sys.action : "strike";
     const actionGlyph = action === "area-fire" ? "2" : "1";
 
     // Type label (shown where "Spell 3" appears on spell cards)
     const range = sys.range as { increment?: number; max?: number | null } | null;
     let typeLabel: string;
     if (action === "area-fire") {
-        typeLabel = "Area Attack";
+        typeLabel = game.i18n!.localize("sf2e-forge-custom.prad.areaAttack");
     } else if (range?.increment) {
-        typeLabel = "Ranged Strike";
+        typeLabel = game.i18n!.localize("sf2e-forge-custom.prad.rangedStrike");
     } else {
-        typeLabel = "Melee Strike";
+        typeLabel = game.i18n!.localize("sf2e-forge-custom.prad.meleeStrike");
     }
 
     // ── Damage rolls (extracted first so damage types can feed into traits) ──
-    const damageRollsObj = (sys.damageRolls as Record<string, { damage?: string; damageType?: string }>) ?? {};
+    const damageRollsObj = typeof sys.damageRolls === "object" && sys.damageRolls !== null
+        ? sys.damageRolls as Record<string, { damage?: unknown; damageType?: unknown; category?: unknown }>
+        : {};
     const damageRolls: DamageRollEntry[] = [];
     for (const key of Object.keys(damageRollsObj)) {
         const dr = damageRollsObj[key];
-        if (dr?.damage) {
+        if (typeof dr?.damage === "string") {
+            const damageType = typeof dr.damageType === "string" ? dr.damageType : "untyped";
+            const category = typeof dr.category === "string" && dr.category.length > 0 ? dr.category : undefined;
             damageRolls.push({
                 formula: dr.damage,
-                damageType: dr.damageType ?? "untyped",
+                damageType,
+                displayDamageType: category ? `${category} ${damageType}` : damageType,
+                ...(category ? { category } : {}),
             });
         }
     }
     const hasDamage = damageRolls.length > 0;
 
     // ── Traits (enriched: attack + weapon traits + damage types + range) ──
-    const traitValues: string[] = ((sys.traits as Record<string, unknown>)?.value as string[]) ?? [];
+    const rawTraitValues = (sys.traits as Record<string, unknown> | undefined)?.value;
+    const traitValues = Array.isArray(rawTraitValues)
+        ? rawTraitValues.filter((trait): trait is string => typeof trait === "string")
+        : [];
 
     // Deduplicate by slug
     const seenSlugs = new Set<string>();
@@ -254,7 +310,7 @@ function extractWeaponData(weaponItem: Item.Implementation): WeaponDisplayData {
     };
 
     // 1. "Attack" — every strike has this trait
-    addTrait("attack", "Attack");
+    addTrait("attack", game.i18n!.localize("sf2e-forge-custom.prad.attack"));
 
     // 2. Weapon traits from item data (e.g. "sonic", "volley 30 ft.")
     for (const t of traitValues) {
@@ -268,7 +324,7 @@ function extractWeaponData(weaponItem: Item.Implementation): WeaponDisplayData {
 
     // 4. Range increment tag (matches what PF2e damage rolls show)
     if (range?.increment) {
-        addTrait("range-increment", `Range Increment ${range.increment} ft.`);
+        addTrait("range-increment", game.i18n!.format("sf2e-forge-custom.prad.rangeIncrement", { value: String(range.increment) }));
     }
 
     const hasTraits = traits.length > 0;
@@ -277,11 +333,11 @@ function extractWeaponData(weaponItem: Item.Implementation): WeaponDisplayData {
     let rangeLabel = "";
     let hasRange = false;
     if (range?.increment) {
-        rangeLabel = `${range.increment} feet`;
-        if (range.max) rangeLabel += ` (${range.max} ft. max)`;
+        rangeLabel = game.i18n!.format("sf2e-forge-custom.prad.rangeFeet", { value: String(range.increment) });
+        if (range.max) rangeLabel += ` (${game.i18n!.format("sf2e-forge-custom.prad.rangeMax", { value: String(range.max) })})`;
         hasRange = true;
     } else if (range?.max) {
-        rangeLabel = `${range.max} feet`;
+        rangeLabel = game.i18n!.format("sf2e-forge-custom.prad.rangeFeet", { value: String(range.max) });
         hasRange = true;
     }
 
@@ -289,18 +345,12 @@ function extractWeaponData(weaponItem: Item.Implementation): WeaponDisplayData {
     let areaLabel = "";
     let hasArea = false;
     if (area?.type && area?.value) {
-        areaLabel = `${area.value}-foot ${area.type}`;
+        areaLabel = game.i18n!.format("sf2e-forge-custom.prad.areaFeet", { value: String(area.value), type: area.type });
         hasArea = true;
     }
 
     const hasRangeOrArea = hasRange || hasArea;
 
-    // ── Damage formula display ───────────────────────────────────────────
-    let damageFormula = "";
-    if (hasDamage) {
-        const parts = damageRolls.map((d) => `${d.formula} ${d.damageType}`);
-        damageFormula = `<strong>Damage</strong> ${parts.join(" plus ")}`;
-    }
 
     const hasDetails = hasRangeOrArea || hasDamage;
 
@@ -315,7 +365,6 @@ function extractWeaponData(weaponItem: Item.Implementation): WeaponDisplayData {
         areaLabel,
         hasArea,
         hasRangeOrArea,
-        damageFormula,
         hasDamage,
         hasDetails,
         damageRolls,
@@ -331,101 +380,285 @@ function extractWeaponData(weaponItem: Item.Implementation): WeaponDisplayData {
  * damage formulas, and a "Roll Damage" button, matching the PF2e spell card
  * format.
  */
-export async function postAttackCard(params: AttackCardParams): Promise<void> {
-    const { attacker, weaponName, attackDC, attackerTokenId, weaponItem } = params;
+const MAX_CARD_TARGETS = 100;
+const MAX_UUID_LENGTH = 512;
 
-    try {
-        _pradRollInProgress = true;
+function isBoundedString(value: unknown, maxLength = MAX_UUID_LENGTH): value is string {
+    return typeof value === "string" && value.length > 0 && value.length <= maxLength;
 
-        const saveLabel = game.i18n!.format("PF2E.SaveDCLabel", {
-            dc: `<dc>${attackDC}</dc>`,
-            type: game.i18n!.localize("sf2e-forge-custom.prad.armorSave"),
-        }).replace(/<dc>(.*?)<\/dc>/, '<span data-visibility="all">$1</span>');
+}
+const MAX_ROLL_OPTIONS = 100;
+function isItemUuid(value: unknown): value is string {
+    if (!isBoundedString(value)) return false;
+    const parts = value.split(".");
+    const itemIndex = parts.lastIndexOf("Item");
+    return itemIndex >= 0 && itemIndex === parts.length - 2 && parts[itemIndex + 1].length > 0;
+}
 
-        const sf2eAttacker = attacker as Sf2eActor;
+const MAX_ROLL_OPTION_LENGTH = 200;
 
-        // Extract enriched weapon data when the item is available
-        const wd = weaponItem ? extractWeaponData(weaponItem) : null;
+function getValidatedWeaponRollOptions(weaponItem: Item.Implementation, captured?: readonly string[]): string[] {
+    const itemWithRollOptions = weaponItem as Item.Implementation & {
+        getOriginData?: () => { readonly rollOptions?: unknown };
+        getRollOptions?: (domain: string) => string[];
+    };
+    const options = captured ?? itemWithRollOptions.getOriginData?.().rollOptions ?? itemWithRollOptions.getRollOptions?.("origin:item") ?? [];
+    if (!Array.isArray(options) || options.length > MAX_ROLL_OPTIONS || !options.every((option) => isBoundedString(option, MAX_ROLL_OPTION_LENGTH))) {
+        throw new Error("PRAD attack cards require bounded weapon roll options");
+    }
+    return [...options];
+}
 
-        const templateData = {
-            attackerId: attacker.id,
-            attackerTokenId: attackerTokenId ?? "",
-            weaponName,
-            attackDC,
-            saveLabel,
+function isTokenUuid(value: unknown): value is string {
+    return isSceneTokenUuid(value);
+}
 
-            // Enriched weapon fields (fall back to sensible defaults)
-            weaponImg: wd?.weaponImg ?? sf2eAttacker.img ?? "icons/svg/mystery-man.svg",
-            actionGlyph: wd?.actionGlyph ?? "",
-            typeLabel: wd?.typeLabel ?? "Strike",
-            hasTraits: wd?.hasTraits ?? false,
-            traits: wd?.traits ?? [],
-            hasDetails: wd?.hasDetails ?? false,
-            hasRange: wd?.hasRange ?? false,
-            rangeLabel: wd?.rangeLabel ?? "",
-            hasArea: wd?.hasArea ?? false,
-            areaLabel: wd?.areaLabel ?? "",
-            hasRangeOrArea: wd?.hasRangeOrArea ?? false,
-            hasDamage: wd?.hasDamage ?? false,
-            damageFormula: wd?.damageFormula ?? "",
-        };
+export function getAttackCardTargetUUIDs(explicitTargetTokenUUIDs: readonly string[]): string[] {
+    if (!Array.isArray(explicitTargetTokenUUIDs) || explicitTargetTokenUUIDs.length > MAX_CARD_TARGETS || !explicitTargetTokenUUIDs.every(isTokenUuid)) {
+        throw new Error("PRAD attack cards require an explicit bounded target Token UUID array");
+    }
+    return [...new Set(explicitTargetTokenUUIDs)];
+}
 
-        const content = await foundry.applications.handlebars.renderTemplate(TEMPLATE_ATTACK_CARD, templateData);
+export async function postAttackCard(params: AttackCardParams): Promise<string> {
+    if (!params || typeof params !== "object") throw new Error("PRAD attack card parameters must be an object");
+    if (!game.user?.isGM) throw new Error("Only a GM can post PRAD attack cards");
+    const { attacker, attackDC, attackerTokenUUID, targetTokenUUIDs, weaponItem, weaponRollOptions, contextualTargetAc, interceptedAttack } = params;
+    const attackerToken = attackerTokenUUID ? resolveUuidSync<Sf2eTokenDocument>(attackerTokenUUID) : null;
+    const hasExactAttackerToken = isSceneTokenUuid(attackerTokenUUID)
+        && attackerToken?.uuid === attackerTokenUUID
+        && attackerToken.actor === attacker;
+    const hasRegisteredWorldAttacker = !!attacker?.id && game.actors?.get(attacker.id) === attacker;
+    if (!attacker?.id || (attacker.type as string) !== "npc" || (!hasExactAttackerToken && !hasRegisteredWorldAttacker)) throw new Error("PRAD attack cards require a registered world NPC or exact NPC token attacker");
+    if (!Number.isInteger(attackDC) || attackDC < 0) throw new Error("PRAD attack cards require a non-negative integer attack DC");
+    if (attackerTokenUUID !== undefined && !hasExactAttackerToken) throw new Error("Invalid PRAD attacker token UUID");
+    if (!weaponItem?.id || !isNpcStrikeItem(weaponItem) || attacker.items.get(weaponItem.id) !== weaponItem) throw new Error("PRAD attack cards require an attacker-owned NPC strike item");
+    const weaponItemUUID = (weaponItem as Item.Implementation & { readonly uuid?: unknown }).uuid;
+    if (!isItemUuid(weaponItemUUID)) throw new Error("PRAD attack cards require an exact weapon item UUID");
+    const validatedWeaponRollOptions = getValidatedWeaponRollOptions(weaponItem, weaponRollOptions);
+    const explicitTargets = getAttackCardTargetUUIDs(targetTokenUUIDs);
+    const targets = getPublicSceneTokenUuids(explicitTargets);
+    if (targets.length !== explicitTargets.length || targets.some((uuid) => !explicitTargets.includes(uuid))) {
+        throw new Error("PRAD attack cards cannot include private targets");
+    }
+    if ((interceptedAttack === true) !== (contextualTargetAc !== undefined)) {
+        throw new Error("Intercepted PRAD attack cards require exact contextual AC provenance");
+    }
+    if (interceptedAttack === true && !hasExactAttackerToken) {
+        throw new Error("Intercepted PRAD attack cards require an exact attacker token");
+    }
+    if (interceptedAttack === true && targets.length !== 1) {
+        throw new Error("Intercepted PRAD attack cards require exactly one target");
+    }
+    if (contextualTargetAc !== undefined && (!isSceneTokenUuid(contextualTargetAc.targetUuid) || !targets.includes(contextualTargetAc.targetUuid) || typeof contextualTargetAc.value !== "number" || !Number.isFinite(contextualTargetAc.value))) {
+        throw new Error("PRAD attack cards require contextual AC bound to an exact card target");
+    }
+    const sf2eAttacker = attacker as Sf2eActor;
+    const wd = extractWeaponData(weaponItem);
+    const weaponName = isBoundedString(weaponItem.name, 200) ? weaponItem.name : game.i18n!.localize("sf2e-forge-custom.prad.strike");
+    const revision = createTargetRevision();
+    const templateData = {
+        attackerId: attacker.id,
+        attackerTokenId: attackerTokenUUID ? getSceneTokenId(attackerTokenUUID) ?? "" : "",
+        weaponName,
+        attackDC,
+        revision,
+        weaponImg: wd?.weaponImg ?? sf2eAttacker.img ?? "icons/svg/mystery-man.svg",
+        actionGlyph: wd?.actionGlyph ?? "",
+        typeLabel: wd?.typeLabel ?? game.i18n!.localize("sf2e-forge-custom.prad.strike"),
+        hasTraits: wd?.hasTraits ?? false,
+        traits: wd?.traits ?? [],
+        hasDetails: wd?.hasDetails ?? false,
+        hasRange: wd?.hasRange ?? false,
+        rangeLabel: wd?.rangeLabel ?? "",
+        hasArea: wd?.hasArea ?? false,
+        areaLabel: wd?.areaLabel ?? "",
+        hasRangeOrArea: wd?.hasRangeOrArea ?? false,
+        hasDamage: wd?.hasDamage ?? false,
+        damageRolls: wd?.damageRolls ?? [],
+    };
 
-        // Get current targets (PCs targeted by this attack)
-        const targetUUIDs: string[] = [];
-        const sf2eG = game as Sf2eGame;
-        const userTargets = sf2eG.user?.targets;
-        if (userTargets && typeof (userTargets as Iterable<unknown>)[Symbol.iterator] === "function") {
-            for (const token of userTargets) {
-                if (token.actor) {
-                    targetUUIDs.push(token.document?.uuid ?? token.uuid);
-                }
-            }
-        }
-
-        await ChatMessage.create({
-            content,
-            speaker: {
-                actor: attacker.id,
-                token: attackerTokenId,
-                alias: attacker.name ?? "Unknown",
-            },
-            flags: {
-                [MODULE_ID]: {
-                    pradType: "attack-card",
-                    attackDC,
-                    weaponName,
-                    attackerId: attacker.id,
-                    weaponItemId: wd?.weaponItemId ?? "",
-                    damageRolls: wd?.damageRolls ?? [],
-                    // Target Helper integration: store targets + save data
-                    targetHelper: {
-                        type: "prad-attack",
-                        targets: targetUUIDs,
-                        save: {
-                            statistic: "ac",
-                            dc: attackDC,
-                            basic: false,
-                        },
-                        author: sf2eAttacker.uuid,
+    const content = await foundry.applications.handlebars.renderTemplate(TEMPLATE_ATTACK_CARD, templateData);
+    const created = await ChatMessage.create({
+        content,
+        speaker: {
+            actor: attacker.id,
+            token: attackerTokenUUID ? getSceneTokenId(attackerTokenUUID) ?? undefined : undefined,
+            scene: attackerTokenUUID?.split(".")[1],
+            alias: attacker.name ?? game.i18n!.localize("sf2e-forge-custom.prad.unknownNpc"),
+        },
+        flags: {
+            [MODULE_ID]: {
+                pradType: "attack-card",
+                attackDC,
+                weaponName,
+                attackerId: attacker.id,
+                ...(attackerTokenUUID ? { attackerTokenUUID } : {}),
+                weaponItemId: wd?.weaponItemId ?? "",
+                damageRolls: wd.damageRolls,
+                targetHelper: {
+                    type: "prad-attack",
+                    targets,
+                    generation: 0,
+                    revision,
+                    save: {
+                        statistic: "ac",
+                        dc: attackDC,
+                        basic: false,
                     },
+                    author: sf2eAttacker.uuid,
+                    item: weaponItemUUID,
+                    options: validatedWeaponRollOptions,
+                    ...(contextualTargetAc ? { contextualTargetAc: { targetUuid: contextualTargetAc.targetUuid, value: contextualTargetAc.value } } : {}),
+                    ...(interceptedAttack ? { interceptedAttack: true } : {}),
                 },
             },
-        } as Record<string, unknown>);
-    } catch (err) {
-        console.error(`${MODULE_ID} | PRAD: Error posting attack card`, err);
-    } finally {
-        _pradRollInProgress = false;
+        },
+    } as Record<string, unknown>);
+    const createdUuid = (created as { uuid?: unknown } | null)?.uuid;
+    if (typeof createdUuid !== "string" || createdUuid.length === 0) {
+        throw new Error("Creating the PRAD replacement returned no chat message UUID");
     }
+    return createdUuid;
 }
 
 // ─── renderChatMessage: listen for Armor Save button clicks ──────────────────
 
-/**
- * When a PRAD attack card is rendered, attach click listeners to both the
- * "Armor Save" button and the "Roll Damage" button.
- */
+export interface AttackCardProvenance {
+    readonly attacker: Sf2eActor;
+    readonly attackerToken?: Sf2eTokenDocument;
+    readonly weaponItem: Item.Implementation;
+    readonly weaponName: string;
+    readonly attackDC: number;
+    readonly targetTokenUUIDs: readonly string[];
+    readonly weaponRollOptions: readonly string[];
+    readonly contextualTargetAc?: ContextualTargetAc;
+    readonly interceptedAttack: boolean;
+    readonly strike?: { damage?: (opts: object) => Promise<unknown> };
+}
+
+/** Resolve only persisted, GM-authored PRAD cards backed by a registered NPC strike. */
+export function resolveAttackCardProvenance(message: ChatMessage.Implementation): AttackCardProvenance | undefined {
+    const authoredBy = (message as unknown as { author?: { isGM?: unknown }; user?: { isGM?: unknown } }).author
+        ?? (message as unknown as { user?: { isGM?: unknown } }).user;
+    if (authoredBy?.isGM !== true) return;
+
+    const moduleFlags = (message.flags as Record<string, Record<string, unknown>> | undefined)?.[MODULE_ID];
+    if (moduleFlags?.pradType !== "attack-card") return;
+
+    const targetHelper = normalizeTargetHelperFlagData(moduleFlags.targetHelper);
+    const attackDC = moduleFlags.attackDC;
+    if (targetHelper?.type !== "prad-attack" || targetHelper.save?.statistic !== "ac" || targetHelper.save.basic || !Array.isArray(targetHelper.options)) return;
+    if (!Number.isInteger(attackDC) || (attackDC as number) < 0 || targetHelper.save.dc !== attackDC) return;
+
+    const attackerId = typeof moduleFlags.attackerId === "string" ? moduleFlags.attackerId : undefined;
+    const rawAttackerTokenUUID = moduleFlags.attackerTokenUUID;
+    if (rawAttackerTokenUUID !== undefined && !isSceneTokenUuid(rawAttackerTokenUUID)) return;
+    const attackerTokenUUID = rawAttackerTokenUUID as string | undefined;
+    const weaponItemId = typeof moduleFlags.weaponItemId === "string" ? moduleFlags.weaponItemId : undefined;
+    if (!weaponItemId) return;
+
+    const attackerToken = attackerTokenUUID && isSceneTokenUuid(attackerTokenUUID)
+        ? resolveUuidSync<Sf2eTokenDocument>(attackerTokenUUID)
+        : null;
+    const attacker = attackerTokenUUID !== undefined
+        ? attackerToken?.uuid === attackerTokenUUID ? attackerToken.actor ?? undefined : undefined
+        : attackerId ? game.actors!.get(attackerId) as Sf2eActor | undefined : undefined;
+    if (targetHelper.interceptedAttack && !attackerToken) return;
+    if (!attacker || (attacker.type as string) !== "npc") return;
+
+    const weaponItem = attacker.items.get(weaponItemId);
+    if (!isNpcStrikeItem(weaponItem) || targetHelper.item !== (weaponItem as Item.Implementation & { readonly uuid?: unknown }).uuid) return;
+
+    const sys = attacker.system && typeof attacker.system === "object"
+        ? attacker.system as Record<string, unknown>
+        : {};
+    const actions = sys.actions as Array<{ item?: { id?: string }; damage?: (opts: object) => Promise<unknown> }> | undefined;
+    const strike = Array.isArray(actions) ? actions.find((action) => action.item?.id === weaponItemId) : undefined;
+    const weaponName = isBoundedString(weaponItem.name, 200)
+        ? weaponItem.name
+        : game.i18n!.localize("sf2e-forge-custom.prad.strike");
+    return { attacker, ...(attackerToken ? { attackerToken } : {}), weaponItem, weaponName, weaponRollOptions: targetHelper.options, attackDC: attackDC as number, targetTokenUUIDs: targetHelper.targets, interceptedAttack: targetHelper.interceptedAttack === true, ...(targetHelper.contextualTargetAc ? { contextualTargetAc: targetHelper.contextualTargetAc } : {}), strike };
+}
+
+function isConsumableWeapon(item: Item.Implementation): boolean {
+    const traits = (item as Item.Implementation & { readonly traits?: { has?(slug: string): boolean } }).traits;
+    return (item as Sf2eItem).isOfType?.("weapon") === true && traits?.has?.("consumable") === true;
+}
+
+const inFlightArmorRolls = new WeakMap<object, Set<string>>();
+
+function reserveArmorTargets(message: ChatMessage.Implementation, targetUuids: readonly string[]): (() => void) | null {
+    let reserved = inFlightArmorRolls.get(message);
+    if (!reserved) {
+        reserved = new Set<string>();
+        inFlightArmorRolls.set(message, reserved);
+    }
+    if (targetUuids.some((uuid) => reserved!.has(uuid))) return null;
+    for (const uuid of targetUuids) reserved.add(uuid);
+
+    return () => {
+        for (const uuid of targetUuids) reserved!.delete(uuid);
+        if (reserved!.size === 0) inFlightArmorRolls.delete(message);
+    };
+}
+
+/** Roll armor saves only from trusted persisted PRAD attack-card provenance. */
+export async function rollAttackCardArmorSaves(
+    message: ChatMessage.Implementation,
+    tokens: readonly Sf2eTokenDocument[],
+): Promise<boolean> {
+    const provenance = resolveAttackCardProvenance(message);
+    if (!provenance || !Array.isArray(tokens) || tokens.length === 0) return false;
+
+    const cardTargets = new Set(provenance.targetTokenUUIDs);
+    const seen = new Set<string>();
+    for (const token of tokens) {
+        const uuid = token?.uuid;
+        if (!isSceneTokenUuid(uuid) || seen.has(uuid) || !cardTargets.has(uuid)) return false;
+        const resolved = resolveUuidSync<Sf2eTokenDocument>(uuid);
+        if (resolved?.uuid !== uuid || resolved.actor !== token.actor || !token.actor || (!game.user?.isGM && !token.isOwner)) return false;
+        if (!isCurrentUserDesignatedTargetRollCreator(token)) return false;
+        seen.add(uuid);
+        if (provenance.contextualTargetAc && provenance.contextualTargetAc.targetUuid !== uuid) return false;
+    }
+
+    const release = reserveArmorTargets(message, [...seen]);
+    if (!release) return false;
+    try {
+        return await rollArmorSavesForTargets(tokens, provenance.attackDC, provenance.weaponName, provenance.attacker, provenance.weaponItem, provenance.weaponRollOptions, provenance.contextualTargetAc, provenance.attackerToken);
+    } finally {
+        release();
+    }
+}
+
+export function getCardArmorSaveTargets(message: ChatMessage.Implementation): Sf2eTokenDocument[] {
+    const provenance = resolveAttackCardProvenance(message);
+    if (!provenance) return [];
+
+    const cardTargetUUIDs = new Set(provenance.targetTokenUUIDs);
+    const activeTokens = [...((game as Sf2eGame).user?.getActiveTokens?.() ?? [])];
+    const tokens: Sf2eTokenDocument[] = [];
+    const seenUUIDs = new Set<string>();
+    for (const activeToken of activeTokens) {
+        const token = (activeToken.document ?? activeToken) as Sf2eTokenDocument;
+        const uuid = token.uuid;
+        if (!cardTargetUUIDs.has(uuid) || seenUUIDs.has(uuid)) continue;
+        if (!token.actor || (!game.user?.isGM && !token.isOwner)) continue;
+        seenUUIDs.add(uuid);
+        tokens.push(token);
+    }
+    return tokens;
+}
+
+/** Attach idempotent card actions when a PRAD attack card renders. */
+function handleAsyncCardAction(label: string, operation: Promise<unknown>): void {
+    void operation.catch((error: unknown) => {
+        console.error(`${MODULE_ID} | PRAD: ${label} failed`, error);
+        ui.notifications!.error(game.i18n!.localize("sf2e-forge-custom.prad.attackCardFailed"));
+    });
+}
+
 function onRenderAttackCard(
     message: ChatMessage.Implementation,
     html: JQuery<HTMLElement> | HTMLElement,
@@ -433,35 +666,29 @@ function onRenderAttackCard(
 ): void {
     try {
         const root = resolveHtmlRoot(html);
-        if (!root) return;
+        if (!root || !resolveAttackCardProvenance(message)) return;
 
-        // ── Armor Save button ────────────────────────────────────────────
         const saveBtn = root.querySelector<HTMLButtonElement>('button[data-action="prad-armor-save"]');
         if (saveBtn && !saveBtn.dataset.pradBound) {
             saveBtn.dataset.pradBound = "true";
-
             saveBtn.addEventListener("click", (ev) => {
                 ev.preventDefault();
                 ev.stopPropagation();
-
-                const dc = Number(saveBtn.dataset.dc);
-                const weaponLabel = saveBtn.dataset.weapon ?? "Strike";
-                const attackerId = saveBtn.dataset.attackerId ?? "";
-                const attacker = attackerId ? game.actors!.get(attackerId) : undefined;
-
-                rollArmorSavesForActiveTokens(dc, weaponLabel, attacker ?? undefined);
+                if (!resolveAttackCardProvenance(message)) return;
+                handleAsyncCardAction("Armor save roll", rollAttackCardArmorSaves(message, getCardArmorSaveTargets(message)));
             });
         }
 
-        // ── Roll Damage button ───────────────────────────────────────────
         const dmgBtn = root.querySelector<HTMLButtonElement>('button[data-action="prad-roll-damage"]');
-        if (dmgBtn && !dmgBtn.dataset.pradBound) {
+        if (dmgBtn && !game.user?.isGM) {
+            dmgBtn.disabled = true;
+            dmgBtn.hidden = true;
+        } else if (dmgBtn && !dmgBtn.dataset.pradBound) {
             dmgBtn.dataset.pradBound = "true";
-
             dmgBtn.addEventListener("click", (ev) => {
                 ev.preventDefault();
                 ev.stopPropagation();
-                rollWeaponDamage(message);
+                handleAsyncCardAction("Weapon damage roll", rollWeaponDamage(message));
             });
         }
     } catch (err) {
@@ -471,129 +698,143 @@ function onRenderAttackCard(
 
 // ─── Weapon Damage Roll (triggered by Roll Damage click) ─────────────────────
 
-/**
- * Roll the NPC weapon's damage from data stored in the chat message flags.
- *
- * Tries the system's native strike-damage pipeline first (which produces a
- * proper PF2e damage card). Falls back to a manual `Roll` from the stored
- * formulas if the system path is unavailable.
- */
-async function rollWeaponDamage(message: ChatMessage.Implementation): Promise<void> {
-    const moduleFlags = (message.flags as Record<string, Record<string, unknown>> | undefined)?.[MODULE_ID];
-    if (!moduleFlags) return;
+const HTML_ESCAPE_BY_CHARACTER: Record<string, string> = {
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;",
+};
 
-    const attackerId = moduleFlags.attackerId as string | undefined;
-    const weaponItemId = moduleFlags.weaponItemId as string | undefined;
-    const weaponName = (moduleFlags.weaponName as string) ?? "Strike";
+function escapeHtml(value: string): string {
+    return value.replace(/[&<>"']/g, (character) => HTML_ESCAPE_BY_CHARACTER[character]);
+}
 
-    // ── Try system-native damage via the actor's strike actions ───────
-    if (attackerId && weaponItemId) {
-        const attacker = game.actors!.get(attackerId) as Sf2eActor | undefined;
-        if (attacker) {
-            const sys = attacker.system as Record<string, unknown>;
-            const actions = sys.actions as Array<{ item?: { id?: string }; damage?: (opts: object) => Promise<unknown> }> | undefined;
-            if (Array.isArray(actions)) {
-                const strike = actions.find((a) => a.item?.id === weaponItemId);
-                if (strike?.damage) {
-                    try {
-                        await strike.damage({ event: new MouseEvent("click") });
-                        return;
-                    } catch (err) {
-                        console.warn(`${MODULE_ID} | PRAD: System damage roll failed, using fallback`, err);
-                    }
-                }
-            }
+interface NativeDamageTarget {
+    readonly document?: { readonly uuid?: string };
+}
+
+function getPlaceableUuid(token: NativeDamageTarget): string | undefined {
+    return token.document?.uuid;
+}
+
+/** Select the one explicit canvas token authorized by a damage-card action. */
+export function resolveNativeDamageTarget(targetTokenUUIDs: readonly string[]): NativeDamageTarget | undefined {
+    if (targetTokenUUIDs.length === 1) {
+        const uuid = targetTokenUUIDs[0];
+        const tokenId = getSceneTokenId(uuid);
+        if (!tokenId) return;
+        const document = resolveUuidSync<{ object?: NativeDamageTarget }>(uuid);
+        const token = document?.object ?? (globalThis as unknown as { canvas?: { tokens?: { get?: (id: string) => NativeDamageTarget | undefined } } }).canvas?.tokens?.get?.(tokenId);
+        return token && getPlaceableUuid(token) === uuid ? token : undefined;
+    }
+
+    const authorized = new Set(targetTokenUUIDs);
+    const selected = [...((game as Sf2eGame).user?.targets ?? [])]
+        .filter((token) => authorized.has(getPlaceableUuid(token as NativeDamageTarget) ?? ""));
+    return selected.length === 1 ? selected[0] : undefined;
+}
+
+export async function rollWeaponDamage(message: ChatMessage.Implementation): Promise<boolean> {
+    if (!game.user?.isGM) {
+        ui.notifications!.warn(game.i18n!.localize("sf2e-forge-custom.prad.damageGmOnly"));
+        return false;
+    }
+
+    const provenance = resolveAttackCardProvenance(message);
+    if (!provenance) {
+        ui.notifications!.warn(game.i18n!.localize("sf2e-forge-custom.prad.noDamageData"));
+        return false;
+    }
+
+    const { attacker, weaponItem, strike } = provenance;
+    if (typeof strike?.damage === "function") {
+        const target = resolveNativeDamageTarget(provenance.targetTokenUUIDs);
+        if (!target) {
+            ui.notifications!.warn(game.i18n!.localize("sf2e-forge-custom.prad.damageTargetRequired"));
+            return false;
+        }
+        try {
+            const created = await strike.damage({ event: new MouseEvent("click"), target });
+            return created != null;
+        } catch (err) {
+            console.warn(`${MODULE_ID} | PRAD: System damage roll failed`, err);
+            return false;
         }
     }
 
-    // ── Fallback: manual roll from stored damage formulas ─────────────
-    const damageRolls = moduleFlags.damageRolls as DamageRollEntry[] | undefined;
-    if (!damageRolls?.length) {
-        ui.notifications!.warn("No damage data available for this attack.");
-        return;
+    // Never execute formulas copied from chat flags: a forged card must not be
+    // able to make a GM evaluate arbitrary Roll syntax.
+    const damageRolls = extractWeaponData(weaponItem).damageRolls;
+    if (damageRolls.length === 0) {
+        ui.notifications!.warn(game.i18n!.localize("sf2e-forge-custom.prad.noDamageData"));
+        return false;
+    }
+    if (damageRolls.some((damage) => damage.category !== undefined)) {
+        ui.notifications!.warn(game.i18n!.localize("sf2e-forge-custom.prad.categorizedDamageRequiresNative"));
+        return false;
     }
 
-    const formula = damageRolls.map((d) => d.formula).join(" + ");
+    const formula = damageRolls.map((damage) => damage.formula).join(" + ");
     const roll = new Roll(formula);
     await roll.evaluate();
 
-    const damageTypes = [...new Set(damageRolls.map((d) => d.damageType))].join(", ");
-
-    await roll.toMessage({
+    const damageTypes = [...new Set(damageRolls.map((damage) => damage.damageType))].join(", ");
+    const damageLabel = game.i18n!.localize("sf2e-forge-custom.prad.damage");
+    const created = await roll.toMessage({
         speaker: {
-            actor: attackerId ?? undefined,
-            alias: game.actors!.get(attackerId ?? "")?.name ?? "NPC",
+            actor: attacker.id,
+            alias: attacker.name ?? game.i18n!.localize("sf2e-forge-custom.prad.unknownNpc"),
         },
-        flavor: `<strong>${weaponName}</strong> Damage (${damageTypes})`,
+        flavor: `<strong>${escapeHtml(weaponItem.name ?? game.i18n!.localize("sf2e-forge-custom.prad.strike"))}</strong> ${escapeHtml(damageLabel)} (${escapeHtml(damageTypes)})`,
     } as Record<string, unknown>);
+    return created != null;
 }
 
 // ─── Armor Save Roll (triggered by player click) ────────────────────────────
 
-/**
- * Roll armor saves for the current user's active (selected/owned) tokens.
- * This mirrors the PF2e pattern: game.user.getActiveTokens() → roll for each.
- */
-async function rollArmorSavesForActiveTokens(
+/** Roll armor saves for the explicit owned tokens represented by a caller. */
+export async function rollArmorSavesForTargets(
+    tokens: readonly Sf2eTokenDocument[],
     attackDC: number,
     weaponName: string,
-    attacker?: Actor.Implementation
-): Promise<void> {
-    const sf2eG = game as Sf2eGame;
-    const tokens: Sf2eActiveToken[] = sf2eG.user?.getActiveTokens?.() ?? [];
-
+    attacker?: Actor.Implementation,
+    weaponItem?: Item.Implementation,
+    weaponRollOptions: readonly string[] = [],
+    contextualTargetAc?: ContextualTargetAc,
+    attackerToken?: Sf2eTokenDocument,
+): Promise<boolean> {
+    if (!Array.isArray(tokens) || !Number.isInteger(attackDC) || attackDC < 0 || !isBoundedString(weaponName, 200)) return false;
+    if (!Array.isArray(weaponRollOptions) || weaponRollOptions.length > MAX_ROLL_OPTIONS || !weaponRollOptions.every((option) => isBoundedString(option, MAX_ROLL_OPTION_LENGTH))) return false;
+    if (contextualTargetAc !== undefined && (!isSceneTokenUuid(contextualTargetAc.targetUuid) || typeof contextualTargetAc.value !== "number" || !Number.isFinite(contextualTargetAc.value) || tokens.some((token) => token.uuid !== contextualTargetAc.targetUuid))) return false;
+    if (attackerToken !== undefined && (!attacker || !isSceneTokenUuid(attackerToken.uuid) || attackerToken.actor !== attacker)) return false;
     if (tokens.length === 0) {
         ui.notifications!.error(game.i18n!.localize("sf2e-forge-custom.prad.noToken"));
-        return;
+        return false;
     }
 
+    let rolled = false;
     for (const token of tokens) {
+        if (!game.user?.isGM && !token.isOwner) continue;
         const actor = token.actor as Sf2eActor | null | undefined;
         if (!actor) continue;
 
-        // Use the PC's ArmorStatistic for a native check card
-        const armorStatistic = actor.armorClass?.parent;
-
-        if (armorStatistic?.roll) {
-            await armorStatistic.roll({
-                dc: { value: attackDC, label: weaponName },
-                origin: attacker ?? null,
-                target: actor,
-                title: game.i18n!.localize("sf2e-forge-custom.prad.armorSave"),
-                skipDialog: true,
-                createMessage: true,
-            });
-        } else {
-            // Fallback for actors without ArmorStatistic
-            const pf2e = sf2eG.pf2e;
-            if (pf2e?.Check?.roll && pf2e?.CheckModifier && pf2e?.Modifier) {
-                const sys = actor.system as Sf2eActorSystemData;
-                const acValue = sys?.attributes?.ac?.value ?? 10;
-                const armorMod = acValue - 10;
-                const check = new pf2e.CheckModifier(
-                    game.i18n!.localize("sf2e-forge-custom.prad.armorSave"),
-                    { modifiers: [] },
-                    [new pf2e.Modifier({
-                        label: game.i18n!.localize("sf2e-forge-custom.prad.armorSave"),
-                        modifier: armorMod,
-                        type: "untyped",
-                    })]
-                );
-                const actorToken = actor.getActiveTokens?.(true, true)?.[0] ?? null;
-                await pf2e.Check.roll(check, {
-                    actor,
-                    token: actorToken,
-                    type: "check",
-                    title: game.i18n!.localize("sf2e-forge-custom.prad.armorSave"),
-                    dc: { value: attackDC, label: weaponName },
-                    skipDialog: true,
-                    createMessage: true,
-                });
-            }
-        }
+        const item = !weaponItem || isConsumableWeapon(weaponItem) ? null : weaponItem as Sf2eItem;
+        const created = await rollArmorSave({
+            actor,
+            token,
+            attackDC,
+            weaponName,
+            ...(contextualTargetAc ? { armorClass: contextualTargetAc.value } : {}),
+            origin: attacker ?? null,
+            originToken: attackerToken ?? null,
+            item,
+            rollOptions: weaponRollOptions,
+            skipDialog: true,
+            createMessage: true,
+        });
+        rolled = created != null || rolled;
     }
+    return rolled;
 }
 
-// ─── Exports for NPC sheet usage ─────────────────────────────────────────────
-
-export type { AttackCardParams };
