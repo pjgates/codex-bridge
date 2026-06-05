@@ -117,6 +117,7 @@ declare global {
         target?: Sf2eRawRollTarget | null;
         item?: Sf2eItem | null;
         type?: "attack-roll" | "check" | "counteract-check" | "flat-check" | "initiative" | "perception-check" | "saving-throw" | "skill-check";
+        identifier?: string;
         title?: string;
         dc?: { value: number; label?: string } | null;
         options?: Set<string>;
@@ -428,9 +429,15 @@ declare module "fvtt-types/configuration" {
 
     namespace Hooks {
         interface HookConfig {
+            "pf2e.preReroll": (
+                discardedRoll: Roll,
+                unevaluatedNewRoll: Roll,
+                resource: Sf2eRerollResource | null,
+                options: Sf2eRerollHookOptions,
+            ) => void;
             "pf2e.reroll": (
-                oldRoll: Roll,
-                newRoll: Roll,
+                discardedRoll: Roll,
+                evaluatedNewRoll: Roll,
                 resource: Sf2eRerollResource | null,
                 options: Sf2eRerollHookOptions,
             ) => void;

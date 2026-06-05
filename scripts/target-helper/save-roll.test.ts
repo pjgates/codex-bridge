@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { canRollOvercomeAsCurrentUser, resolveOvercomeCasterActor, rollOvercomeForTargets, rollSavesForTargets } from "../../src/target-helper/save-roll.js";
+import { canRollOvercomeAsCurrentUser, onTargetHelperReroll, resolveOvercomeCasterActor, rollOvercomeForTargets, rollSavesForTargets } from "../../src/target-helper/save-roll.js";
 import { encodeTargetUuidSaveKey } from "../../src/target-helper/result-validation.js";
 import { DC_BASE_DEFAULT, DC_BASE_STRICT, setDCBase } from "../../src/shared/dc.js";
 
@@ -10,6 +10,7 @@ const ROLL = { total: 17, terms: [{ total: 10 }] } as unknown as Roll;
 
 function createMessage(targetIds: string[] = [], pradOvercome = false) {
     return {
+        id: "parent",
         actor: null,
         isAuthor: true,
         canUserModify: vi.fn().mockReturnValue(true),
@@ -601,6 +602,8 @@ describe("rollOvercomeForTargets", () => {
             origin: { actor: caster, token: casterToken, item },
             target: { actor: npcActor, token: tokenB, statistic: contextualNpcStatistic },
             options: new Set(["item:trait:mental"]),
+            identifier: `sf2e-forge-custom:target-helper-overcome:v1|parent|${tokenB.uuid}|0|${REVISION}`,
+            createMessage: true,
         });
         expect(rawRoll.mock.calls[0][1].target.token).not.toBe(tokenA);
         expect(message.update).toHaveBeenCalledWith(expect.objectContaining({
@@ -631,9 +634,13 @@ describe("rollOvercomeForTargets", () => {
 
         expect(consumable.quantity).toBe(2);
         expect(rawRoll).toHaveBeenCalledTimes(2);
+        const identifiers = rawRoll.mock.calls.map(([, context]) => context.identifier);
+        expect(new Set(identifiers).size).toBe(2);
+        expect(identifiers).toEqual(targets.map((target) => `sf2e-forge-custom:target-helper-overcome:v1|parent|${target.uuid}|0|${REVISION}`));
         for (const [, context] of rawRoll.mock.calls) {
             expect(context).not.toHaveProperty("item");
             expect(context).toMatchObject({ origin: { item: null }, options: new Set(["item:trait:area"]) });
+            expect(context).toMatchObject({ createMessage: true });
         }
         expect(casterStatistic.withRollOptions).toHaveBeenCalledWith(expect.objectContaining({ item: consumable, extraRollOptions: ["item:trait:area"] }));
         expect(npcStatistic.withRollOptions).toHaveBeenCalledWith(expect.objectContaining({ item: consumable, extraRollOptions: ["item:trait:area"] }));
@@ -675,5 +682,128 @@ describe("rollOvercomeForTargets", () => {
         Object.assign(globalThis, { game: { ...game, user: assignedOwner, users: [gm, assignedOwner, firstOwner] } });
         await rollOvercomeForTargets(EVENT, message as unknown as ChatMessage.Implementation, [target]);
         expect(rawRoll).toHaveBeenCalledOnce();
+    });
+});
+
+describe("native linked Overcome rerolls", () => {
+    const targetUuid = "Scene.scene.Token.target";
+    const saveKey = encodeTargetUuidSaveKey(targetUuid, 0, REVISION);
+
+    function linkedIdentifier(uuid = targetUuid, generation = 0): string {
+        return `sf2e-forge-custom:target-helper-overcome:v1|parent|${uuid}|${generation}|${REVISION}`;
+    }
+
+    function linkedRoll(identifier: string, total = 30, die = 10): Roll {
+        return {
+            total,
+            options: { identifier },
+            dice: [{
+                number: 1,
+                faces: 20,
+                results: [{ active: false, result: 3 }, { active: true, result: die }],
+            }],
+        } as unknown as Roll;
+    }
+
+    function createLinkedParent() {
+        const caster = {};
+        const message = createMessage(["target"], true);
+        Object.assign(message, { actor: caster });
+        message.flags["sf2e-forge-custom"].targetHelper.saves = {
+            [saveKey]: {
+                value: 17,
+                die: 2,
+                success: "failure",
+                modifiers: [{ label: "base", modifier: 15 }],
+                private: false,
+                statistic: "reflex",
+                targetUuid,
+                generation: 0,
+                revision: REVISION,
+                overcomeDc: 20,
+                overcomeSuccess: "success",
+            },
+        } as never;
+        const user = { id: "gm", active: true, isGM: true };
+        Object.assign(globalThis, {
+            game: { user, users: [user], messages: new Map([["parent", message]]) },
+        });
+        return message;
+    }
+
+    it("updates the exact inline target from the replacement total and active Heroic-floor-compatible d20", async () => {
+        const message = createLinkedParent();
+        const identifier = linkedIdentifier();
+
+        onTargetHelperReroll(linkedRoll(identifier, 17, 2), linkedRoll(identifier, 30, 10));
+
+        await vi.waitFor(() => expect(message.update).toHaveBeenCalledOnce());
+        expect(message.update).toHaveBeenCalledWith({
+            [`flags.sf2e-forge-custom.targetHelper.saves.${saveKey}`]: {
+                value: 30,
+                die: 10,
+                success: "criticalFailure",
+                modifiers: [{ label: "base", modifier: 15 }],
+                private: false,
+                statistic: "reflex",
+                targetUuid,
+                generation: 0,
+                revision: REVISION,
+                overcomeDc: 20,
+                overcomeSuccess: "criticalSuccess",
+            },
+        });
+    });
+
+    it.each([
+        { name: "unrelated", configure: (_message: ReturnType<typeof createMessage>) => "another-module:roll" },
+        { name: "malformed", configure: (_message: ReturnType<typeof createMessage>) => `${linkedIdentifier()}|extra` },
+        { name: "stale", configure: (_message: ReturnType<typeof createMessage>) => linkedIdentifier(targetUuid, 1) },
+        { name: "wrong-target", configure: (_message: ReturnType<typeof createMessage>) => linkedIdentifier("Scene.scene.Token.other") },
+        { name: "private", configure: (message: ReturnType<typeof createMessage>) => {
+            message.flags["sf2e-forge-custom"].targetHelper.saves = {
+                [saveKey]: { private: true, statistic: "reflex", targetUuid, generation: 0, revision: REVISION },
+            } as never;
+            return linkedIdentifier();
+        } },
+        { name: "invalid-current-flags", configure: (message: ReturnType<typeof createMessage>) => {
+            message.flags["sf2e-forge-custom"].targetHelper.revision = "invalid";
+            return linkedIdentifier();
+        } },
+        { name: "no-authority", configure: (message: ReturnType<typeof createMessage>) => {
+            message.isAuthor = false;
+            const user = { id: "player", active: true, isGM: false };
+            Object.assign(globalThis, { game: { ...game, user, users: [user] } });
+            return linkedIdentifier();
+        } },
+        { name: "no-parent-update-permission", configure: (message: ReturnType<typeof createMessage>) => {
+            message.canUserModify.mockReturnValue(false);
+            return linkedIdentifier();
+        } },
+    ])("ignores $name rerolls", async ({ configure }) => {
+        const message = createLinkedParent();
+        const identifier = configure(message);
+
+        onTargetHelperReroll(linkedRoll(identifier, 17, 2), linkedRoll(identifier, 30, 10));
+        await Promise.resolve();
+        await Promise.resolve();
+
+        expect(message.update).not.toHaveBeenCalled();
+    });
+
+    it("logs a parent persistence failure without throwing into PF2e", async () => {
+        const message = createLinkedParent();
+        const error = new Error("persistence failed");
+        message.update.mockRejectedValue(error);
+        const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+        const identifier = linkedIdentifier();
+
+        expect(() => onTargetHelperReroll(linkedRoll(identifier, 17, 2), linkedRoll(identifier, 30, 10))).not.toThrow();
+
+        await vi.waitFor(() => expect(consoleError).toHaveBeenCalledWith(
+            "sf2e-forge-custom | PRAD Overcome: Unable to persist native reroll result",
+            error,
+        ));
+        consoleError.mockRestore();
     });
 });

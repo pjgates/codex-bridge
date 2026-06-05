@@ -1,8 +1,7 @@
 /**
  * Target Helper — Save Rolling (Imperative Shell)
  *
- * Handles rolling saves for targets using the system's native
- * Statistic.check.roll() API with createMessage: false.
+ * Handles rolling saves for targets using the system's native check APIs.
  * Results are captured via callback and stored in message flags.
  *
  * Filtering and result-building logic is delegated to pure functions
@@ -14,6 +13,7 @@
 import { MODULE_ID } from "../constants.js";
 import { isCurrentUserDesignatedActorRoller, isCurrentUserDesignatedTargetRoller } from "../shared/authorized-roller.js";
 import { getArmorSaveModifier, getPcAC, getSaveDC } from "../shared/dc.js";
+import { calculateDegree, degreeToString, invertDegreeString } from "../shared/degree.js";
 import {
     filterUnrolledNpcTargets,
     filterEligibleActiveTokens,
@@ -27,7 +27,7 @@ import {
 } from "../shared/roll-logic.js";
 import { canUpdateMessage, getFlagData, updateSaves } from "./flags.js";
 import { type PersistedSaveResultData, type SaveResultData, type DegreeOfSuccessString } from "./types.js";
-import { normalizeSaveResult } from "./result-validation.js";
+import { getTargetTokenId, normalizeSaveResult } from "./result-validation.js";
 
 // ─── Roll Callback Helpers ───────────────────────────────────────────────────
 
@@ -88,6 +88,144 @@ function resolveUuidSync<T>(uuid: string): T | null {
 
 function getTokenUuid(token: Sf2eTokenDocument): string {
     return token.uuid;
+}
+
+const OVERCOME_REROLL_IDENTIFIER_PREFIX = `${MODULE_ID}:target-helper-overcome:v1`;
+const MAX_OVERCOME_REROLL_IDENTIFIER_LENGTH = 768;
+const MAX_PARENT_MESSAGE_ID_LENGTH = 128;
+const TARGET_REVISION_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const SAFE_PARENT_MESSAGE_ID_PATTERN = /^[A-Za-z0-9_-]+$/;
+
+interface OvercomeRerollLink {
+    readonly parentMessageId: string;
+    readonly targetUuid: string;
+    readonly generation: number;
+    readonly revision: string;
+}
+
+interface RollDieResult {
+    readonly active?: unknown;
+    readonly result?: unknown;
+}
+
+interface RollDie {
+    readonly number?: unknown;
+    readonly faces?: unknown;
+    readonly results?: readonly RollDieResult[];
+}
+
+function isSafeParentMessageId(value: unknown): value is string {
+    return typeof value === "string"
+        && value.length > 0
+        && value.length <= MAX_PARENT_MESSAGE_ID_LENGTH
+        && SAFE_PARENT_MESSAGE_ID_PATTERN.test(value)
+        && value !== "__proto__"
+        && value !== "constructor"
+        && value !== "prototype";
+}
+
+function isTargetRevision(value: unknown): value is string {
+    return typeof value === "string" && TARGET_REVISION_PATTERN.test(value);
+}
+
+function createOvercomeRerollIdentifier(link: OvercomeRerollLink): string | null {
+    if (!isSafeParentMessageId(link.parentMessageId)
+        || getTargetTokenId(link.targetUuid) === null
+        || !Number.isSafeInteger(link.generation)
+        || link.generation < 0
+        || !isTargetRevision(link.revision)) return null;
+
+    const identifier = `${OVERCOME_REROLL_IDENTIFIER_PREFIX}|${link.parentMessageId}|${link.targetUuid}|${link.generation}|${link.revision}`;
+    return identifier.length <= MAX_OVERCOME_REROLL_IDENTIFIER_LENGTH ? identifier : null;
+}
+
+function parseOvercomeRerollIdentifier(value: unknown): OvercomeRerollLink | null {
+    if (typeof value !== "string" || value.length > MAX_OVERCOME_REROLL_IDENTIFIER_LENGTH) return null;
+    const parts = value.split("|");
+    if (parts.length !== 5 || parts[0] !== OVERCOME_REROLL_IDENTIFIER_PREFIX) return null;
+
+    const [, parentMessageId, targetUuid, rawGeneration, revision] = parts;
+    const generation = Number(rawGeneration);
+    if (!isSafeParentMessageId(parentMessageId)
+        || getTargetTokenId(targetUuid) === null
+        || !Number.isSafeInteger(generation)
+        || generation < 0
+        || generation.toString() !== rawGeneration
+        || !isTargetRevision(revision)) return null;
+
+    return { parentMessageId, targetUuid, generation, revision };
+}
+
+function getRollIdentifier(roll: Roll): unknown {
+    return (roll as Roll & { readonly options?: { readonly identifier?: unknown } }).options?.identifier;
+}
+
+function getActiveD20Result(roll: Roll): number | null {
+    const dice = (roll as Roll & { readonly dice?: readonly RollDie[] }).dice;
+    if (!Array.isArray(dice)) return null;
+    const d20s = dice.filter((die) => die.number === 1 && die.faces === 20);
+    if (d20s.length !== 1 || !Array.isArray(d20s[0].results)) return null;
+    const activeResults = d20s[0].results.filter((result) => result.active === true);
+    const result = activeResults.length === 1 ? activeResults[0].result : null;
+    return typeof result === "number" && Number.isInteger(result) && result >= 1 && result <= 20 ? result : null;
+}
+
+function getMessageById(id: string): ChatMessage.Implementation | null {
+    const message = game.messages?.get(id) as ChatMessage.Implementation | undefined;
+    return message?.id === id ? message : null;
+}
+
+async function updateLinkedOvercomeReroll(oldRoll: Roll, newRoll: Roll): Promise<void> {
+    const oldIdentifier = getRollIdentifier(oldRoll);
+    if (getRollIdentifier(newRoll) !== oldIdentifier) return;
+    const link = parseOvercomeRerollIdentifier(oldIdentifier);
+    if (!link) return;
+
+    const parent = getMessageById(link.parentMessageId);
+    if (!parent || !canUpdateMessage(parent)) return;
+    const flagData = getFlagData(parent);
+    if (!flagData?.pradOvercome
+        || !flagData.save
+        || flagData.generation !== link.generation
+        || flagData.revision !== link.revision
+        || !flagData.targets.includes(link.targetUuid)) return;
+
+    const targetId = getTargetTokenId(link.targetUuid);
+    const previous = targetId ? flagData.saves?.[targetId] : undefined;
+    if (!targetId
+        || !previous
+        || previous.private
+        || previous.targetUuid !== link.targetUuid
+        || previous.generation !== link.generation
+        || previous.revision !== link.revision
+        || previous.statistic !== flagData.save.statistic
+        || typeof previous.overcomeDc !== "number"
+        || !Number.isFinite(previous.overcomeDc)
+        || previous.overcomeSuccess === undefined
+        || previous.success !== invertDegreeString(previous.overcomeSuccess)
+        || !canRollOvercomeAsCurrentUser(parent, flagData.author)) return;
+
+    const die = getActiveD20Result(newRoll);
+    const total = newRoll.total;
+    if (die === null || typeof total !== "number" || !Number.isFinite(total)) return;
+    const overcomeSuccess = degreeToString(calculateDegree(total, previous.overcomeDc, die));
+    const replacement = normalizeSaveResult({
+        ...previous,
+        value: total,
+        die,
+        success: invertDegreeString(overcomeSuccess),
+        overcomeSuccess,
+    }, flagData.save.statistic);
+    if (!replacement) return;
+
+    await updateSaves(parent, { [targetId]: replacement });
+}
+
+/** Update a linked inline Overcome result after PF2e evaluates a native replacement roll. */
+export function onTargetHelperReroll(oldRoll: Roll, newRoll: Roll): void {
+    void updateLinkedOvercomeReroll(oldRoll, newRoll).catch((error: unknown) => {
+        console.error(`${MODULE_ID} | PRAD Overcome: Unable to persist native reroll result`, error);
+    });
 }
 
 function resolveMessageOriginToken(message: ChatMessage.Implementation, origin: Sf2eActor | null): Sf2eTokenDocument | null {
@@ -485,6 +623,8 @@ export async function rollOvercomeForTargets(
     const { statistic: saveStatistic } = flagData.save;
     const existingSaves = flagData.saves ?? {};
     const { generation, revision } = flagData;
+    const parentMessageId = message.id;
+    if (!isSafeParentMessageId(parentMessageId)) return false;
     const messageItem = (message as Sf2eChatMessage).item;
     const item = messageItem && messageItem.uuid === flagData.item
         ? messageItem
@@ -518,9 +658,11 @@ export async function rollOvercomeForTargets(
     const rollPromises = targets.map(async (target) => {
         if (existingSaves[target.id]) return;
         const npcActor = target.actor;
-        const exactTarget = resolveUuidSync<Sf2eTokenDocument>(getTokenUuid(target));
-        if (!npcActor || exactTarget?.uuid !== getTokenUuid(target) || exactTarget.actor !== npcActor) return;
-
+        const targetUuid = getTokenUuid(target);
+        const exactTarget = resolveUuidSync<Sf2eTokenDocument>(targetUuid);
+        if (!npcActor || exactTarget?.uuid !== targetUuid || exactTarget.actor !== npcActor) return;
+        const identifier = createOvercomeRerollIdentifier({ parentMessageId, targetUuid, generation, revision });
+        if (!identifier) return;
         const pf2e = (game as Sf2eGame).pf2e;
         const rollItem = isConsumableWeapon(item) ? null : item;
         const npcStatistic = npcActor.getStatistic?.(saveStatistic) as ContextualStatistic | undefined;
@@ -545,7 +687,7 @@ export async function rollOvercomeForTargets(
         });
         if (!pf2e?.Check?.roll || !pf2e.CheckModifier || typeof npcSaveDC !== "number" || !Number.isFinite(npcSaveDC) || !Array.isArray(casterModifiers) || !(rawOptions instanceof Set)) return;
 
-        const release = reserveTokenRoll(message, getTokenUuid(target));
+        const release = reserveTokenRoll(message, targetUuid);
         if (!release) return;
         releases.push(release);
 
@@ -561,7 +703,7 @@ export async function rollOvercomeForTargets(
                     saveStatistic,
                     npcSaveDC,
                 );
-                const normalized = normalizeSaveResult({ ...result, targetUuid: getTokenUuid(target), generation, revision }, saveStatistic);
+                const normalized = normalizeSaveResult({ ...result, targetUuid, generation, revision }, saveStatistic);
                 if (normalized) updates[target.id] = normalized;
                 else console.error(`${MODULE_ID} | PRAD Overcome: Native roll returned invalid data`);
             } catch (error) {
@@ -578,6 +720,7 @@ export async function rollOvercomeForTargets(
                 type: "check",
                 title: label,
                 dc: { value: npcSaveDC, label },
+                identifier,
                 origin: {
                     actor: casterActor,
                     token: casterToken,
@@ -598,7 +741,7 @@ export async function rollOvercomeForTargets(
                 ...(rollItem ? { item: rollItem } : {}),
                 options: rawOptions,
                 skipDialog,
-                createMessage: false,
+                createMessage: true,
             }, event, callback);
         } catch (error) {
             console.error(`${MODULE_ID} | PRAD Overcome: Error rolling check`, error);

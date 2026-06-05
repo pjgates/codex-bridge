@@ -8,7 +8,7 @@
  * Architecture:
  *   1. preCreateChatMessage: detect message type → store targets + save data in flags
  *   2. renderChatMessageHTML: read flags → inject per-target rows + custom buttons
- *   3. Player clicks save → roll with createMessage:false → store result in flags
+ *   3. Player clicks save → roll → store result in flags
  *   4. Flag update → message re-renders → inline results appear
  */
 
@@ -21,6 +21,7 @@ import {
     isActionMessage, prepareActionMessage,
 } from "./detect.js";
 import { registerTargetHelperTemplates, onRenderTargetHelper } from "./render.js";
+import { onTargetHelperReroll } from "./save-roll.js";
 import type { TargetHelperFlagData } from "./types.js";
 
 // ─── Module-scoped PRAD state (set by ready.ts, not imported from prad/) ─────
@@ -57,6 +58,7 @@ export function initTargetHelper(): void {
  * after confirming that the feature should be enabled.
  */
 export function activateTargetHelper(): void {
+    Hooks.on("pf2e.reroll", onTargetHelperReroll);
     // Check if PF2e Toolbelt's Target Helper is already active
     // to avoid duplicate processing for standard message types
     const sf2eG = game as Sf2eGame;

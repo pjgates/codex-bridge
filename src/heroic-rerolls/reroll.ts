@@ -2,54 +2,54 @@
 
 import { MODULE_ID } from "../constants.js";
 
-const HEROIC_REROLL_MINIMUM = 10;
-
-interface HeroicRerollResult {
-    active?: boolean;
-    result: number;
-}
+const HEROIC_REROLL_MODIFIER = "min10";
 
 interface HeroicRerollDie {
     readonly number?: number;
     readonly faces?: number;
-    readonly results: HeroicRerollResult[];
+    readonly modifiers: string[];
 }
 
 interface HeroicRerollRoll {
     readonly dice: readonly HeroicRerollDie[];
-    _total: number;
 }
 
-/**
- * Apply the Heroic Rerolls floor to an evaluated Hero Point reroll.
- * Returns whether the roll changed.
- */
-export function applyHeroicRerollFloor(
+/** Add the Heroic Rerolls minimum to an unevaluated single-d20 Hero Point reroll. */
+export function addHeroicRerollMinimum(
     roll: HeroicRerollRoll,
     resource: Sf2eRerollResource | null,
 ): boolean {
     if (resource?.slug !== "hero-points") return false;
 
-    const die = roll.dice.find((candidate) => candidate.number === 1 && candidate.faces === 20);
-    const result = die?.results.find((candidate) => candidate.active && candidate.result < HEROIC_REROLL_MINIMUM);
-    if (!result) return false;
+    let d20: HeroicRerollDie | undefined;
+    for (const die of roll.dice) {
+        if (die.faces !== 20) continue;
+        if (die.number !== 1 || d20) return false;
+        d20 = die;
+    }
 
-    roll._total += HEROIC_REROLL_MINIMUM - result.result;
-    result.result = HEROIC_REROLL_MINIMUM;
+    if (!d20) return false;
+    const existingMinimum = d20.modifiers.reduce((minimum, modifier) => {
+        const match = /^min(\d+)$/.exec(modifier);
+        return match ? Math.max(minimum, Number(match[1])) : minimum;
+    }, 0);
+    if (existingMinimum >= 10) return false;
+
+    d20.modifiers.push(HEROIC_REROLL_MODIFIER);
     return true;
 }
 
-/** Handle an evaluated PF2e reroll without mutating the discarded roll. */
-export function onHeroicReroll(
+/** Add the Heroic Rerolls minimum before PF2e evaluates the replacement roll. */
+export function onHeroicPreReroll(
     _oldRoll: Roll,
-    newRoll: Roll,
+    unevaluatedNewRoll: Roll,
     resource: Sf2eRerollResource | null,
 ): void {
-    applyHeroicRerollFloor(newRoll as unknown as HeroicRerollRoll, resource);
+    addHeroicRerollMinimum(unevaluatedNewRoll, resource);
 }
 
 /** Activate Heroic Rerolls after Foundry has initialized its hook system. */
 export function activateHeroicRerolls(): void {
-    Hooks.on("pf2e.reroll", onHeroicReroll);
+    Hooks.on("pf2e.preReroll", onHeroicPreReroll);
     console.log(`${MODULE_ID} | Heroic Rerolls variant is ENABLED`);
 }

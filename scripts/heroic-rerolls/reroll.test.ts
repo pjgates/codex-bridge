@@ -1,83 +1,107 @@
-import { describe, expect, it } from "vitest";
-import { applyHeroicRerollFloor, onHeroicReroll } from "../../src/heroic-rerolls/reroll.js";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+    activateHeroicRerolls,
+    addHeroicRerollMinimum,
+    onHeroicPreReroll,
+} from "../../src/heroic-rerolls/reroll.js";
 
-function createRoll(result: number, { active = true, faces = 20, number = 1 } = {}) {
-    return {
-        dice: [{ number, faces, results: [{ active, result }] }],
-        _total: result + 7,
-    };
+interface TestDie {
+    number: number;
+    faces: number;
+    modifiers: string[];
+}
+
+function createDie(number = 1, faces = 20, modifiers: string[] = []): TestDie {
+    return { number, faces, modifiers };
+}
+
+function createRoll(...dice: TestDie[]) {
+    return { dice };
 }
 
 const HERO_POINTS = { slug: "hero-points" };
 
-describe("applyHeroicRerollFloor", () => {
+afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+});
+
+describe("addHeroicRerollMinimum", () => {
+    it("adds exactly one min10 modifier to a Hero Point single-d20 reroll", () => {
+        const roll = createRoll(createDie());
+
+        expect(addHeroicRerollMinimum(roll, HERO_POINTS)).toBe(true);
+        expect(addHeroicRerollMinimum(roll, HERO_POINTS)).toBe(false);
+
+        expect(roll.dice[0].modifiers).toEqual(["min10"]);
+    });
+
     it.each([
-        [9, 10],
-        [2, 10],
-        [17, 17],
-    ])("changes a Hero Point reroll of %i to %i", (result, expected) => {
-        const roll = createRoll(result);
+        { resource: { slug: "mythic-points" } },
+        { resource: null },
+    ])("does not change rerolls that do not spend a Hero Point", ({ resource }) => {
+        const roll = createRoll(createDie());
 
-        applyHeroicRerollFloor(roll, HERO_POINTS);
-
-        expect(roll.dice[0].results[0].result).toBe(expected);
-        expect(roll._total).toBe(expected + 7);
+        expect(addHeroicRerollMinimum(roll, resource)).toBe(false);
+        expect(roll.dice[0].modifiers).toEqual([]);
     });
 
-    it("leaves a result of 10 unchanged", () => {
-        const roll = createRoll(10);
+    it.each([
+        { number: 2, faces: 20, modifiers: ["kh"] },
+        { number: 2, faces: 20, modifiers: ["kl"] },
+        { number: 1, faces: 12, modifiers: [] },
+    ])("does not change a $number d$faces reroll", ({ number, faces, modifiers }) => {
+        const roll = createRoll(createDie(number, faces, modifiers));
+        const originalModifiers = [...modifiers];
 
-        expect(applyHeroicRerollFloor(roll, HERO_POINTS)).toBe(false);
-        expect(roll).toEqual(createRoll(10));
+        expect(addHeroicRerollMinimum(roll, HERO_POINTS)).toBe(false);
+        expect(roll.dice[0].modifiers).toEqual(originalModifiers);
     });
 
-    it("does not change rerolls that do not spend a Hero Point", () => {
-        const roll = createRoll(2);
+    it("does not change a formula with multiple single-d20 terms", () => {
+        const roll = createRoll(createDie(), createDie());
 
-        expect(applyHeroicRerollFloor(roll, { slug: "mythic-points" })).toBe(false);
-        expect(roll).toEqual(createRoll(2));
+        expect(addHeroicRerollMinimum(roll, HERO_POINTS)).toBe(false);
+        expect(roll.dice.map((die) => die.modifiers)).toEqual([[], []]);
     });
 
-    it("does not change ordinary rerolls without a resource", () => {
-        const roll = createRoll(2);
+    it("adds min10 after a weaker existing minimum", () => {
+        const roll = createRoll(createDie(1, 20, ["min5"]));
 
-        expect(applyHeroicRerollFloor(roll, null)).toBe(false);
-        expect(roll).toEqual(createRoll(2));
+        expect(addHeroicRerollMinimum(roll, HERO_POINTS)).toBe(true);
+        expect(roll.dice[0].modifiers).toEqual(["min5", "min10"]);
     });
 
-    it("does not change an inactive d20 result", () => {
-        const roll = createRoll(2, { active: false });
+    it.each(["min10", "min15"])("preserves an existing sufficient %s modifier", (modifier) => {
+        const roll = createRoll(createDie(1, 20, [modifier]));
 
-        expect(applyHeroicRerollFloor(roll, HERO_POINTS)).toBe(false);
-        expect(roll).toEqual(createRoll(2, { active: false }));
-    });
-
-    it("does not change a non-d20 result", () => {
-        const roll = createRoll(2, { faces: 12 });
-
-        expect(applyHeroicRerollFloor(roll, HERO_POINTS)).toBe(false);
-        expect(roll).toEqual(createRoll(2, { faces: 12 }));
+        expect(addHeroicRerollMinimum(roll, HERO_POINTS)).toBe(false);
+        expect(roll.dice[0].modifiers).toEqual([modifier]);
     });
 });
 
-describe("onHeroicReroll", () => {
-    it("floors only the evaluated replacement roll", () => {
-        const oldRoll = createRoll(2);
-        const newRoll = createRoll(9);
+describe("onHeroicPreReroll", () => {
+    it("changes only the unevaluated replacement roll", () => {
+        const oldRoll = createRoll(createDie());
+        const newRoll = createRoll(createDie());
 
-        onHeroicReroll(oldRoll as unknown as Roll, newRoll as unknown as Roll, HERO_POINTS);
+        onHeroicPreReroll(oldRoll as unknown as Roll, newRoll as unknown as Roll, HERO_POINTS);
 
-        expect(oldRoll).toEqual(createRoll(2));
-        expect(newRoll).toEqual(createRoll(10));
+        expect(oldRoll.dice[0].modifiers).toEqual([]);
+        expect(newRoll.dice[0].modifiers).toEqual(["min10"]);
     });
+});
 
-    it("does not throw for ordinary rerolls without a resource", () => {
-        const oldRoll = createRoll(2);
-        const newRoll = createRoll(9);
+describe("activateHeroicRerolls", () => {
+    it("registers the pre-evaluation reroll hook rather than the evaluated reroll hook", () => {
+        const on = vi.fn();
+        vi.stubGlobal("Hooks", { on });
+        vi.spyOn(console, "log").mockImplementation(() => undefined);
 
-        onHeroicReroll(oldRoll as unknown as Roll, newRoll as unknown as Roll, null);
+        activateHeroicRerolls();
 
-        expect(oldRoll).toEqual(createRoll(2));
-        expect(newRoll).toEqual(createRoll(9));
+        expect(on).toHaveBeenCalledOnce();
+        expect(on).toHaveBeenCalledWith("pf2e.preReroll", onHeroicPreReroll);
+        expect(on).not.toHaveBeenCalledWith("pf2e.reroll", expect.anything());
     });
 });
