@@ -13,6 +13,6 @@
         "declaration": false,
         "sourceMap": false
     },
-    "include": ["scripts/**/*.ts", "src/types/**/*.d.ts"],
+    "include": ["scripts/**/*.ts", "src/statblock/**/*.ts", "src/types/**/*.d.ts"],
     "exclude": ["node_modules"]
 }
