@@ -8,6 +8,7 @@ import { MODULE_ID } from "../constants.js";
 import { registerPradSettings, registerPradTemplates, registerAttackCardTemplate } from "../prad/index.js";
 import { registerHeroicRerollsSetting } from "../heroic-rerolls/index.js";
 import { initTargetHelper } from "../target-helper/index.js";
+import { initStatblockImporter, registerStatblockImporterSetting } from "../statblock-importer/index.js";
 import { resolveHtmlRoot } from "../shared/html.js";
 
 export function onInit(): void {
@@ -26,6 +27,10 @@ export function onInit(): void {
 
     // Initialize Target Helper (template registration)
     initTargetHelper();
+
+    // Statblock importer: setting + Actors-directory button
+    registerStatblockImporterSetting();
+    initStatblockImporter();
 
     // Hook into settings UI to enforce dependency: PRAD requires Target Helper
     Hooks.on("renderSettingsConfig", onRenderSettingsConfig);

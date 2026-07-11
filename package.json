@@ -20,6 +20,7 @@
     },
     "devDependencies": {
         "@foundryvtt/foundryvtt-cli": "^3.0.3",
+        "@types/js-yaml": "^4.0.9",
         "@types/node": "^22.10.0",
         "@typescript-eslint/eslint-plugin": "^8.54.0",
         "@typescript-eslint/parser": "^8.54.0",
@@ -30,6 +31,7 @@
         "fvtt-types": "github:League-of-Foundry-Developers/foundry-vtt-types#main",
         "gray-matter": "^4.0.3",
         "happy-dom": "^20.9.0",
+        "js-yaml": "^5.2.1",
         "marked": "^17.0.1",
         "sass": "~1.83.0",
         "tsx": "^4.21.0",

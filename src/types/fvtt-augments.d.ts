@@ -16,6 +16,7 @@ declare global {
 
     interface SettingConfig {
         "sf2e-forge-custom.enableCustomRules": boolean;
+        "sf2e-forge-custom.enableStatblockImporter": boolean;
         "sf2e-forge-custom.enableTargetHelper": boolean;
         "sf2e-forge-custom.heroicRerolls": boolean;
         "sf2e-forge-custom.playersRollAllDice": boolean;

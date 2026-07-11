@@ -1,0 +1,23 @@
+{
+    "sf2e-forge-custom": {
+        "settings": {
+            "enableStatblockImporter": {
+                "name": "Statblock Importer",
+                "hint": "Adds an Import Statblock button to the Actors sidebar (GM only). Paste a vault bestiary markdown file to preview its stats against the GM Core creature-building benchmarks and create the NPC."
+            }
+        },
+        "statblockImporter": {
+            "buttonLabel": "Import Statblock",
+            "dialogTitle": "Import SF2e Statblock",
+            "previewTitle": "Preview",
+            "pasteHint": "Paste the full markdown file (frontmatter included). Prose after the frontmatter becomes the NPC's public notes.",
+            "previewButton": "Preview",
+            "createButton": "Create NPC",
+            "cancelButton": "Cancel",
+            "noFrontmatter": "No YAML frontmatter found (expected a --- … --- block at the top).",
+            "notAStatblock": "The frontmatter has no `statblock: true` marker.",
+            "parseFailed": "Statblock import failed: {message}",
+            "created": "Created {name} (level {level} NPC)."
+        }
+    }
+}

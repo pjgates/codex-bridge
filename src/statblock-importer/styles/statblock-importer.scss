@@ -1,0 +1,112 @@
+/* Statblock importer — paste dialog and benchmark preview */
+
+.ssi-paste {
+    width: 100%;
+    font-family: var(--font-monospace);
+    font-size: 0.8rem;
+}
+
+.ssi-preview {
+    max-height: 60vh;
+    overflow-y: auto;
+    line-height: 1.7;
+    padding: 0 0.25rem;
+
+    .ssi-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        border-bottom: 2px solid var(--color-underline-header, #782e22);
+        margin-bottom: 0.25rem;
+
+        h2 {
+            border: none;
+            margin: 0;
+        }
+    }
+
+    .ssi-level {
+        font-weight: bold;
+    }
+
+    .ssi-traits {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 2px;
+        margin-bottom: 0.35rem;
+    }
+
+    .ssi-trait {
+        background: #522e2c;
+        color: #f5efe0;
+        border: 1px solid #d8c483;
+        font-size: 0.62rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        padding: 1px 6px;
+
+        &.ssi-rarity-rare {
+            background: #002664;
+        }
+
+        &.ssi-rarity-uncommon {
+            background: #98513d;
+        }
+
+        &.ssi-rarity-unique {
+            background: #54166e;
+        }
+    }
+
+    .ssi-row {
+        margin: 1px 0;
+    }
+
+    .ssi-subtle {
+        color: var(--color-text-dark-secondary, #666);
+        font-size: 0.8rem;
+    }
+
+    .ssi-cost {
+        font-weight: 700;
+        font-size: 0.8rem;
+    }
+
+    .ssi-footnote {
+        margin-top: 0.5rem;
+        font-size: 0.75rem;
+        color: var(--color-text-dark-secondary, #666);
+        border-top: 1px dotted #999;
+        padding-top: 0.25rem;
+    }
+}
+
+.ssi-chip {
+    display: inline-block;
+    border-radius: 8px;
+    padding: 0 7px;
+    font-weight: 600;
+    font-size: 0.8rem;
+    white-space: nowrap;
+    border: 1px solid rgb(0 0 0 / 25%);
+    cursor: help;
+
+    em {
+        font-style: normal;
+        font-size: 0.65rem;
+        text-transform: uppercase;
+        opacity: 0.85;
+    }
+
+    /* Benchmark colors: hot = strong, cool = weak */
+    &.ssi-extreme { background: #8e24aa; color: #fff; }
+    &.ssi-high, &.ssi-max { background: #c62828; color: #fff; }
+    &.ssi-moderate { background: #ef6c00; color: #fff; }
+    &.ssi-low, &.ssi-min { background: #1565c0; color: #fff; }
+    &.ssi-terrible { background: #455a64; color: #fff; }
+}
+
+.ssi-import-button {
+    flex: 0;
+    white-space: nowrap;
+}
