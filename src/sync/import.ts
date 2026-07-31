@@ -155,22 +155,37 @@ function journalShellUpdate(entity: SyncEntity): Record<string, unknown> {
     };
 }
 
+function peopleActorVaultPrototypeToken(portrait: string): Record<string, unknown> {
+    const img = `forge-sync/${portrait}`;
+    return {
+        texture: { src: img },
+        ring: { enabled: true },
+    };
+}
+
 /** Vault-owned fields written on EVERY people-actor sync (update-safe: never clobbers GM token tweaks). */
-function peopleActorVaultFields(entity: SyncEntity): Record<string, unknown> {
+export function peopleActorUpdateData(entity: SyncEntity): Record<string, unknown> {
     const img = `forge-sync/${entity.portrait}`;
     return {
         name: entity.name,
         img,
-        prototypeToken: {
-            texture: { src: img },
-            ring: { enabled: true },
-        },
+        prototypeToken: peopleActorVaultPrototypeToken(entity.portrait!),
         flags: syncFlags(entity.syncId, "people-actor", entity.contentHash),
     };
 }
 
-/** Create-only token defaults — set once, thereafter GM-owned. */
-const PEOPLE_ACTOR_CREATE_DEFAULTS = { prototypeToken: { actorLink: true, disposition: 0 } };
+/** Create payload — vault fields plus create-only token defaults in one prototypeToken. */
+export function peopleActorCreateData(entity: SyncEntity): Record<string, unknown> {
+    const vault = peopleActorUpdateData(entity);
+    return {
+        ...vault,
+        prototypeToken: {
+            ...peopleActorVaultPrototypeToken(entity.portrait!),
+            actorLink: true,
+            disposition: 0,
+        },
+    };
+}
 
 function buildTranslatedCreature(creature: SyncCreature): Record<string, unknown> {
     return buildActorDocument(
@@ -267,7 +282,7 @@ async function applyJournalContent(
 }
 
 async function applyPeopleActorContent(doc: Actor.Implementation, entity: SyncEntity): Promise<void> {
-    await doc.update(peopleActorVaultFields(entity) as Actor.UpdateData);
+    await doc.update(peopleActorUpdateData(entity) as Actor.UpdateData);
 }
 
 export function snapshotWorld(): WorldDocSnapshot[] {
@@ -423,8 +438,7 @@ export async function applySyncPlan(
                 const doc = await getDocumentClass("Actor").create({
                     type: "npc",
                     system: {},
-                    ...peopleActorVaultFields(entity),
-                    ...PEOPLE_ACTOR_CREATE_DEFAULTS,
+                    ...peopleActorCreateData(entity),
                     ownership: { default: NONE },
                     folder: await getOrCreateFolder("People", "Actor"),
                 } as unknown as Actor.CreateData);

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { hashCreatureImportData, rewriteLinkPlaceholders } from "./import.js";
+import { hashCreatureImportData, peopleActorCreateData, peopleActorUpdateData, rewriteLinkPlaceholders } from "./import.js";
+import type { SyncEntity } from "./payload-types.js";
 
 describe("rewriteLinkPlaceholders", () => {
     it("rewrites known sync ids to journal UUID links", () => {
@@ -37,5 +38,37 @@ describe("hashCreatureImportData", () => {
         };
         const changed = { ...base, items: [{ name: "Claw", type: "melee", system: {} }] };
         expect(hashCreatureImportData(base as never)).not.toBe(hashCreatureImportData(changed as never));
+    });
+});
+
+
+const randall: SyncEntity = {
+    syncId: "fs-randall1",
+    slug: "randall",
+    name: "Randall",
+    type: "Character",
+    published: false,
+    playerHtml: "<p></p>",
+    gmHtml: null,
+    portrait: "art/fs-randall1.webp",
+    contentHash: "h-r1",
+};
+
+describe("peopleActorCreateData", () => {
+    it("composes full prototypeToken on create but vault-only on update", () => {
+        const create = peopleActorCreateData(randall);
+        expect(create.prototypeToken).toEqual({
+            texture: { src: "forge-sync/art/fs-randall1.webp" },
+            ring: { enabled: true },
+            actorLink: true,
+            disposition: 0,
+        });
+
+        const update = peopleActorUpdateData(randall);
+        expect(update.prototypeToken).toEqual({
+            texture: { src: "forge-sync/art/fs-randall1.webp" },
+            ring: { enabled: true },
+        });
+        expect(Object.keys(update.prototypeToken as object).sort()).toEqual(["ring", "texture"]);
     });
 });
