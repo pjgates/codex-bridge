@@ -49,14 +49,31 @@ export function rewriteLinkPlaceholders(html: string, journalIdBySyncId: Map<str
     });
 }
 
-/** Stable JSON hash of actor import state for Foundry-side change detection. */
-export function hashCreatureImportData(actor: Pick<Actor.Implementation, "name" | "system" | "items">): string {
-    const payload = {
-        name: actor.name,
-        system: actor.system,
-        items: [...actor.items].map((item) => ({ name: item.name, type: item.type, system: item.system })),
+function creatureImportProjection(source: {
+    name: string;
+    system: object;
+    items?: { name: string; type: string; system: object }[];
+}): object {
+    return {
+        name: source.name,
+        system: source.system,
+        items: (source.items ?? []).map((item) => ({ name: item.name, type: item.type, system: item.system })),
     };
-    return hashString(stableStringify(sortKeysDeep(payload)));
+}
+
+/** Stable JSON hash of actor import state for Foundry-side change detection. */
+export function hashCreatureImportData(
+    actor: Pick<Actor.Implementation, "name" | "system" | "items" | "toObject">,
+): string {
+    const source =
+        typeof actor.toObject === "function"
+            ? creatureImportProjection(actor.toObject() as Parameters<typeof creatureImportProjection>[0])
+            : creatureImportProjection({
+                name: actor.name,
+                system: actor.system,
+                items: [...actor.items].map((item) => ({ name: item.name, type: item.type, system: item.system })),
+            });
+    return hashString(stableStringify(sortKeysDeep(source)));
 }
 
 function sortKeysDeep(value: unknown): unknown {
@@ -88,6 +105,11 @@ function syncFlags(syncId: string, syncKind: SyncKind, importedHash: string): Re
     return { [MODULE_ID]: { syncId, syncKind, importedHash } };
 }
 
+/** Identity-only flags for pass 1 — content hashes advance ONLY with successful content application. */
+function identityFlags(syncId: string, syncKind: SyncKind): Record<string, SyncModuleFlags> {
+    return { [MODULE_ID]: { syncId, syncKind } };
+}
+
 function creatureFlags(syncId: string, importedHash: string, importedBaseline: string): Record<string, SyncModuleFlags> {
     return { [MODULE_ID]: { syncId, syncKind: "creature-actor", importedHash, importedBaseline } };
 }
@@ -103,7 +125,7 @@ async function getOrCreateFolder(name: string, type: "JournalEntry" | "Actor"): 
     return folder!.id;
 }
 
-function journalData(entity: SyncEntity, journalIdBySyncId: Map<string, string>): Record<string, unknown> {
+function journalPages(entity: SyncEntity, journalIdBySyncId: Map<string, string>): Record<string, unknown>[] {
     const pages: Record<string, unknown>[] = [{
         name: entity.name,
         type: "text",
@@ -122,14 +144,18 @@ function journalData(entity: SyncEntity, journalIdBySyncId: Map<string, string>)
             ownership: { default: NONE },
         });
     }
+    return pages;
+}
+
+function journalShellUpdate(entity: SyncEntity): Record<string, unknown> {
     return {
         name: entity.name,
-        pages,
         ownership: { default: entity.published ? OBSERVER : NONE },
         flags: syncFlags(entity.syncId, "entity-journal", entity.contentHash),
     };
 }
 
+/** Vault-owned fields written on EVERY people-actor sync (update-safe: never clobbers GM token tweaks). */
 function peopleActorVaultFields(entity: SyncEntity): Record<string, unknown> {
     const img = `forge-sync/${entity.portrait}`;
     return {
@@ -138,12 +164,13 @@ function peopleActorVaultFields(entity: SyncEntity): Record<string, unknown> {
         prototypeToken: {
             texture: { src: img },
             ring: { enabled: true },
-            actorLink: true,
-            disposition: 0,
         },
         flags: syncFlags(entity.syncId, "people-actor", entity.contentHash),
     };
 }
+
+/** Create-only token defaults — set once, thereafter GM-owned. */
+const PEOPLE_ACTOR_CREATE_DEFAULTS = { prototypeToken: { actorLink: true, disposition: 0 } };
 
 function buildTranslatedCreature(creature: SyncCreature): Record<string, unknown> {
     return buildActorDocument(
@@ -184,12 +211,20 @@ async function writeCreatureBaseline(actor: Actor.Implementation, syncId: string
 async function createCreatureActor(creature: SyncCreature): Promise<Actor.Implementation> {
     const translated = buildTranslatedCreature(creature);
     const portrait = creaturePortrait(creature);
+    const translatedFlags = translated.flags as Record<string, Record<string, unknown>> | undefined;
+    const builderModuleFlags = translatedFlags?.[MODULE_ID] ?? {};
     const actor = await getDocumentClass("Actor").create({
         ...translated,
         ...(portrait ? { img: portrait } : {}),
         folder: await getOrCreateFolder("Bestiary", "Actor"),
         ownership: { default: NONE },
-        flags: syncFlags(creature.syncId, "creature-actor", creature.contentHash),
+        flags: {
+            ...translatedFlags,
+            [MODULE_ID]: {
+                ...builderModuleFlags,
+                ...syncFlags(creature.syncId, "creature-actor", creature.contentHash)[MODULE_ID],
+            },
+        },
     } as unknown as Actor.CreateData);
     if (!actor) throw new Error(`Failed to create creature actor "${creature.name}"`);
     await writeCreatureBaseline(actor, creature.syncId, creature.contentHash);
@@ -220,7 +255,15 @@ async function applyJournalContent(
     entity: SyncEntity,
     journalIdBySyncId: Map<string, string>,
 ): Promise<void> {
-    await doc.update(journalData(entity, journalIdBySyncId) as JournalEntry.UpdateData);
+    const pages = journalPages(entity, journalIdBySyncId);
+    const pageIds = doc.pages.map((page) => page.id);
+    if (pageIds.length > 0) {
+        await doc.deleteEmbeddedDocuments("JournalEntryPage", pageIds);
+    }
+    if (pages.length > 0) {
+        await doc.createEmbeddedDocuments("JournalEntryPage", pages as unknown as JournalEntryPage.CreateData[]);
+    }
+    await doc.update(journalShellUpdate(entity) as JournalEntry.UpdateData);
 }
 
 async function applyPeopleActorContent(doc: Actor.Implementation, entity: SyncEntity): Promise<void> {
@@ -298,7 +341,7 @@ export async function applySyncPlan(
         try {
             const doc = getManagedDocument(action.item.docType, action.existingId);
             if (!doc) throw new Error(`Document not found: ${action.existingId}`);
-            await doc.update({ flags: syncFlags(action.item.syncId, action.item.kind, action.item.contentHash) });
+            await doc.update({ flags: identityFlags(action.item.syncId, action.item.kind) });
         } catch (error) {
             markFailed(action.item, error);
         }
@@ -315,11 +358,10 @@ export async function applySyncPlan(
             const doc = await getDocumentClass("JournalEntry").create({
                 name: entity.name,
                 ownership: { default: entity.published ? OBSERVER : NONE },
-                flags: syncFlags(entity.syncId, "entity-journal", entity.contentHash),
+                flags: identityFlags(entity.syncId, "entity-journal"),
             } as unknown as JournalEntry.CreateData);
             if (!doc) throw new Error(`Failed to create journal "${entity.name}"`);
             createdJournalIds.set(action.item.syncId, doc.id);
-            report.created += 1;
         } catch (error) {
             markFailed(action.item, error);
         }
@@ -374,6 +416,7 @@ export async function applySyncPlan(
                 const journalId = createdJournalIds.get(action.item.syncId);
                 if (!journalId) throw new Error(`Created journal missing for syncId ${action.item.syncId}`);
                 await applyJournal(action, journalId);
+                report.created += 1;
             } else if (action.item.kind === "people-actor") {
                 const entity = entityBySyncId.get(action.item.syncId);
                 if (!entity) throw new Error(`Entity not found for syncId ${action.item.syncId}`);
@@ -381,6 +424,7 @@ export async function applySyncPlan(
                     type: "npc",
                     system: {},
                     ...peopleActorVaultFields(entity),
+                    ...PEOPLE_ACTOR_CREATE_DEFAULTS,
                     ownership: { default: NONE },
                     folder: await getOrCreateFolder("People", "Actor"),
                 } as unknown as Actor.CreateData);
