@@ -9,6 +9,7 @@ import { registerPradSettings, registerPradTemplates, registerAttackCardTemplate
 import { registerHeroicRerollsSetting } from "../heroic-rerolls/index.js";
 import { initTargetHelper } from "../target-helper/index.js";
 import { initStatblockImporter, registerStatblockImporterSetting } from "../statblock-importer/index.js";
+import { registerSyncSettings } from "../sync/settings.js";
 import { resolveHtmlRoot } from "../shared/html.js";
 
 export function onInit(): void {
@@ -17,6 +18,9 @@ export function onInit(): void {
 
     // Register Heroic Rerolls variant setting
     registerHeroicRerollsSetting();
+
+    // Register Vault Sync settings
+    registerSyncSettings();
 
     // Register PRAD (Players Roll All Dice) settings
     registerPradSettings();
