@@ -157,10 +157,12 @@ describe("parsePastedStatblock", () => {
     it("is lenient where the strict converter is not", () => {
         const yaml = FIXTURE.match(/^---\r?\n([\s\S]*?)\r?\n---/)![1];
         const data = load(yaml) as Record<string, unknown>;
-        // Strict mode (pack converter) rejects the homebrew sense vocabulary.
-        expect(() => normaliseStatblock(data, "converted-dust-manta.md")).toThrow(/unknown sense type/);
-        // Lenient mode (paste importer) accepts it.
-        expect(() => normaliseStatblock(data, "converted-dust-manta.md", { lenient: true })).not.toThrow();
+        // Reviewed custom senses route to details in strict mode; unreviewed senses still fail strict.
+        expect(() => normaliseStatblock({ ...data, senses: "voidsight 60 feet" }, "test.md")).toThrow(/unknown sense type/);
+        // Lenient mode (paste importer) accepts unreviewed senses.
+        expect(() => normaliseStatblock({ ...data, senses: "voidsight 60 feet" }, "test.md", { lenient: true })).not.toThrow();
+        // Reviewed sandsense is accepted in strict mode (routes to details, not structured senses).
+        expect(() => normaliseStatblock(data, "converted-dust-manta.md")).not.toThrow();
     });
 });
 

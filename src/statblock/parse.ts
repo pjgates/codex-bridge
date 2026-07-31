@@ -15,7 +15,11 @@ import type {
 import { SF2E_ACTION_TRAITS, SF2E_CREATURE_TRAITS, SF2E_NPC_ATTACK_TRAITS } from "./traits.js";
 
 /** Reviewed campaign-specific creature traits that are intentionally outside SF2e's vocabulary. */
-const PROJECT_CREATURE_TRAITS: Record<string, true> = { aurelian: true, converted: true };
+const PROJECT_CREATURE_TRAITS: Record<string, true> = { aurelian: true, converted: true, halcyon: true };
+
+
+/** Reviewed campaign-specific sense terms: recognised in strict mode but routed to perception.details, never the structured senses array. */
+const PROJECT_CUSTOM_SENSE_TERMS: Record<string, true> = { sandsense: true };
 
 /**
  * Normalisation options.
@@ -40,7 +44,7 @@ const STATBLOCK_FIELDS: Record<string, true> = {
     attacks: true, attributes: true, hp: true, hpNote: true, immunities: true, items: true,
     languages: true, layout: true, level: true, modifier: true, name: true, published: true,
     rarity: true, resistances: true, saves: true, senses: true, size: true, skills: true,
-    source: true, speed: true, spellcasting: true, statblock: true, traits: true, weaknesses: true,
+    source: true, speed: true, spellcasting: true, statblock: true, syncId: true, traits: true, weaknesses: true,
 };
 
 function hasOwn(record: object, key: PropertyKey): boolean {
@@ -215,9 +219,49 @@ function validateSenseMechanics(sense: SenseData, filename: string, path: string
     return { type: sense.type, acuity, range };
 }
 
+
+function extractSenseTermSlug(segment: string): string | null {
+    const str = segment.trim();
+    const match = str.match(/^(.+?)\s*(?:\(([^)]+)\))?\s*(?:(\d+)\s*(?:feet|ft\.?))?$/i);
+    if (!match) return null;
+    if (/[()]/.test(str) && !match[2]) return null;
+    return slugify(match[1].trim());
+}
+
+function parseSensesStringStrict(
+    sensesRaw: unknown,
+    filename: string,
+): { senses: SenseData[]; details?: string } {
+    if (sensesRaw == null) return { senses: [] };
+    if (typeof sensesRaw !== "string") {
+        return { senses: parseSensesString(sensesRaw, filename, "senses") };
+    }
+
+    const str = sensesRaw.trim();
+    if (!str) return { senses: [] };
+
+    const senses: SenseData[] = [];
+    const details: string[] = [];
+    for (const [index, segment] of str.split(/,\s*/).entries()) {
+        const trimmed = segment.trim();
+        if (!trimmed) continue;
+        const slug = extractSenseTermSlug(trimmed);
+        if (slug != null && hasOwn(PROJECT_CUSTOM_SENSE_TERMS, slug)) {
+            details.push(trimmed);
+            continue;
+        }
+        senses.push(parseSingleSense(trimmed, filename, `senses[${index}]`));
+    }
+
+    return details.length > 0 ? { senses, details: details.join(", ") } : { senses };
+}
+
 function normalisePerception(modifier: unknown, sensesRaw: unknown, filename: string, lenient = false): PerceptionData {
     const mod = finiteNumber(modifier, filename, "modifier");
-    if (!lenient) return { mod, senses: parseSensesString(sensesRaw, filename, "senses") };
+    if (!lenient) {
+        const { senses, details } = parseSensesStringStrict(sensesRaw, filename);
+        return details != null ? { mod, senses, details } : { mod, senses };
+    }
 
     // Lenient: parse each authored segment independently; anything the strict
     // parser rejects (custom senses like "sandsense") lands in `details`.
