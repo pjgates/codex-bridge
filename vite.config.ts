@@ -73,6 +73,7 @@ export default defineConfig({
                 // Feature-co-located templates
                 { src: "src/prad/templates/**/*", dest: "templates/prad" },
                 { src: "src/target-helper/templates/**/*", dest: "templates/target-helper" },
+                { src: "src/sync/templates/**/*", dest: "templates/sync" },
                 { src: "module.json", dest: "." },
             ],
         }),

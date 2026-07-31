@@ -1,5 +1,5 @@
 import { MODULE_ID } from "../constants.js";
-import { buildActorDocument } from "../statblock/actor.js";
+import { buildActorDocument } from "../statblock/index.js";
 import type { SyncCreature, SyncEntity, SyncPayload } from "./payload-types.js";
 import { SETTING_LAST_MANIFEST } from "./settings.js";
 import {

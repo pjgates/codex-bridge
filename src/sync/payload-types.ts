@@ -1,4 +1,4 @@
-import type { CreatureStatblock } from "../statblock/types.js";
+import type { CreatureStatblock } from "../statblock/index.js";
 
 export const PAYLOAD_FORMAT_VERSION = 1;
 
