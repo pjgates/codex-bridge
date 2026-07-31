@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { hashCreatureImportData, peopleActorCreateData, peopleActorUpdateData, rewriteLinkPlaceholders } from "./import.js";
+import { hashCreatureImportData, journalAdoptUpdateData, journalShellCreateData, JOURNAL_SHELL_FOLDER, peopleActorCreateData, peopleActorUpdateData, rewriteLinkPlaceholders } from "./import.js";
 import type { SyncEntity } from "./payload-types.js";
 
 describe("rewriteLinkPlaceholders", () => {
@@ -72,3 +72,24 @@ describe("peopleActorCreateData", () => {
         expect(Object.keys(update.prototypeToken as object).sort()).toEqual(["ring", "texture"]);
     });
 });
+
+describe("journal shell folder placement", () => {
+    it("create payload uses Entities/JournalEntry folder; adopt update omits folder", () => {
+        expect(JOURNAL_SHELL_FOLDER).toEqual({ name: "Entities", type: "JournalEntry" });
+
+        const create = journalShellCreateData(randall, "fld-entities");
+        expect(create.folder).toBe("fld-entities");
+        expect(create.flags).toEqual({
+            "sf2e-forge-custom": { syncId: "fs-randall1", syncKind: "entity-journal" },
+        });
+
+        const adopt = journalAdoptUpdateData("fs-randall1", "entity-journal");
+        expect(adopt).toEqual({
+            flags: {
+                "sf2e-forge-custom": { syncId: "fs-randall1", syncKind: "entity-journal" },
+            },
+        });
+        expect(adopt).not.toHaveProperty("folder");
+    });
+});
+

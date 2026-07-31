@@ -155,6 +155,24 @@ function journalShellUpdate(entity: SyncEntity): Record<string, unknown> {
     };
 }
 
+/** Managed folder for pass-1 journal shells (create only — adopts never move). */
+export const JOURNAL_SHELL_FOLDER = { name: "Entities", type: "JournalEntry" as const };
+
+/** Pass-1 journal shell create — identity flags plus managed folder placement. */
+export function journalShellCreateData(entity: SyncEntity, folderId: string): Record<string, unknown> {
+    return {
+        name: entity.name,
+        ownership: { default: entity.published ? OBSERVER : NONE },
+        folder: folderId,
+        flags: identityFlags(entity.syncId, "entity-journal"),
+    };
+}
+
+/** Pass-1 adopt attach — identity flags only; never moves existing documents. */
+export function journalAdoptUpdateData(syncId: string, syncKind: SyncKind): Record<string, unknown> {
+    return { flags: identityFlags(syncId, syncKind) };
+}
+
 function peopleActorVaultPrototypeToken(portrait: string): Record<string, unknown> {
     const img = `forge-sync/${portrait}`;
     return {
@@ -356,7 +374,7 @@ export async function applySyncPlan(
         try {
             const doc = getManagedDocument(action.item.docType, action.existingId);
             if (!doc) throw new Error(`Document not found: ${action.existingId}`);
-            await doc.update({ flags: identityFlags(action.item.syncId, action.item.kind) });
+            await doc.update(journalAdoptUpdateData(action.item.syncId, action.item.kind));
         } catch (error) {
             markFailed(action.item, error);
         }
@@ -370,11 +388,12 @@ export async function applySyncPlan(
             continue;
         }
         try {
-            const doc = await getDocumentClass("JournalEntry").create({
-                name: entity.name,
-                ownership: { default: entity.published ? OBSERVER : NONE },
-                flags: identityFlags(entity.syncId, "entity-journal"),
-            } as unknown as JournalEntry.CreateData);
+            const doc = await getDocumentClass("JournalEntry").create(
+                journalShellCreateData(
+                    entity,
+                    await getOrCreateFolder(JOURNAL_SHELL_FOLDER.name, JOURNAL_SHELL_FOLDER.type),
+                ) as unknown as JournalEntry.CreateData,
+            );
             if (!doc) throw new Error(`Failed to create journal "${entity.name}"`);
             createdJournalIds.set(action.item.syncId, doc.id);
         } catch (error) {
