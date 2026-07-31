@@ -21,3 +21,5 @@ packs/
 # Environment
 .env
 .env.local
+forge-sync.config.json
+sync-out/

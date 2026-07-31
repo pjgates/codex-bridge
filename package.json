@@ -5,6 +5,7 @@
     "type": "module",
     "scripts": {
         "convert": "tsx scripts/convert-vault.ts",
+        "push": "tsx scripts/forge-sync.ts push",
         "compile-packs": "tsx scripts/compile-packs.ts",
         "build": "yarn convert && yarn compile-packs && vite build",
         "sync": "git submodule update --init --remote && yarn convert --include-unpublished && yarn compile-packs && npx vite build",
