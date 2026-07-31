@@ -11,8 +11,8 @@ export interface WorldDocSnapshot {
     syncId: string | null; // flags[MODULE_ID].syncId
     syncKind: SyncKind | null; // flags[MODULE_ID].syncKind
     importedHash: string | null; // payload-domain contentHash stored at create/import time
-    importedBaseline: string | null; // creature-actor only: actor-state hash recomputed at snapshot time, for modified-in-Foundry detection
-    currentHash: string | null;
+    importedBaseline: string | null; // creature-actor only: actor-state hash (hashCreatureImportData) stored at create/reimport time
+    currentHash: string | null; // creature-actor only: actor-state hash recomputed at snapshot time, for modified-in-Foundry detection
 }
 
 export interface SyncItem {
@@ -30,10 +30,10 @@ export interface ReimportAction extends SyncAction { existingId: string; modifie
 export interface StaleDoc { docType: ManagedDocType; id: string; name: string; syncId: string; kind: SyncKind; }
 
 export interface SyncPlan {
-    adopt: AdoptAction[]; // unflagged, exact name match, no syncId flag yet
-    create: SyncAction[]; // journals + people-actors with changed contentHash – automatic
-    update: UpdateAction[];
-    reimport: ReimportAction[]; // creature-actors with changed contentHash – GM confirms each
+    adopt: AdoptAction[];      // (docType, exact name) match, no syncId flag yet — GM confirms each
+    create: SyncAction[];
+    update: UpdateAction[];    // journals + people-actors with changed contentHash — automatic
+    reimport: ReimportAction[];// creature-actors with changed contentHash — GM confirms each
     unchanged: number;
     stale: StaleDoc[]; // flagged docs whose syncId left the payload
 }

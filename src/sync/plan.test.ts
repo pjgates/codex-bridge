@@ -84,7 +84,7 @@ describe("computeSyncPlan", () => {
             snap({ docType: "Actor", id: "A2", name: "Dust Manta", syncId: "fs-manta001", syncKind: "creature-actor", importedHash: "old", importedBaseline: "b1", currentHash: "diverged" }),
         ];
         const plan = computeSyncPlan(payload(), world);
-        expect(plan.update.find((a) => a.existingId === "J1")).toBeTruthy();
+        expect(plan.update.map((a) => a.existingId)).toEqual(["J1"]);
         expect(plan.reimport).toEqual([expect.objectContaining({ existingId: "A2", modifiedInFoundry: true })]);
     });
 
