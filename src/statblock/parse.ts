@@ -17,7 +17,6 @@ import { SF2E_ACTION_TRAITS, SF2E_CREATURE_TRAITS, SF2E_NPC_ATTACK_TRAITS } from
 /** Reviewed campaign-specific creature traits that are intentionally outside SF2e's vocabulary. */
 const PROJECT_CREATURE_TRAITS: Record<string, true> = { aurelian: true, converted: true, halcyon: true };
 
-
 /** Reviewed campaign-specific sense terms: recognised in strict mode but routed to perception.details, never the structured senses array. */
 const PROJECT_CUSTOM_SENSE_TERMS: Record<string, true> = { sandsense: true };
 
@@ -219,12 +218,19 @@ function validateSenseMechanics(sense: SenseData, filename: string, path: string
     return { type: sense.type, acuity, range };
 }
 
+const SENSE_SEGMENT_PATTERN = /^(.+?)\s*(?:\(([^)]+)\))?\s*(?:(\d+)\s*(?:feet|ft\.?))?$/i;
 
-function extractSenseTermSlug(segment: string): string | null {
+function matchSenseSegment(segment: string): RegExpMatchArray | null {
     const str = segment.trim();
-    const match = str.match(/^(.+?)\s*(?:\(([^)]+)\))?\s*(?:(\d+)\s*(?:feet|ft\.?))?$/i);
+    const match = str.match(SENSE_SEGMENT_PATTERN);
     if (!match) return null;
     if (/[()]/.test(str) && !match[2]) return null;
+    return match;
+}
+
+function extractSenseTermSlug(segment: string): string | null {
+    const match = matchSenseSegment(segment);
+    if (!match) return null;
     return slugify(match[1].trim());
 }
 
@@ -244,7 +250,6 @@ function parseSensesStringStrict(
     const details: string[] = [];
     for (const [index, segment] of str.split(/,\s*/).entries()) {
         const trimmed = segment.trim();
-        if (!trimmed) continue;
         const slug = extractSenseTermSlug(trimmed);
         if (slug != null && hasOwn(PROJECT_CUSTOM_SENSE_TERMS, slug)) {
             details.push(trimmed);
@@ -310,10 +315,8 @@ export function parseSensesString(raw: unknown, filename = "<input>", path = "se
 }
 
 function parseSingleSense(raw: string, filename: string, path: string): SenseData {
-    const str = raw.trim();
-    const match = str.match(/^(.+?)\s*(?:\(([^)]+)\))?\s*(?:(\d+)\s*(?:feet|ft\.?))?$/i);
+    const match = matchSenseSegment(raw);
     if (!match) fail(filename, path, "expected a sense like \"scent (imprecise) 30 feet\"");
-    if (/[()]/.test(str) && !match[2]) fail(filename, path, "expected a sense like \"scent (imprecise) 30 feet\"");
     const type = validateSenseType(slugify(match[1].trim()), filename, `${path}.type`);
     const sense: SenseData = { type };
     if (match[2]) sense.acuity = senseAcuity(match[2], filename, `${path}.acuity`);

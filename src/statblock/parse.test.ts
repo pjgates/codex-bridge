@@ -42,4 +42,10 @@ describe("normalisePerception (strict mode)", () => {
             'test.md: senses[0].type: unknown sense type "voidsight"',
         );
     });
+
+    it("rejects empty comma-separated sense segments in strict mode", () => {
+        expect(() => strictPerception("darkvision,, scent (imprecise) 30 feet")).toThrow(
+            'test.md: senses[1]: expected a sense like "scent (imprecise) 30 feet"',
+        );
+    });
 });
