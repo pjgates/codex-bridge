@@ -27,11 +27,28 @@ function hash(value: string): string {
     return createHash("sha256").update(value).digest("hex").slice(0, 16);
 }
 
-/** [[slug|Display]] in markdown resolves to @ForgeSync[syncId]{Display} when the slug is a synced entity, else plain display text. */
-export function resolveLinkPlaceholders(markdown: string, syncIdBySlug: Map<string, string>): string {
-    return markdown.replace(/\[\[([^\]|]+?)(?:\|([^\]]+))?\]\]/g, (_all, slug: string, display?: string) => {
+/**
+ * Content resolution, in order:
+ * 1. Embeds `![[file.webp|200]]` — every image embed in synced prose is an art dependency: staged
+ *    (deduped with portraits) and rewritten to `<img src="forge-sync/art/…">`. Unsupported embeds
+ *    (non-image extensions, e.g. `![[note.md]]`) are stripped with a build warning; a missing image
+ *    file fails the build. `portrait:` frontmatter alone drives Actor/token art.
+ * 2. Links `[[slug]]` / `[[slug|Display]]` → `@ForgeSync[syncId]{Display}` for synced ENTITY slugs
+ *    (exact match, lowercase-hyphenated vault convention; creatures are actors, not link targets),
+ *    else plain display text.
+ */
+export function resolveLinkPlaceholders(
+    markdown: string,
+    syncIdBySlug: Map<string, string>,
+    stagedArtByFilename: Map<string, string>,
+): string {
+    const withoutEmbeds = markdown.replace(/!\[\[([^\]|]+?)(?:\|[^\]]*)?\]\]/g, (_all, file: string) => {
+        const staged = stagedArtByFilename.get(file.trim());
+        return staged ? `<img src="forge-sync/${staged}" />` : "";
+    });
+    return withoutEmbeds.replace(/\[\[([^\]|]+?)(?:\|([^\]]*))?\]\]/g, (_all, slug: string, display?: string) => {
         const text = display?.trim() || slug.trim();
-        const syncId = syncIdBySlug.get(slug.trim().toLowerCase());
+        const syncId = syncIdBySlug.get(slug.trim());
         return syncId ? `@ForgeSync[${syncId}]{${text}}` : text;
     });
 }
@@ -51,6 +68,8 @@ export async function buildPayload(options: BuildPayloadOptions): Promise<BuildR
     const warnings: string[] = [];
     const mintedFiles: string[] = [];
     const artFiles = new Map<string, string>();
+    /** bare filename → staged relative path, for embed rewriting */
+    const stagedArtByFilename = new Map<string, string>();
     const syncIdOwners = new Map<string, string>();
 
     async function ensureSyncId(filePath: string, existing: string | undefined): Promise<string> {
@@ -71,6 +90,9 @@ export async function buildPayload(options: BuildPayloadOptions): Promise<BuildR
     async function stageArt(portraitFile: string | undefined, syncId: string, sourceLabel: string): Promise<string | null> {
         if (!portraitFile) return null;
         const sourcePath = path.join(assetsDir, portraitFile);
+        // Dedupe: a source shared by several entities stages once; all reference the first relative path.
+        const already = artFiles.get(sourcePath);
+        if (already) return already;
         try {
             await stat(sourcePath);
         } catch {
@@ -78,8 +100,33 @@ export async function buildPayload(options: BuildPayloadOptions): Promise<BuildR
         }
         const relative = `art/${syncId}${path.extname(portraitFile)}`;
         artFiles.set(sourcePath, relative);
+        stagedArtByFilename.set(portraitFile, relative);
         return relative;
     }
+
+    const IMAGE_EXTENSIONS = new Set([".webp", ".png", ".jpg", ".jpeg", ".gif", ".svg"]);
+
+    /** Stage a prose-embedded image as an art dependency; returns null (and warns) for unsupported extensions. */
+    async function stageEmbedAsset(filename: string, sourceLabel: string): Promise<string | null> {
+        const already = stagedArtByFilename.get(filename);
+        if (already) return already;
+        if (!IMAGE_EXTENSIONS.has(path.extname(filename).toLowerCase())) {
+            warnings.push(`${sourceLabel}: unsupported embed stripped: ![[${filename}]]`);
+            return null;
+        }
+        const sourcePath = path.join(assetsDir, filename);
+        try {
+            await stat(sourcePath);
+        } catch {
+            throw new Error(`${sourceLabel}: embedded image not found: ${sourcePath}`);
+        }
+        const relative = `art/${filename}`;
+        artFiles.set(sourcePath, relative);
+        stagedArtByFilename.set(filename, relative);
+        return relative;
+    }
+
+    const EMBED_PATTERN = /!\[\[([^\]|]+?)(?:\|[^\]]*)?\]\]/g;
 
     // Entities
     const entitiesDir = path.join(campaignDir, "entities");
@@ -91,13 +138,31 @@ export async function buildPayload(options: BuildPayloadOptions): Promise<BuildR
         parsed.push({ filePath, entity, syncId });
     }
 
-    const syncIdBySlug = new Map(parsed.map(({ entity, syncId }) => [entity.slug.toLowerCase(), syncId]));
-    const entities: SyncEntity[] = [];
+    const syncIdBySlug = new Map(parsed.map(({ entity, syncId }) => [entity.slug, syncId]));
+
+    // Stage ALL art before the content pass: portraits first (syncId-named, drive Actor/token art),
+    // then every image embedded in prose (original-filename-named, deduped against portraits).
+    const portraitBySyncId = new Map<string, string | null>();
     for (const { filePath, entity, syncId } of parsed) {
-        const portrait = await stageArt(entity.frontmatter.portrait, syncId, filePath);
-        if (entity.frontmatter.type === "Character" && !portrait) warnings.push(`${entity.slug}: character has no portrait — journal syncs, no actor created`);
-        const playerHtml = markdownToHtml(resolveLinkPlaceholders(entity.playerContent, syncIdBySlug));
-        const gmHtml = entity.gmContent === null ? null : markdownToHtml(resolveLinkPlaceholders(entity.gmContent, syncIdBySlug));
+        portraitBySyncId.set(syncId, await stageArt(entity.frontmatter.portrait, syncId, filePath));
+    }
+    for (const { filePath, entity } of parsed) {
+        const prose = entity.playerContent + "\n" + (entity.gmContent ?? "");
+        for (const match of prose.matchAll(EMBED_PATTERN)) {
+            await stageEmbedAsset(match[1].trim(), filePath);
+        }
+    }
+
+    const entities: SyncEntity[] = [];
+    for (const { entity, syncId } of parsed) {
+        const portrait = portraitBySyncId.get(syncId) ?? null;
+        if (entity.frontmatter.type === "Character" && !portrait) {
+            warnings.push(`${entity.slug}: character has no portrait — journal syncs, no actor created`);
+        }
+        const playerHtml = markdownToHtml(resolveLinkPlaceholders(entity.playerContent, syncIdBySlug, stagedArtByFilename));
+        const gmHtml = entity.gmContent === null
+            ? null
+            : markdownToHtml(resolveLinkPlaceholders(entity.gmContent, syncIdBySlug, stagedArtByFilename));
         entities.push({
             syncId,
             slug: entity.slug,
@@ -107,7 +172,7 @@ export async function buildPayload(options: BuildPayloadOptions): Promise<BuildR
             playerHtml,
             gmHtml,
             portrait,
-            contentHash: hash(JSON.stringify({ title: entity.frontmatter.title, type: entity.frontmatter.type, playerHtml, gmHtml, portrait, published: entity.frontmatter.published })),
+            contentHash: hash(JSON.stringify([entity.frontmatter.title, entity.frontmatter.type, entity.frontmatter.published, playerHtml, gmHtml, portrait])),
         });
     }
 
@@ -128,13 +193,13 @@ export async function buildPayload(options: BuildPayloadOptions): Promise<BuildR
             name: creature.statblock.name,
             statblock: creature.statblock,
             portrait,
-            contentHash: hash(JSON.stringify({ statblock: creature.statblock, portrait })),
+            contentHash: hash(JSON.stringify([creature.statblock, portrait])),
         });
     }
 
     const manifestHash = hash(JSON.stringify([
-        ...entities.map((entity) => [entity.syncId, entity.contentHash]),
-        ...creatures.map((creature) => [creature.syncId, creature.contentHash]),
+        entities.map((entity) => [entity.syncId, entity.contentHash]),
+        creatures.map((creature) => [creature.syncId, creature.contentHash]),
     ]));
 
     return {

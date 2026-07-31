@@ -46,7 +46,7 @@ published: false
 ---
 # Randall
 
-A companion of [[Wren-kadau]].
+A compliance officer. See [[wren-kadau|Wren]].
 `);
         await writeFile(path.join(vault, "codex/the-forge/entities/wren-kadau.md"), `---
 title: Wren Kadau
@@ -64,11 +64,40 @@ The ally.
 
         expect(randall.syncId).toMatch(/^fs-[a-z0-9]{8}$/);
         expect(randall.portrait).toBe(`art/${randall.syncId}.webp`);
-        expect(randall.playerHtml).toContain("@ForgeSync[fs-wren0001]");
+        expect(randall.playerHtml).toContain("@ForgeSync[fs-wren0001]{Wren}");
         expect(result.mintedFiles).toEqual([path.join(vault, "codex/the-forge/entities/randall.md")]);
         expect(await readFile(result.mintedFiles[0], "utf-8")).toContain(`syncId: ${randall.syncId}`);
         expect(result.artFiles.get(path.join(vault, "codex/assets/randall-20260726.webp"))).toBe(`art/${randall.syncId}.webp`);
         expect(result.warnings.some((warning) => warning.includes("wren-kadau"))).toBe(true);
+    });
+
+    it("dedupes shared portrait sources across entities", async () => {
+        await writeFile(path.join(vault, "codex/the-forge/entities/twin-a.md"), `---
+title: Twin A
+type: Character
+portrait: "[[randall-20260726.webp]]"
+published: false
+syncId: fs-twina001
+---
+# Twin A
+`);
+        await writeFile(path.join(vault, "codex/the-forge/entities/twin-b.md"), `---
+title: Twin B
+type: Character
+portrait: "[[randall-20260726.webp]]"
+published: false
+syncId: fs-twinb001
+---
+# Twin B
+`);
+
+        const result = await buildPayload({ vaultPath: vault, campaign: "the-forge" });
+        const twinA = result.payload.entities.find((entry) => entry.slug === "twin-a")!;
+        const twinB = result.payload.entities.find((entry) => entry.slug === "twin-b")!;
+
+        expect(twinA.portrait).toBe("art/fs-twina001.webp");
+        expect(twinB.portrait).toBe("art/fs-twina001.webp");
+        expect(result.artFiles.size).toBe(1);
     });
 
     it("hard-fails on duplicate syncIds naming both files", async () => {
@@ -122,5 +151,83 @@ Secret XYZ\n%%Secret%%\nGM only
 
         expect(result.payload.creatures[0]?.name).toBe("Dust Manta");
         expect(result.payload.creatures[0]?.statblock.level).toBe(3);
+    });
+
+    it("rewrites portrait embeds in prose to img tags without stray embed syntax", async () => {
+        await writeFile(path.join(vault, "codex/the-forge/entities/randall.md"), `---
+title: Randall
+type: Character
+portrait: "[[randall-20260726.webp]]"
+published: false
+syncId: fs-rand0001
+---
+# Randall
+
+![[randall-20260726.webp|200]]
+`);
+
+        const result = await buildPayload({ vaultPath: vault, campaign: "the-forge" });
+        const randall = result.payload.entities.find((entry) => entry.slug === "randall")!;
+
+        expect(randall.playerHtml).toContain('<img src="forge-sync/art/');
+        expect(randall.playerHtml).not.toMatch(/(?<!<img src="forge-sync\/art\/[^"]*")randall-20260726\.webp/);
+        expect(randall.playerHtml).not.toContain("![[");
+        expect(randall.playerHtml).not.toMatch(/(?<!<img[^>]*>)\s*!/);
+    });
+
+    it("stages non-portrait image embeds and renders img tags", async () => {
+        await writeFile(path.join(vault, "codex/assets/town-map.webp"), "fake-map");
+        await writeFile(path.join(vault, "codex/the-forge/entities/guide.md"), `---
+title: Guide
+type: Location
+published: true
+syncId: fs-guide001
+---
+# Guide
+
+![[town-map.webp]]
+`);
+
+        const result = await buildPayload({ vaultPath: vault, campaign: "the-forge" });
+        const guide = result.payload.entities.find((entry) => entry.slug === "guide")!;
+
+        expect(result.artFiles.get(path.join(vault, "codex/assets/town-map.webp"))).toBe("art/town-map.webp");
+        expect(guide.playerHtml).toContain('src="forge-sync/art/town-map.webp"');
+    });
+
+    it("strips unsupported embeds with a warning", async () => {
+        await writeFile(path.join(vault, "codex/assets/notes.md"), "notes");
+        await writeFile(path.join(vault, "codex/the-forge/entities/scribe.md"), `---
+title: Scribe
+type: Location
+published: true
+syncId: fs-scribe01
+---
+# Scribe
+
+![[notes.md]]
+`);
+
+        const result = await buildPayload({ vaultPath: vault, campaign: "the-forge" });
+        const scribe = result.payload.entities.find((entry) => entry.slug === "scribe")!;
+
+        expect(result.warnings.some((warning) => warning.includes("unsupported embed stripped: ![[notes.md]]"))).toBe(true);
+        expect(scribe.playerHtml).not.toContain("notes.md");
+        expect(scribe.playerHtml).not.toContain("![[");
+    });
+
+    it("hard-fails when an embedded image asset is missing", async () => {
+        await writeFile(path.join(vault, "codex/the-forge/entities/broken.md"), `---
+title: Broken
+type: Location
+published: true
+syncId: fs-broken01
+---
+# Broken
+
+![[missing.webp]]
+`);
+
+        await expect(buildPayload({ vaultPath: vault, campaign: "the-forge" })).rejects.toThrow(/missing\.webp/);
     });
 });
