@@ -124,6 +124,11 @@ function onRenderSettingsConfig(
         const heroicRerollsInput = root.querySelector<HTMLInputElement>(
             `input[name="${MODULE_ID}.heroicRerolls"]`,
         );
+        if (heroicRerollsInput && !masterEnabled) {
+            heroicRerollsInput.disabled = true;
+            heroicRerollsInput.closest(".form-group")?.classList.add("disabled");
+        }
+
         // Find the Vault Sync setting row and disable it if master is off
         const syncInput = root.querySelector<HTMLInputElement>(
             `input[name="${MODULE_ID}.${SETTING_ENABLE_SYNC}"]`,
@@ -131,11 +136,6 @@ function onRenderSettingsConfig(
         if (syncInput && !masterEnabled) {
             syncInput.disabled = true;
             syncInput.closest(".form-group")?.classList.add("disabled");
-        }
-
-        if (heroicRerollsInput && !masterEnabled) {
-            heroicRerollsInput.disabled = true;
-            heroicRerollsInput.closest(".form-group")?.classList.add("disabled");
         }
 
         // Disable the strict DC setting when PRAD is off

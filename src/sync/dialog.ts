@@ -120,7 +120,7 @@ class SyncDialog extends SyncDialogBase {
         this.#plan = plan;
     }
 
-    static override DEFAULT_OPTIONS = foundry.utils.mergeObject(super.DEFAULT_OPTIONS, {
+    static override DEFAULT_OPTIONS = {
         id: "forge-sync-dialog",
         tag: "form",
         classes: ["forge-sync-dialog-app"],
@@ -134,7 +134,7 @@ class SyncDialog extends SyncDialogBase {
             submitOnChange: false,
             closeOnSubmit: false,
         },
-    }) as typeof SyncDialogBase.DEFAULT_OPTIONS;
+    } as typeof SyncDialogBase.DEFAULT_OPTIONS;
 
     static override PARTS = {
         form: {
@@ -194,7 +194,7 @@ export async function checkForVaultUpdates(): Promise<void> {
         const openLabel = game.i18n!.localize(`${MODULE_ID}.sync.openDialog`);
         const summary = game.i18n!.localize(`${MODULE_ID}.sync.updated`);
         const message = `${summary} <button type="button" class="forge-sync-notification-open">${openLabel}</button>`;
-        ui.notifications!.info(message, { escape: false });
+        ui.notifications!.info(message, { escape: false, clean: false });
     } catch (error) {
         if (error instanceof PayloadUnavailableError) return;
         if (error instanceof PayloadDecryptError) {
@@ -202,7 +202,9 @@ export async function checkForVaultUpdates(): Promise<void> {
                 decryptWarnShown = true;
                 ui.notifications!.warn(game.i18n!.localize(`${MODULE_ID}.sync.decryptFailed`));
             }
+            return;
         }
+        throw error;
     }
 }
 
