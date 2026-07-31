@@ -8,13 +8,26 @@ import { deploy, stageSyncOut, type RemoteConfig } from "./sync/deploy.js";
 
 interface Config { vaultPath: string; campaign: string; remote: RemoteConfig; }
 
+function stripEnvQuotes(value: string): string {
+    if (
+        (value.startsWith('"') && value.endsWith('"')) ||
+        (value.startsWith("'") && value.endsWith("'"))
+    ) {
+        return value.slice(1, -1);
+    }
+    return value;
+}
+
 async function loadDotEnv(dir: string): Promise<void> {
     try {
         for (const line of (await readFile(path.join(dir, ".env"), "utf-8")).split("\n")) {
             const match = /^([A-Z0-9_]+)=(.*)$/.exec(line.trim());
-            if (match && !(match[1] in process.env)) process.env[match[1]] = match[2];
+            if (match && !(match[1] in process.env)) process.env[match[1]] = stripEnvQuotes(match[2]);
         }
-    } catch { /* no .env — env var may be set directly */ }
+    } catch (error: unknown) {
+        if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") return;
+        throw error;
+    }
 }
 
 const program = new Command();
