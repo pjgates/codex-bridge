@@ -9,6 +9,9 @@ export interface EntityFrontmatter {
     creation_date: string;
     campaign: string[];
     published: boolean;
+    syncId?: string;
+    /** Bare art filename extracted from a [[...]] wikilink */
+    portrait?: string;
 }
 
 /** A parsed entity before markdown-to-HTML conversion. */
