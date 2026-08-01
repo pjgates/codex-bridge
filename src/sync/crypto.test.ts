@@ -9,7 +9,7 @@ const payload: SyncPayload = {
     entities: [{
         syncId: "fs-7k2m9p", slug: "randall", name: "Randall", type: "Character",
         published: false, playerHtml: "<p>Hi</p>", gmHtml: null,
-        portrait: "art/fs-7k2m9p.webp", contentHash: "h1",
+        portrait: "art/fs-7k2m9p.webp", subject: null, contentHash: "h1",
     }],
     creatures: [],
 };

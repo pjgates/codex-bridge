@@ -5,7 +5,7 @@ import { PAYLOAD_FORMAT_VERSION, type SyncPayload } from "./payload-types.js";
 function payload(overrides: Partial<SyncPayload> = {}): SyncPayload {
     return {
         formatVersion: PAYLOAD_FORMAT_VERSION, generatedAt: "", manifestHash: "",
-        entities: [{ syncId: "fs-randall1", slug: "randall", name: "Randall", type: "Character", published: false, playerHtml: "<p></p>", gmHtml: null, portrait: "art/fs-randall1.webp", contentHash: "h-r1" }],
+        entities: [{ syncId: "fs-randall1", slug: "randall", name: "Randall", type: "Character", published: false, playerHtml: "<p></p>", gmHtml: null, portrait: "art/fs-randall1.webp", subject: null, contentHash: "h-r1" }],
         creatures: [{ syncId: "fs-manta001", slug: "manta", name: "Dust Manta", statblock: {} as never, portrait: null, contentHash: "h-m1" }],
         ...overrides,
     };
@@ -18,7 +18,7 @@ function snap(partial: Partial<WorldDocSnapshot>): WorldDocSnapshot {
 describe("payloadItems", () => {
     it("emits journal+actor for every Character (placeholder when portrait-less)", () => {
         const p = payload();
-        p.entities.push({ ...p.entities[0], syncId: "fs-wren0001", slug: "wren", name: "Wren", portrait: null, contentHash: "h-w1" });
+        p.entities.push({ ...p.entities[0], syncId: "fs-wren0001", slug: "wren", name: "Wren", portrait: null, subject: null, contentHash: "h-w1" });
         const items = payloadItems(p);
         expect(items.filter((i) => i.syncId === "fs-randall1").map((i) => i.kind).sort()).toEqual(["entity-journal", "people-actor"]);
         expect(items.filter((i) => i.syncId === "fs-wren0001").map((i) => i.kind).sort()).toEqual(["entity-journal", "people-actor"]);

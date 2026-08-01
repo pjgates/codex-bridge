@@ -14,6 +14,8 @@ export interface SyncEntity {
     gmHtml: string | null;
     /** Path relative to Data/forge-sync/, e.g. "art/fs-7k2m9p.webp"; null = no portrait */
     portrait: string | null;
+    /** Path relative to Data/forge-sync/, e.g. "art/fs-7k2m9p-subject.png"; null = ring uses mystery-man */
+    subject: string | null;
     contentHash: string;
 }
 

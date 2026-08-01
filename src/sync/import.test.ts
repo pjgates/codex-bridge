@@ -51,6 +51,7 @@ const randall: SyncEntity = {
     playerHtml: "<p></p>",
     gmHtml: null,
     portrait: "art/fs-randall1.webp",
+    subject: null,
     contentHash: "h-r1",
 };
 
@@ -63,7 +64,21 @@ const wren: SyncEntity = {
     playerHtml: "<p></p>",
     gmHtml: null,
     portrait: null,
+    subject: null,
     contentHash: "h-w1",
+};
+
+const withSubject: SyncEntity = {
+    syncId: "fs-subj0001",
+    slug: "hero",
+    name: "Hero",
+    type: "Character",
+    published: false,
+    playerHtml: "<p></p>",
+    gmHtml: null,
+    portrait: null,
+    subject: "art/fs-subj0001-subject.png",
+    contentHash: "h-s1",
 };
 
 describe("peopleActor placeholder portraits", () => {
@@ -91,7 +106,10 @@ describe("peopleActorCreateData", () => {
         const create = peopleActorCreateData(randall);
         expect(create.prototypeToken).toEqual({
             texture: { src: "forge-sync/art/fs-randall1.webp" },
-            ring: { enabled: true },
+            ring: {
+                enabled: true,
+                subject: { texture: "icons/svg/mystery-man.svg", scale: 1 },
+            },
             actorLink: true,
             disposition: 0,
         });
@@ -99,9 +117,51 @@ describe("peopleActorCreateData", () => {
         const update = peopleActorUpdateData(randall);
         expect(update.prototypeToken).toEqual({
             texture: { src: "forge-sync/art/fs-randall1.webp" },
-            ring: { enabled: true },
+            ring: {
+                enabled: true,
+                subject: { texture: "icons/svg/mystery-man.svg", scale: 1 },
+            },
         });
         expect(Object.keys(update.prototypeToken as object).sort()).toEqual(["ring", "texture"]);
+    });
+});
+
+describe("peopleActor ring subject art", () => {
+    const MYSTERY_MAN = "icons/svg/mystery-man.svg";
+
+    it("uses staged subject art on the ring when subject is present", () => {
+        const create = peopleActorCreateData(withSubject);
+        const token = create.prototypeToken as {
+            texture: { src: string };
+            ring: { enabled: boolean; subject: { texture: string; scale: number } };
+        };
+        expect(token.ring.enabled).toBe(true);
+        expect(token.ring.subject).toEqual({
+            texture: "forge-sync/art/fs-subj0001-subject.png",
+            scale: 1,
+        });
+        expect(token.texture.src).toBe(MYSTERY_MAN);
+    });
+
+    it("keeps mystery-man on the ring when portrait is present but subject is absent", () => {
+        const create = peopleActorCreateData(randall);
+        const token = create.prototypeToken as {
+            texture: { src: string };
+            ring: { subject: { texture: string } };
+        };
+        expect(token.texture.src).toBe("forge-sync/art/fs-randall1.webp");
+        expect(token.ring.subject.texture).toBe(MYSTERY_MAN);
+        expect(token.ring.subject.texture).not.toBe(token.texture.src);
+    });
+
+    it("uses mystery-man for ring subject and texture when both portrait and subject are absent", () => {
+        const create = peopleActorCreateData(wren);
+        const token = create.prototypeToken as {
+            texture: { src: string };
+            ring: { subject: { texture: string } };
+        };
+        expect(token.texture.src).toBe(MYSTERY_MAN);
+        expect(token.ring.subject.texture).toBe(MYSTERY_MAN);
     });
 });
 
@@ -124,4 +184,3 @@ describe("journal shell folder placement", () => {
         expect(adopt).not.toHaveProperty("folder");
     });
 });
-

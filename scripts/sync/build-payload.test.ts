@@ -12,6 +12,7 @@ beforeEach(async () => {
     await mkdir(path.join(vault, "codex/the-forge/bestiary"), { recursive: true });
     await mkdir(path.join(vault, "codex/assets"), { recursive: true });
     await writeFile(path.join(vault, "codex/assets/randall-20260726.webp"), "fake-webp");
+    await writeFile(path.join(vault, "codex/assets/hero-subject.png"), "fake-subject");
 });
 
 afterEach(async () => {
@@ -230,4 +231,34 @@ syncId: fs-broken01
 
         await expect(buildPayload({ vaultPath: vault, campaign: "the-forge" })).rejects.toThrow(/missing\.webp/);
     });
+    it("stages subject art and includes subject in payload and contentHash", async () => {
+        await writeFile(path.join(vault, "codex/the-forge/entities/hero.md"), `---
+title: Hero
+type: Character
+subject: "[[hero-subject.png]]"
+published: false
+syncId: fs-hero0001
+---
+# Hero
+`);
+        await writeFile(path.join(vault, "codex/the-forge/entities/plain.md"), `---
+title: Plain
+type: Character
+published: false
+syncId: fs-plain001
+---
+# Plain
+`);
+
+        const result = await buildPayload({ vaultPath: vault, campaign: "the-forge" });
+        const hero = result.payload.entities.find((entry) => entry.slug === "hero")!;
+        const plain = result.payload.entities.find((entry) => entry.slug === "plain")!;
+
+        expect(hero.subject).toBe("art/fs-hero0001-subject.png");
+        expect(plain.subject).toBeNull();
+        expect(result.artFiles.get(path.join(vault, "codex/assets/hero-subject.png"))).toBe("art/fs-hero0001-subject.png");
+        expect(hero.contentHash).not.toBe(plain.contentHash);
+    });
+
 });
+

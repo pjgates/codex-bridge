@@ -12,6 +12,8 @@ export interface EntityFrontmatter {
     syncId?: string;
     /** Bare art filename extracted from a [[...]] wikilink */
     portrait?: string;
+    /** Bare ring-subject art filename extracted from a [[...]] wikilink */
+    subject?: string;
 }
 
 /** A parsed entity before markdown-to-HTML conversion. */

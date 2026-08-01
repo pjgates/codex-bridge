@@ -32,7 +32,7 @@ function hash(value: string): string {
  * 1. Embeds `![[file.webp|200]]` — every image embed in synced prose is an art dependency: staged
  *    (deduped with portraits) and rewritten to `<img src="forge-sync/art/…">`. Unsupported embeds
  *    (non-image extensions, e.g. `![[note.md]]`) are stripped with a build warning; a missing image
- *    file fails the build. `portrait:` frontmatter alone drives Actor/token art.
+ *    file fails the build. `portrait:` frontmatter drives Actor/token texture art; `subject:` drives ring subject art.
  * 2. Links `[[slug]]` / `[[slug|Display]]` → `@ForgeSync[syncId]{Display}` for synced ENTITY slugs
  *    (exact match, lowercase-hyphenated vault convention; creatures are actors, not link targets),
  *    else plain display text.
@@ -104,6 +104,21 @@ export async function buildPayload(options: BuildPayloadOptions): Promise<BuildR
         return relative;
     }
 
+    async function stageSubjectArt(subjectFile: string | undefined, syncId: string, sourceLabel: string): Promise<string | null> {
+        if (!subjectFile) return null;
+        const sourcePath = path.join(assetsDir, subjectFile);
+        const already = artFiles.get(sourcePath);
+        if (already) return already;
+        try {
+            await stat(sourcePath);
+        } catch {
+            throw new Error(`${sourceLabel}: subject asset not found: ${sourcePath}`);
+        }
+        const relative = `art/${syncId}-subject${path.extname(subjectFile)}`;
+        artFiles.set(sourcePath, relative);
+        return relative;
+    }
+
     const IMAGE_EXTENSIONS = new Set([".webp", ".png", ".jpg", ".jpeg", ".gif", ".svg"]);
 
     /** Stage a prose-embedded image as an art dependency; returns null (and warns) for unsupported extensions. */
@@ -143,8 +158,10 @@ export async function buildPayload(options: BuildPayloadOptions): Promise<BuildR
     // Stage ALL art before the content pass: portraits first (syncId-named, drive Actor/token art),
     // then every image embedded in prose (original-filename-named, deduped against portraits).
     const portraitBySyncId = new Map<string, string | null>();
+    const subjectBySyncId = new Map<string, string | null>();
     for (const { filePath, entity, syncId } of parsed) {
         portraitBySyncId.set(syncId, await stageArt(entity.frontmatter.portrait, syncId, filePath));
+        subjectBySyncId.set(syncId, await stageSubjectArt(entity.frontmatter.subject, syncId, filePath));
     }
     for (const { filePath, entity } of parsed) {
         const prose = entity.playerContent + "\n" + (entity.gmContent ?? "");
@@ -156,6 +173,7 @@ export async function buildPayload(options: BuildPayloadOptions): Promise<BuildR
     const entities: SyncEntity[] = [];
     for (const { entity, syncId } of parsed) {
         const portrait = portraitBySyncId.get(syncId) ?? null;
+        const subject = subjectBySyncId.get(syncId) ?? null;
         if (entity.frontmatter.type === "Character" && !portrait) {
             warnings.push(`${entity.slug}: character has no portrait — actor created with mystery-man placeholder`);
         }
@@ -172,7 +190,8 @@ export async function buildPayload(options: BuildPayloadOptions): Promise<BuildR
             playerHtml,
             gmHtml,
             portrait,
-            contentHash: hash(JSON.stringify([entity.frontmatter.title, entity.frontmatter.type, entity.frontmatter.published, playerHtml, gmHtml, portrait])),
+            subject,
+            contentHash: hash(JSON.stringify([entity.frontmatter.title, entity.frontmatter.type, entity.frontmatter.published, playerHtml, gmHtml, portrait, subject])),
         });
     }
 

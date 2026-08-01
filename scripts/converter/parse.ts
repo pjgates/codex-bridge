@@ -45,11 +45,18 @@ function normaliseFrontmatter(filename: string, data: Record<string, unknown>): 
 
     if (typeof data.syncId === "string" && data.syncId.length > 0) frontmatter.syncId = data.syncId;
     if (typeof data.portrait === "string" && data.portrait.length > 0) {
-        const match = /^\[\[([^\]|]+?)(?:\|[^\]]*)?\]\]$/.exec(data.portrait.trim());
-        frontmatter.portrait = (match ? match[1] : data.portrait).trim();
+        frontmatter.portrait = parseArtWikilink(data.portrait);
+    }
+    if (typeof data.subject === "string" && data.subject.length > 0) {
+        frontmatter.subject = parseArtWikilink(data.subject);
     }
 
     return frontmatter;
+}
+
+function parseArtWikilink(value: string): string {
+    const match = /^\[\[([^\]|]+?)(?:\|[^\]]*)?\]\]$/.exec(value.trim());
+    return (match ? match[1] : value).trim();
 }
 
 function parseDepth(filename: string, value: unknown): number {
