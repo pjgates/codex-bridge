@@ -157,7 +157,7 @@ export async function buildPayload(options: BuildPayloadOptions): Promise<BuildR
     for (const { entity, syncId } of parsed) {
         const portrait = portraitBySyncId.get(syncId) ?? null;
         if (entity.frontmatter.type === "Character" && !portrait) {
-            warnings.push(`${entity.slug}: character has no portrait — journal syncs, no actor created`);
+            warnings.push(`${entity.slug}: character has no portrait — actor created with mystery-man placeholder`);
         }
         const playerHtml = markdownToHtml(resolveLinkPlaceholders(entity.playerContent, syncIdBySlug, stagedArtByFilename));
         const gmHtml = entity.gmContent === null
