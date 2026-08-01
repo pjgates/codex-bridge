@@ -116,6 +116,7 @@ export async function buildPayload(options: BuildPayloadOptions): Promise<BuildR
         }
         const relative = `art/${syncId}-subject${path.extname(subjectFile)}`;
         artFiles.set(sourcePath, relative);
+        stagedArtByFilename.set(subjectFile, relative);
         return relative;
     }
 

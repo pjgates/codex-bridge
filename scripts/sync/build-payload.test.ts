@@ -231,6 +231,19 @@ syncId: fs-broken01
 
         await expect(buildPayload({ vaultPath: vault, campaign: "the-forge" })).rejects.toThrow(/missing\.webp/);
     });
+
+    it("hard-fails when a referenced subject asset is missing", async () => {
+        await writeFile(path.join(vault, "codex/the-forge/entities/ghost.md"), `---
+title: Ghost
+type: Character
+subject: "[[missing-subject.png]]"
+published: true
+---
+`);
+
+        await expect(buildPayload({ vaultPath: vault, campaign: "the-forge" })).rejects.toThrow(/missing-subject\.png/);
+    });
+
     it("stages subject art and includes subject in payload and contentHash", async () => {
         await writeFile(path.join(vault, "codex/the-forge/entities/hero.md"), `---
 title: Hero
@@ -241,24 +254,65 @@ syncId: fs-hero0001
 ---
 # Hero
 `);
-        await writeFile(path.join(vault, "codex/the-forge/entities/plain.md"), `---
-title: Plain
+        await writeFile(path.join(vault, "codex/the-forge/entities/hero-no-subject.md"), `---
+title: Hero
 type: Character
 published: false
-syncId: fs-plain001
+syncId: fs-hero0002
 ---
-# Plain
+# Hero
+`);
+        await writeFile(path.join(vault, "codex/the-forge/entities/twin-a.md"), `---
+title: Twin
+type: Character
+subject: "[[hero-subject.png]]"
+published: false
+syncId: fs-twina001
+---
+# Twin
+`);
+        await writeFile(path.join(vault, "codex/the-forge/entities/twin-b.md"), `---
+title: Twin
+type: Character
+subject: "[[hero-subject.png]]"
+published: false
+syncId: fs-twinb001
+---
+# Twin
 `);
 
         const result = await buildPayload({ vaultPath: vault, campaign: "the-forge" });
         const hero = result.payload.entities.find((entry) => entry.slug === "hero")!;
-        const plain = result.payload.entities.find((entry) => entry.slug === "plain")!;
+        const heroNoSubject = result.payload.entities.find((entry) => entry.slug === "hero-no-subject")!;
+        const twinA = result.payload.entities.find((entry) => entry.slug === "twin-a")!;
+        const twinB = result.payload.entities.find((entry) => entry.slug === "twin-b")!;
 
         expect(hero.subject).toBe("art/fs-hero0001-subject.png");
-        expect(plain.subject).toBeNull();
+        expect(heroNoSubject.subject).toBeNull();
         expect(result.artFiles.get(path.join(vault, "codex/assets/hero-subject.png"))).toBe("art/fs-hero0001-subject.png");
-        expect(hero.contentHash).not.toBe(plain.contentHash);
+        expect(hero.contentHash).not.toBe(heroNoSubject.contentHash);
+        expect(twinA.contentHash).toBe(twinB.contentHash);
     });
 
-});
+    it("dedupes subject art with a matching prose embed", async () => {
+        await writeFile(path.join(vault, "codex/assets/shared-subject.png"), "fake-subject");
+        await writeFile(path.join(vault, "codex/the-forge/entities/ring.md"), `---
+title: Ring
+type: Character
+subject: "[[shared-subject.png]]"
+published: false
+syncId: fs-ring0001
+---
+# Ring
 
+![[shared-subject.png]]
+`);
+
+        const result = await buildPayload({ vaultPath: vault, campaign: "the-forge" });
+        const ring = result.payload.entities.find((entry) => entry.slug === "ring")!;
+        expect(ring.subject).toBe("art/fs-ring0001-subject.png");
+        expect(result.artFiles.get(path.join(vault, "codex/assets/shared-subject.png"))).toBe("art/fs-ring0001-subject.png");
+        expect(ring.playerHtml).toContain('src="forge-sync/art/fs-ring0001-subject.png"');
+        expect(result.artFiles.size).toBe(1);
+    });
+});
