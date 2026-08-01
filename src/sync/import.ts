@@ -173,7 +173,7 @@ export function journalAdoptUpdateData(syncId: string, syncKind: SyncKind): Reco
     return { flags: identityFlags(syncId, syncKind) };
 }
 
-/** Vault-owned fields written on EVERY people-actor sync (update-safe: never clobbers GM token tweaks). */
+/** Vault-owned fields written on EVERY people-actor sync (update-safe: never clobbers GM token tweaks like actorLink/disposition; note img is vault-owned — manual GM art on a placeholder actor reverts on the next content sync; set `portrait:` in the vault instead). */
 export function peopleActorVaultFields(entity: SyncEntity): Record<string, unknown> {
     const img = entity.portrait ? `forge-sync/${entity.portrait}` : "icons/svg/mystery-man.svg";
     return {

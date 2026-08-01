@@ -78,6 +78,12 @@ describe("peopleActor placeholder portraits", () => {
         expect(create.img).toBe("forge-sync/art/fs-randall1.webp");
         expect((create.prototypeToken as { texture: { src: string } }).texture.src).toBe("forge-sync/art/fs-randall1.webp");
     });
+
+    it("uses mystery-man for portrait-less Character update data", () => {
+        const update = peopleActorUpdateData(wren);
+        expect(update.img).toBe("icons/svg/mystery-man.svg");
+        expect((update.prototypeToken as { texture: { src: string } }).texture.src).toBe("icons/svg/mystery-man.svg");
+    });
 });
 
 describe("peopleActorCreateData", () => {
