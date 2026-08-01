@@ -48,7 +48,7 @@ export function payloadItems(payload: SyncPayload): SyncItem[] {
 
     for (const entity of payload.entities) {
         items.push({ kind: "entity-journal", docType: "JournalEntry", syncId: entity.syncId, name: entity.name, contentHash: entity.contentHash });
-        if (entity.type === "Character" && entity.portrait) {
+        if (entity.type === "Character") {
             items.push({ kind: "people-actor", docType: "Actor", syncId: entity.syncId, name: entity.name, contentHash: entity.contentHash });
         }
     }

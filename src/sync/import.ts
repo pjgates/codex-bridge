@@ -173,32 +173,32 @@ export function journalAdoptUpdateData(syncId: string, syncKind: SyncKind): Reco
     return { flags: identityFlags(syncId, syncKind) };
 }
 
-function peopleActorVaultPrototypeToken(portrait: string): Record<string, unknown> {
-    const img = `forge-sync/${portrait}`;
-    return {
-        texture: { src: img },
-        ring: { enabled: true },
-    };
-}
-
 /** Vault-owned fields written on EVERY people-actor sync (update-safe: never clobbers GM token tweaks). */
-export function peopleActorUpdateData(entity: SyncEntity): Record<string, unknown> {
-    const img = `forge-sync/${entity.portrait}`;
+export function peopleActorVaultFields(entity: SyncEntity): Record<string, unknown> {
+    const img = entity.portrait ? `forge-sync/${entity.portrait}` : "icons/svg/mystery-man.svg";
     return {
         name: entity.name,
         img,
-        prototypeToken: peopleActorVaultPrototypeToken(entity.portrait!),
+        prototypeToken: {
+            texture: { src: img },
+            ring: { enabled: true },
+        },
         flags: syncFlags(entity.syncId, "people-actor", entity.contentHash),
     };
 }
 
+export function peopleActorUpdateData(entity: SyncEntity): Record<string, unknown> {
+    return peopleActorVaultFields(entity);
+}
+
 /** Create payload — vault fields plus create-only token defaults in one prototypeToken. */
 export function peopleActorCreateData(entity: SyncEntity): Record<string, unknown> {
-    const vault = peopleActorUpdateData(entity);
+    const vault = peopleActorVaultFields(entity);
+    const vaultPrototype = vault.prototypeToken as Record<string, unknown>;
     return {
         ...vault,
         prototypeToken: {
-            ...peopleActorVaultPrototypeToken(entity.portrait!),
+            ...vaultPrototype,
             actorLink: true,
             disposition: 0,
         },

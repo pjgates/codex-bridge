@@ -54,6 +54,32 @@ const randall: SyncEntity = {
     contentHash: "h-r1",
 };
 
+const wren: SyncEntity = {
+    syncId: "fs-wren0001",
+    slug: "wren",
+    name: "Wren",
+    type: "Character",
+    published: false,
+    playerHtml: "<p></p>",
+    gmHtml: null,
+    portrait: null,
+    contentHash: "h-w1",
+};
+
+describe("peopleActor placeholder portraits", () => {
+    it("uses mystery-man for portrait-less Character create data", () => {
+        const create = peopleActorCreateData(wren);
+        expect(create.img).toBe("icons/svg/mystery-man.svg");
+        expect((create.prototypeToken as { texture: { src: string } }).texture.src).toBe("icons/svg/mystery-man.svg");
+    });
+
+    it("uses forge-sync paths for portrait-bearing Character create data", () => {
+        const create = peopleActorCreateData(randall);
+        expect(create.img).toBe("forge-sync/art/fs-randall1.webp");
+        expect((create.prototypeToken as { texture: { src: string } }).texture.src).toBe("forge-sync/art/fs-randall1.webp");
+    });
+});
+
 describe("peopleActorCreateData", () => {
     it("composes full prototypeToken on create but vault-only on update", () => {
         const create = peopleActorCreateData(randall);

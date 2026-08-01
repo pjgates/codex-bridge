@@ -16,12 +16,12 @@ function snap(partial: Partial<WorldDocSnapshot>): WorldDocSnapshot {
 }
 
 describe("payloadItems", () => {
-    it("emits journal+actor for a character with portrait, journal only without", () => {
+    it("emits journal+actor for every Character (placeholder when portrait-less)", () => {
         const p = payload();
         p.entities.push({ ...p.entities[0], syncId: "fs-wren0001", slug: "wren", name: "Wren", portrait: null, contentHash: "h-w1" });
         const items = payloadItems(p);
         expect(items.filter((i) => i.syncId === "fs-randall1").map((i) => i.kind).sort()).toEqual(["entity-journal", "people-actor"]);
-        expect(items.filter((i) => i.syncId === "fs-wren0001").map((i) => i.kind)).toEqual(["entity-journal"]);
+        expect(items.filter((i) => i.syncId === "fs-wren0001").map((i) => i.kind).sort()).toEqual(["entity-journal", "people-actor"]);
         expect(items.find((i) => i.syncId === "fs-manta001")?.kind).toBe("creature-actor");
     });
 });
