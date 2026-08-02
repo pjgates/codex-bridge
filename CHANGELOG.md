@@ -5,36 +5,44 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## 1.0.1
+
+### Fixed
+
+- **Security (docs):** the 1.0.0 migration procedure carried the Vault Sync Passphrase through the browser console and a saved dump file. The corrected procedure below excludes the passphrase from the settings dump entirely and enters it only via the module Settings UI. If you migrated with the 1.0.0 instructions, clear your browser console history and delete the dump file.
+
 ## 1.0.0
 
 **Breaking rename:** `sf2e-forge-custom` is now **codex-bridge** (module id `codex-foundry`, pipeline `codex-sync`).
 
 ### Migration (one-time, ~5 minutes)
 
-1. **Before uninstalling** (old module still enabled), dump all old settings to a file. In the world, open the browser console and run:
+1. **Before uninstalling** (old module still enabled), dump all non-secret settings. In the world, open the browser console and run:
    ```js
    const dump = {};
    for (const key of game.settings.settings.keys()) {
        if (!key.startsWith("sf2e-forge-custom.")) continue;
        const short = key.split(".")[1];
+       if (short === "forgeSyncPassphrase") continue; // secret — handled via Settings UI only
        try { dump[short] = game.settings.get("sf2e-forge-custom", short); } catch {}
    }
    console.log(JSON.stringify(dump));
    ```
-   Copy the JSON somewhere safe. This captures all 7 world settings, the hidden `forgeSyncLastManifest`, and this browser's client passphrase. Without it, prior state is unrecoverable.
+   Copy the JSON somewhere safe. This captures the 7 world toggles and the hidden `forgeSyncLastManifest`. The passphrase is deliberately excluded — never move it through the console or a file. Without the dump, prior state is unrecoverable.
 2. In Foundry **Setup**, uninstall `SF2e Forge Custom Rules`.
 3. Install from the new manifest URL: `https://github.com/pjgates/codex-bridge/releases/latest/download/module.json`
 4. Enable **Codex Foundry** in your world, reload, then restore the dump in the console:
    ```js
-   const dump = { /* pasted JSON */ };
-   const keyMap = { enableForgeSync: "enableCodexSync", forgeSyncPassphrase: "codexSyncPassphrase", forgeSyncLastManifest: "codexSyncLastManifest" };
+   const dump = { /* pasted JSON — contains no passphrase */ };
+   const keyMap = { enableForgeSync: "enableCodexSync", forgeSyncLastManifest: "codexSyncLastManifest" };
    for (const [short, value] of Object.entries(dump)) {
        await game.settings.set("codex-foundry", keyMap[short] ?? short, value);
    }
    ```
-   Other GM browsers re-enter their own passphrase (client-scoped by design). An empty/absent `forgeSyncLastManifest` is fine to restore as-is.
-5. Run a Vault Sync from the sync dialog. Expect **0 creates and 0 stale**; updates only where art URLs changed. If you see creates, stop and report — do not apply.
-6. Historical chat cards keep working; their old flags are simply inert.
+   An empty/absent `forgeSyncLastManifest` is fine to restore as-is.
+5. Enter the Vault Sync Passphrase via **Module Settings > Codex Foundry > Vault Sync Passphrase** (the UI field, never the console). It is client-scoped by design: each GM browser enters its own. Clear your clipboard and delete the dump afterward.
+6. Run a Vault Sync from the sync dialog. Expect **0 creates and 0 stale**; updates only where art URLs changed. If you see creates, stop and report — do not apply.
+7. Historical chat cards keep working; their old flags are simply inert.
 
 Self-hosting note: pre-rename world documents referencing `forge-sync/art/...` keep resolving via a server-side compatibility symlink (see the restructure spec).
 

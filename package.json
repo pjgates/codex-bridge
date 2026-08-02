@@ -1,6 +1,6 @@
 {
     "name": "codex-bridge",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "description": "Codex bridge: Obsidian↔Foundry VTT content sync plus ruleset houserules",
     "type": "module",
     "scripts": {

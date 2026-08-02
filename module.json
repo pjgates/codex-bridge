@@ -2,7 +2,7 @@
     "id": "codex-foundry",
     "title": "Codex Foundry",
     "description": "Codex bridge for Foundry VTT: vault content sync plus ruleset houserules (currently Starfinder Second Edition).",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "authors": [
         {
             "name": "peterg"
