@@ -1,0 +1,5 @@
+{
+    "vaultPath": "/path/to/your/vault",
+    "campaign": "the-forge",
+    "remote": { "host": "USER@VM_HOST", "dataPath": "/path/to/foundrydata/Data" }
+}

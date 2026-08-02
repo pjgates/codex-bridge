@@ -74,12 +74,32 @@ npm install
 ### Build
 
 ```bash
-# One-time build
+# One-time build (Vite → dist/)
 npm run build
 
 # Watch mode (rebuilds on file changes)
 npm run watch
 ```
+
+### Vault sync (forge-sync)
+
+Campaign content (entities, creatures, art) is published to the Foundry server with **forge-sync**, not compendium packs. The pipeline reads markdown from an external Obsidian vault, builds an encrypted payload, and rsyncs it to the server's `forge-sync/` directory. Foundry worlds with Vault Sync enabled pull that payload at runtime.
+
+1. Copy `forge-sync.config.example.json` to `forge-sync.config.json` and set `vaultPath`, `campaign`, and `remote`.
+2. Put `FORGE_SYNC_PASSPHRASE` in `.env` (never commit).
+3. Dry-run the build:
+
+```bash
+npm run push -- --dry-run
+```
+
+4. Push to the server:
+
+```bash
+npm run push
+```
+
+`npm run verify` runs typecheck, lint, tests, and `vite build` — it does not convert vault markdown or compile compendium packs.
 
 ### Link to Foundry
 

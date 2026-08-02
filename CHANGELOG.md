@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.3.0 - 2026-08-02
+
+### Added
+
+- **Forge Sync** -- encrypted one-way vault → Foundry content pipeline (`npm run push`). Entities, journal entries, and bestiary creatures sync from the vault working copy to the world via AES-GCM payload; syncIds track identity across renames. Dynamic token ring subjects supported via per-entity `subject:` art (birefnet background removal, validated mask recipe). Passphrase entered once in module settings (client-scoped, GM-only). Adoption dialog for pre-existing world documents.
+
+### Removed
+
+- **Compendium packs** -- the `the-forge-entities` and `the-forge-bestiary` compendium packs, the vault submodule, the pack compiler (`compile-packs`), vault converter (`convert-vault`), and all pack-only converter code are retired. Content flows exclusively through forge-sync. `@foundryvtt/foundryvtt-cli` dependency removed.
+
 ## 0.2.0 - 2026-07-11
 
 ### Added

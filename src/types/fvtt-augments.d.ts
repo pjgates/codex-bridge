@@ -21,6 +21,9 @@ declare global {
         "sf2e-forge-custom.heroicRerolls": boolean;
         "sf2e-forge-custom.playersRollAllDice": boolean;
         "sf2e-forge-custom.pradStrictDCs": boolean;
+        "sf2e-forge-custom.enableForgeSync": boolean;
+        "sf2e-forge-custom.forgeSyncPassphrase": string;
+        "sf2e-forge-custom.forgeSyncLastManifest": string;
     }
 
     // ─── Callback & Options Types ────────────────────────────────────────

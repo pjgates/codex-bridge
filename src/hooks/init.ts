@@ -9,6 +9,12 @@ import { registerPradSettings, registerPradTemplates, registerAttackCardTemplate
 import { registerHeroicRerollsSetting } from "../heroic-rerolls/index.js";
 import { initTargetHelper } from "../target-helper/index.js";
 import { initStatblockImporter, registerStatblockImporterSetting } from "../statblock-importer/index.js";
+import {
+    registerSyncSettings,
+    registerSyncSettingsButton,
+    registerSyncTemplates,
+    SETTING_ENABLE_SYNC,
+} from "../sync/index.js";
 import { resolveHtmlRoot } from "../shared/html.js";
 
 export function onInit(): void {
@@ -17,6 +23,11 @@ export function onInit(): void {
 
     // Register Heroic Rerolls variant setting
     registerHeroicRerollsSetting();
+
+    // Register Vault Sync settings
+    registerSyncSettings();
+    registerSyncTemplates();
+    registerSyncSettingsButton();
 
     // Register PRAD (Players Roll All Dice) settings
     registerPradSettings();
@@ -116,6 +127,15 @@ function onRenderSettingsConfig(
         if (heroicRerollsInput && !masterEnabled) {
             heroicRerollsInput.disabled = true;
             heroicRerollsInput.closest(".form-group")?.classList.add("disabled");
+        }
+
+        // Find the Vault Sync setting row and disable it if master is off
+        const syncInput = root.querySelector<HTMLInputElement>(
+            `input[name="${MODULE_ID}.${SETTING_ENABLE_SYNC}"]`,
+        );
+        if (syncInput && !masterEnabled) {
+            syncInput.disabled = true;
+            syncInput.closest(".form-group")?.classList.add("disabled");
         }
 
         // Disable the strict DC setting when PRAD is off

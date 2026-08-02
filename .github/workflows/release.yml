@@ -18,22 +18,10 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Checkout private vault submodule
-        env:
-          VAULT_PAT: ${{ secrets.VAULT_PAT }}
-        run: |
-          # VAULT_PAT must be a fine-grained PAT with read-only Contents access scoped
-          # only to pjgates/codex-silverhold-vault. Keep it out of persistent Git config.
-          AUTH_HEADER="$(printf 'x-access-token:%s' "$VAULT_PAT" | base64 -w 0)"
-          GIT_CONFIG_COUNT=1 \
-          GIT_CONFIG_KEY_0=http.https://github.com/pjgates/codex-silverhold-vault.git.extraheader \
-          GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $AUTH_HEADER" \
-          git submodule update --init -- vault
-
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Install dependencies
@@ -58,152 +46,15 @@ jobs:
       - name: Verify
         run: npm run verify
 
-      - name: Package and verify zip
+      - name: Package release zip
         run: |
-          mapfile -t PACK_NAMES < <(jq -r '.packs[].name' module.json)
-          mapfile -t PACK_PATHS < <(jq -r '.packs[].path' module.json)
-          test "${#PACK_PATHS[@]}" -gt 0
-          test "${#PACK_NAMES[@]}" -eq "${#PACK_PATHS[@]}"
-          declare -A SEEN_PACK_PATHS=()
-          PACKS_ROOT="$(realpath packs)"
-
-          for pack_index in "${!PACK_PATHS[@]}"; do
-            pack_name="${PACK_NAMES[$pack_index]}"
-            pack_path="${PACK_PATHS[$pack_index]}"
-            expected_pack_path="packs/$pack_name"
-            if test "$pack_path" != "$expected_pack_path"; then
-              echo "Refusing to package aliased pack path: expected $expected_pack_path, got $pack_path" >&2
-              exit 1
-            fi
-            case "$pack_path" in
-              packs/*) ;;
-              *) echo "Refusing to package pack outside packs/: $pack_path" >&2; exit 1 ;;
-            esac
-            portable_pack_name="${pack_name,,}"
-            portable_pack_path="${pack_path,,}"
-            case "$portable_pack_name" in
-              ""|*/*|.|..|_source|.compile-stage-*|.compile-backup-*|.compile-lock|.compile-lock-reclaim)
-                echo "Refusing to package non-pack path: $pack_path" >&2
-                exit 1
-                ;;
-            esac
-            if test -n "${SEEN_PACK_PATHS[$portable_pack_path]+x}"; then
-              echo "Refusing to package duplicate portable pack path: $pack_path" >&2
-              exit 1
-            fi
-            SEEN_PACK_PATHS[$portable_pack_path]=1
-            test -d "$pack_path"
-            if test -L "$pack_path" || test "$(dirname "$(realpath "$pack_path")")" != "$PACKS_ROOT"; then
-              echo "Refusing to package redirected pack path: $pack_path" >&2
-              exit 1
-            fi
-            if test -n "$(find "$pack_path" -type l -print -quit)"; then
-              echo "Refusing to package pack containing a redirected path: $pack_path" >&2
-              exit 1
-            fi
-          done
-
           rm -f sf2e-forge-custom.zip
           zip -r sf2e-forge-custom.zip \
             dist/ \
             module.json \
             README.md \
             LICENSE \
-            CHANGELOG.md \
-            "${PACK_PATHS[@]}" \
-            -x 'packs/_source' 'packs/_source/' 'packs/_source/*' 'packs/.compile-stage-*' 'packs/.compile-stage-*/*' 'packs/.compile-backup-*' 'packs/.compile-backup-*/*' 'packs/.compile-lock' 'packs/.compile-lock/*' 'packs/.compile-lock-reclaim' 'packs/.compile-lock-owner-*' 'packs/.compile-lock-reclaim-owner-*'
-
-          for pack_path in "${PACK_PATHS[@]}"; do
-            unzip -p sf2e-forge-custom.zip "$pack_path/CURRENT" | grep -q .
-          done
-
-          python3 - sf2e-forge-custom.zip <<'PY'
-          import re
-          import sys
-          import unicodedata
-          import zipfile
-
-          drive_absolute = re.compile(r"^[A-Za-z]:")
-          reserved_device = re.compile(r"^(?:con|prn|aux|nul|conin\$|conout\$|com(?:[1-9]|[¹²³])|lpt(?:[1-9]|[¹²³]))$", re.IGNORECASE)
-          windows_forbidden = frozenset('<>:"|?*')
-
-          def canonicalize(raw):
-              if not raw or "\\" in raw or raw.startswith("/") or drive_absolute.match(raw):
-                  raise ValueError(f"Non-portable absolute or backslash archive path: {raw!r}")
-              path_without_directory_slash = raw[:-1] if raw.endswith("/") else raw
-              segments = path_without_directory_slash.split("/")
-              if not path_without_directory_slash or any(segment in {"", ".", ".."} for segment in segments):
-                  raise ValueError(f"Non-portable empty or dot archive path segment: {raw!r}")
-
-              canonical_segments = []
-              for segment in segments:
-                  if segment.endswith((".", " ")):
-                      raise ValueError(f"Non-portable trailing dot or space in archive path: {raw!r}")
-                  if any(character in windows_forbidden or ord(character) < 32 for character in segment):
-                      raise ValueError(f"Windows-forbidden character in archive path segment: {raw!r}")
-                  normalized = unicodedata.normalize("NFC", segment)
-                  if reserved_device.fullmatch(normalized.split(".", 1)[0]):
-                      raise ValueError(f"Windows reserved-device archive path segment: {raw!r}")
-                  canonical_segments.append(normalized.upper())
-              return tuple(canonical_segments)
-
-          transient_exact = frozenset({"_SOURCE", ".COMPILE-LOCK", ".COMPILE-LOCK-RECLAIM"})
-          transient_prefixes = (".COMPILE-STAGE-", ".COMPILE-BACKUP-", ".COMPILE-LOCK-OWNER-", ".COMPILE-LOCK-RECLAIM-OWNER-")
-
-          def is_transient(canonical_segments):
-              if len(canonical_segments) < 2 or canonical_segments[0] != "PACKS":
-                  return False
-              transient = canonical_segments[1]
-              return transient in transient_exact or transient.startswith(transient_prefixes)
-
-          invalid_paths = ["/absolute", "C:/absolute", "a\\b", "a/./b", "a/../b", "a//b", "a./b", "a /b", "NUL/file", "dir/COM1.txt", "dir/COM¹.txt", "dir/LPT³", "dir/CONIN$", "dir/CONOUT$.txt"]
-          invalid_paths.extend(f"dist/a{character}b" for character in windows_forbidden)
-          invalid_paths.extend(f"dist/a{chr(codepoint)}b" for codepoint in range(32))
-          for invalid in invalid_paths:
-              try:
-                  canonicalize(invalid)
-              except ValueError:
-                  pass
-              else:
-                  raise AssertionError(f"Archive portability regression accepted {invalid!r}")
-          if canonicalize("dist/Foo") != canonicalize("dist/foo"):
-              raise AssertionError("Archive case-fold collision regression")
-          if canonicalize("dist/é") != canonicalize("dist/e\N{COMBINING ACUTE ACCENT}"):
-              raise AssertionError("Archive Unicode-normalization collision regression")
-          if canonicalize("dist/i") != canonicalize("dist/ı"):
-              raise AssertionError("Archive Windows-case collision regression")
-
-          transient_paths = (
-              "packs/_source",
-              "packs/.compile-stage-owner",
-              "packs/.compile-backup-owner",
-              "packs/.compile-lock",
-              "packs/.compile-lock-reclaim",
-              "packs/.compile-lock-owner-owner",
-              "packs/.compile-lock-reclaim-owner-owner",
-          )
-          for transient_path in transient_paths:
-              for case_variant in (transient_path, transient_path.swapcase()):
-                  if not is_transient(canonicalize(case_variant)):
-                      raise AssertionError(f"Archive transient exclusion regression accepted {case_variant!r}")
-
-          seen = {}
-          with zipfile.ZipFile(sys.argv[1]) as archive:
-              for member in archive.infolist():
-                  raw = member.filename
-                  try:
-                      canonical_segments = canonicalize(raw)
-                  except ValueError as error:
-                      raise SystemExit(str(error)) from error
-                  canonical = "/".join(canonical_segments)
-                  previous = seen.get(canonical)
-                  if previous is not None:
-                      raise SystemExit(f"Duplicate portable archive path: {raw!r} collides with {previous!r}")
-                  seen[canonical] = raw
-
-                  if is_transient(canonical_segments):
-                      raise SystemExit(f"Excluded path present in archive: {raw!r}")
-          PY
+            CHANGELOG.md
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2

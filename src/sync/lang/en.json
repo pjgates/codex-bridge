@@ -1,0 +1,39 @@
+{
+    "sf2e-forge-custom": {
+        "settings": {
+            "enableForgeSync": {
+                "name": "Enable Vault Sync",
+                "hint": "Fetch vault content pushed to Data/forge-sync and offer world imports to the GM."
+            },
+            "forgeSyncPassphrase": {
+                "name": "Vault Sync Passphrase",
+                "hint": "Stored in this browser only. Must match FORGE_SYNC_PASSPHRASE used by the push CLI."
+            }
+        },
+        "sync": {
+            "updated": "Vault content updated \u2014 open Vault Sync to review.",
+            "dialogTitle": "Vault Sync",
+            "openDialog": "Open Vault Sync",
+            "settingsButton": "Vault Sync",
+            "decryptFailed": "Vault Sync payload could not be decrypted \u2014 check the passphrase in module settings.",
+            "unavailable": "No vault sync payload is available on this server yet.",
+            "sectionAdopt": "Adopt existing documents",
+            "sectionCreate": "Create new",
+            "sectionUpdate": "Update automatically",
+            "sectionReimport": "Reimport creatures",
+            "sectionStale": "Remove stale",
+            "modifiedInFoundry": "Modified in Foundry",
+            "staleDeleteLabel": "Delete {name} ({docType})",
+            "apply": "Apply",
+            "nothingToApply": "Nothing to apply \u2014 vault matches this world.",
+            "unchanged": "{count} documents already match the vault.",
+            "reportTitle": "Sync complete",
+            "reportCreated": "Created: {count}",
+            "reportUpdated": "Updated: {count}",
+            "reportAdopted": "Adopted: {count}",
+            "reportReimported": "Reimported: {count}",
+            "reportDeleted": "Deleted: {count}",
+            "reportFailuresTitle": "Failures"
+        }
+    }
+}

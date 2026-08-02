@@ -31,7 +31,7 @@ export function parseEntity(
  * Normalise raw frontmatter data into a typed structure with defaults.
  */
 function normaliseFrontmatter(filename: string, data: Record<string, unknown>): EntityFrontmatter {
-    return {
+    const frontmatter: EntityFrontmatter = {
         title: String(data.title ?? "Untitled"),
         type: String(data.type ?? "Unknown"),
         tags: toStringArray(data.tags),
@@ -42,6 +42,21 @@ function normaliseFrontmatter(filename: string, data: Record<string, unknown>): 
         campaign: toStringArray(data.campaign),
         published: parsePublished(filename, data.published),
     };
+
+    if (typeof data.syncId === "string" && data.syncId.length > 0) frontmatter.syncId = data.syncId;
+    if (typeof data.portrait === "string" && data.portrait.length > 0) {
+        frontmatter.portrait = parseArtWikilink(data.portrait);
+    }
+    if (typeof data.subject === "string" && data.subject.length > 0) {
+        frontmatter.subject = parseArtWikilink(data.subject);
+    }
+
+    return frontmatter;
+}
+
+function parseArtWikilink(value: string): string {
+    const match = /^\[\[([^\]|]+?)(?:\|[^\]]*)?\]\]$/.exec(value.trim());
+    return (match ? match[1] : value).trim();
 }
 
 function parseDepth(filename: string, value: unknown): number {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { enrichDescription } from "../enrich.js";
+import { enrichDescription } from "../../../src/statblock/enrich.js";
 import { markdownToHtml } from "../markdown.js";
-import { sanitizeFoundryEnricherLabels, sanitizeFoundryHtml, sanitizeHtml } from "../sanitize.js";
+import { sanitizeFoundryEnricherLabels, sanitizeFoundryHtml, sanitizeHtml } from "../../../src/statblock/sanitize.js";
 
 describe("converter HTML sanitization", () => {
     it("preserves reviewed journal HTML and safe links", () => {
