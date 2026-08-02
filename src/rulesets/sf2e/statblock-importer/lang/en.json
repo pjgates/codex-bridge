@@ -10,12 +10,15 @@
             "buttonLabel": "Import Statblock",
             "dialogTitle": "Import SF2e Statblock",
             "previewTitle": "Preview",
-            "pasteHint": "Paste the full markdown file (frontmatter included). Prose after the frontmatter becomes the NPC's public notes.",
+            "pasteHint": "Paste a vault bestiary markdown file. Prose outside the statblock blocks becomes the NPC's public notes.",
             "previewButton": "Preview",
             "createButton": "Create NPC",
             "cancelButton": "Cancel",
-            "noFrontmatter": "No YAML frontmatter found (expected a --- … --- block at the top).",
-            "notAStatblock": "The frontmatter has no `statblock: true` marker.",
+            "pickCreatureTitle": "Pick a Creature",
+            "pickCreatureHint": "This file declares several creatures. Pick one to import.",
+            "multipleStatblocks": "This file declares several creatures ({ids}); pick one to import.",
+            "unknownCreatureId": "No creature \"{id}\" in this file (it declares: {ids}).",
+            "notAStatblock": "No `creatures: […]` frontmatter array with statblock blocks found.",
             "parseFailed": "Statblock import failed: {message}",
             "created": "Created {name} (level {level} NPC)."
         }

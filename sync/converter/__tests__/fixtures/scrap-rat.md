@@ -1,5 +1,14 @@
 ---
-statblock: true
+creatures: [scrap-rat]
+---
+
+# Scrap Rat
+
+Small beast scavengers that infest junkyards and cargo bays. They can
+assemble crude grenades from scrap in minutes.
+
+```statblock
+id: scrap-rat
 layout: Pathfinder 2e Creature Layout
 name: Scrap Rat
 level: "Creature -1"
@@ -70,9 +79,4 @@ abilities_bot:
       assemble any level 0 commercial grenade using nothing but junk. It
       falls apart and becomes unusable junk after 10 minutes.
     category: offensive
----
-
-# Scrap Rat
-
-Small beast scavengers that infest junkyards and cargo bays. They can
-assemble crude grenades from scrap in minutes.
+```

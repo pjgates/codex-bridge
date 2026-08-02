@@ -20,7 +20,12 @@ afterEach(async () => {
 });
 
 const MINIMAL_CREATURE = `---
-statblock: true
+creatures: [minimal-creature]
+---
+# Minimal
+
+\`\`\`statblock
+id: minimal-creature
 name: Minimal Creature
 level: 1
 ac: 15
@@ -29,13 +34,13 @@ attributes: { str: 0, dex: 0, con: 0, int: 0, wis: 0, cha: 0 }
 modifier: 0
 saves: { fort: 0, ref: 0, will: 0 }
 speed: 0
----
-# Minimal
+\`\`\`
 `;
 const DUST_MANTA = MINIMAL_CREATURE
     .replace("name: Minimal Creature", "name: Dust Manta")
     .replace("level: 1", "level: 3")
-    .replace("# Minimal", "# Dust Manta");
+    .replace("# Minimal", "# Dust Manta")
+    .replaceAll("minimal-creature", "dust-manta");
 
 describe("buildPayload", () => {
     it("mints missing syncIds, writes them back, and extracts portraits", async () => {
@@ -152,6 +157,63 @@ Secret XYZ\n%%Secret%%\nGM only
 
         expect(result.payload.creatures[0]?.name).toBe("Dust Manta");
         expect(result.payload.creatures[0]?.statblock.level).toBe(3);
+    });
+
+    it("mints a missing creature syncId into the statblock fence, not the frontmatter", async () => {
+        const filePath = path.join(vault, "codex/the-forge/bestiary/dust-manta.md");
+        await writeFile(filePath, DUST_MANTA);
+
+        const result = await buildPayload({ vaultPath: vault, campaign: "the-forge" });
+
+        const syncId = result.payload.creatures[0]?.syncId;
+        expect(syncId).toMatch(/^fs-/);
+        const rewritten = await readFile(filePath, "utf-8");
+        const fenceStart = rewritten.indexOf("```statblock");
+        expect(rewritten.indexOf(`syncId: ${syncId}`)).toBeGreaterThan(fenceStart);
+        expect(rewritten.slice(0, fenceStart)).not.toContain("syncId");
+        expect(result.mintedFiles).toContain(filePath);
+    });
+
+    it("carries every declared creature from a shared file", async () => {
+        const twoRats = `---
+creatures: [big-rat, small-rat]
+---
+# Rats
+
+\`\`\`statblock
+id: small-rat
+name: Small Rat
+level: 1
+ac: 10
+hp: 8
+attributes: { str: 0, dex: 0, con: 0, int: 0, wis: 0, cha: 0 }
+modifier: 0
+saves: { fort: 0, ref: 0, will: 0 }
+speed: 0
+\`\`\`
+
+\`\`\`statblock
+id: big-rat
+syncId: fs-bigrat01
+name: Big Rat
+level: 2
+ac: 12
+hp: 20
+attributes: { str: 0, dex: 0, con: 0, int: 0, wis: 0, cha: 0 }
+modifier: 0
+saves: { fort: 0, ref: 0, will: 0 }
+speed: 0
+\`\`\`
+`;
+        await writeFile(path.join(vault, "codex/the-forge/bestiary/rats.md"), twoRats);
+
+        const result = await buildPayload({ vaultPath: vault, campaign: "the-forge" });
+
+        expect(result.payload.creatures.map((creature) => creature.slug)).toEqual(["big-rat", "small-rat"]);
+        expect(result.payload.creatures[0]?.syncId).toBe("fs-bigrat01");
+        expect(result.payload.creatures[1]?.syncId).toMatch(/^fs-/);
+        expect(result.payload.creatures[0]?.name).toBe("Big Rat");
+        expect(result.payload.creatures[1]?.name).toBe("Small Rat");
     });
 
     it("rewrites portrait embeds in prose to img tags without stray embed syntax", async () => {

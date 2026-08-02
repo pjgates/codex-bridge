@@ -1,5 +1,19 @@
 ---
-statblock: true
+creatures: [converted-dust-manta]
+---
+
+# Converted Dust Manta
+
+A dust manta is a wide, placid grazer that swims beneath the desert the way whales swim beneath the sea, singing to its kin through the sand in subsonic pulses. This one has stopped singing. Lattice ridges run its wings in perfect geometric lines, a lens-cluster sits where its eyes were, and it moves with the deliberate patience of something carrying out a task it does not understand and cannot refuse.
+
+> **Source:** Dust Manta (SF2e AoN, Creature 6 skirmisher) converted up to Creature 8 brute
+> **Role:** Brute set-piece for a Level 6 party of five (party+2, 80 XP)
+> **Stat Trade-offs:** High attack, damage, Fort, and HP; below-par AC, low Will, and electricity weakness 10 paying for physical resistance 5. The base manta's death-spiral toxin is deliberately gone — replaced by Extraction Filaments (drained), because the engine samples, it doesn't kill.
+> **Signature Move:** Burrowing Charge — it vanishes under the dust and breaches like a whale. Telegraph it with the bow-wave; sandsense means it always knows where they are.
+> **Tactical Notes:** It grabs, holds, and samples — damage reads as incidental to curiosity (see [[the-waking-engine|The Waking Engine]] voice discipline: no malice-words). Opens with Dust Veil, hunts by sandsense inside its own cloud, Burrowing Charges anything that keeps its distance. Never flees, never protects itself, ignores prone or fleeing creatures in favour of active ones — it is cataloguing resistance, not winning a fight. Pair with 1–2 [[converted-murmuration|Converted Murmurations]] (120 XP total, between moderate and severe for five players; drop a murmuration for a gentler opener). Electricity is the discovery reward.
+
+```statblock
+id: converted-dust-manta
 layout: Pathfinder 2e Creature Layout
 name: Converted Dust Manta
 level: "Creature 8"
@@ -105,14 +119,4 @@ abilities_bot:
       **Critical failure** drained 2. The filaments withdraw on their own —
       the manta does not pursue a sampled creature that stops fighting it.
     category: offensive
----
-
-# Converted Dust Manta
-
-A dust manta is a wide, placid grazer that swims beneath the desert the way whales swim beneath the sea, singing to its kin through the sand in subsonic pulses. This one has stopped singing. Lattice ridges run its wings in perfect geometric lines, a lens-cluster sits where its eyes were, and it moves with the deliberate patience of something carrying out a task it does not understand and cannot refuse.
-
-> **Source:** Dust Manta (SF2e AoN, Creature 6 skirmisher) converted up to Creature 8 brute
-> **Role:** Brute set-piece for a Level 6 party of five (party+2, 80 XP)
-> **Stat Trade-offs:** High attack, damage, Fort, and HP; below-par AC, low Will, and electricity weakness 10 paying for physical resistance 5. The base manta's death-spiral toxin is deliberately gone — replaced by Extraction Filaments (drained), because the engine samples, it doesn't kill.
-> **Signature Move:** Burrowing Charge — it vanishes under the dust and breaches like a whale. Telegraph it with the bow-wave; sandsense means it always knows where they are.
-> **Tactical Notes:** It grabs, holds, and samples — damage reads as incidental to curiosity (see [[the-waking-engine|The Waking Engine]] voice discipline: no malice-words). Opens with Dust Veil, hunts by sandsense inside its own cloud, Burrowing Charges anything that keeps its distance. Never flees, never protects itself, ignores prone or fleeing creatures in favour of active ones — it is cataloguing resistance, not winning a fight. Pair with 1–2 [[converted-murmuration|Converted Murmurations]] (120 XP total, between moderate and severe for five players; drop a murmuration for a gentler opener). Electricity is the discovery reward.
+```

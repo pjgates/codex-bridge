@@ -9,6 +9,8 @@
 export type * from "./types.js";
 export { normaliseStatblock, parseSensesString, parseSpeedString, parseAttackName, parseAttackDesc, parseDamageString } from "./parse.js";
 export type { ParseOptions } from "./parse.js";
+export { extractStatblocks } from "./extract.js";
+export type { ExtractedCreature, ExtractedStatblocks } from "./extract.js";
 export { buildActorDocument, parseActionFromName, parseIWRString } from "./actor.js";
 export type { BuildActorOptions } from "./actor.js";
 export { enrichDescription, enrichChecks, enrichDamage, enrichTemplates, enrichConditions } from "./enrich.js";

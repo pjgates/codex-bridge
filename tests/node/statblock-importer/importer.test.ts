@@ -4,11 +4,11 @@ import { describe, expect, it } from "vitest";
 // Side effect: inject happy-dom into the shared sanitizer for Node tests.
 import "../../../sync/converter/dom.js";
 import { benchmark, averageDamage } from "../../../src/rulesets/sf2e/statblock-importer/benchmarks.js";
-import { parsePastedStatblock, buildImportActorData } from "../../../src/rulesets/sf2e/statblock-importer/import-dialog.js";
+import { parsePastedStatblock, buildImportActorData, listPastedCreatureIds } from "../../../src/rulesets/sf2e/statblock-importer/import-dialog.js";
 import { renderPreview } from "../../../src/rulesets/sf2e/statblock-importer/preview.js";
 import { normaliseStatblock } from "../../../src/rulesets/sf2e/statblock/parse.js";
+import { extractStatblocks } from "../../../src/rulesets/sf2e/statblock/extract.js";
 import { parseIWRString } from "../../../src/rulesets/sf2e/statblock/actor.js";
-import { load } from "js-yaml";
 
 const FIXTURE = readFileSync(path.join(import.meta.dirname, "fixtures", "converted-dust-manta.md"), "utf8");
 
@@ -149,20 +149,30 @@ describe("parsePastedStatblock", () => {
         expect(publicNotes).not.toContain("[[");
     });
 
-    it("rejects input without frontmatter or statblock marker", () => {
+    it("rejects input without a creatures declaration", () => {
         expect(() => parsePastedStatblock("# Just prose")).toThrow();
         expect(() => parsePastedStatblock("---\nname: X\n---\n")).toThrow();
     });
 
+    it("picks one creature out of a multi-creature file", () => {
+        const minimal = (id: string, name: string): string =>
+            `\`\`\`statblock\nid: ${id}\nname: ${name}\nlevel: 1\nac: 10\nhp: 10\nattributes: { str: 0, dex: 0, con: 0, int: 0, wis: 0, cha: 0 }\nmodifier: 0\nsaves: { fort: 0, ref: 0, will: 0 }\nspeed: 0\n\`\`\`\n`;
+        const two = `---\ncreatures: [a-creature, b-creature]\n---\n# Two\n\n${minimal("a-creature", "A Creature")}\n${minimal("b-creature", "B Creature")}`;
+
+        expect(listPastedCreatureIds(two)).toEqual(["a-creature", "b-creature"]);
+        expect(() => parsePastedStatblock(two)).toThrow();
+        expect(parsePastedStatblock(two, "b-creature").statblock.name).toBe("B Creature");
+        expect(() => parsePastedStatblock(two, "c-creature")).toThrow();
+    });
+
     it("is lenient where the strict converter is not", () => {
-        const yaml = FIXTURE.match(/^---\r?\n([\s\S]*?)\r?\n---/)![1];
-        const data = load(yaml) as Record<string, unknown>;
+        const { data } = extractStatblocks("converted-dust-manta.md", FIXTURE)!.creatures[0];
         // Reviewed custom senses route to details in strict mode; unreviewed senses still fail strict.
         expect(() => normaliseStatblock({ ...data, senses: "voidsight 60 feet" }, "test.md")).toThrow(/unknown sense type/);
         // Lenient mode (paste importer) accepts unreviewed senses.
         expect(() => normaliseStatblock({ ...data, senses: "voidsight 60 feet" }, "test.md", { lenient: true })).not.toThrow();
         // Reviewed sandsense is accepted in strict mode (routes to details, not structured senses).
-        expect(() => normaliseStatblock(data, "converted-dust-manta.md")).not.toThrow();
+        expect(() => normaliseStatblock({ ...data }, "converted-dust-manta.md")).not.toThrow();
     });
 });
 

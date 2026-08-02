@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## Unreleased
+
+### Changed
+
+- **Vault bestiary format:** creature statblocks moved from YAML frontmatter to ` ```statblock ` body fences, declared by a `creatures: [id, …]` frontmatter array. A file can now hold several creatures (e.g. `praetorians.md`); each fence carries its own `id`, `syncId`, `published`, and `portrait`. Push mints missing syncIds into the fence. Old frontmatter statblocks fail the build with a migration error naming the file.
+- **Statblock Importer:** pasting a multi-creature file offers a creature picker; public notes now exclude the statblock fences.
+
 ## 1.0.1
 
 ### Fixed

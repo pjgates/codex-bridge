@@ -202,19 +202,37 @@ export async function buildPayload(options: BuildPayloadOptions): Promise<BuildR
     for (const filename of await listMarkdown(bestiaryDir)) {
         const filePath = path.join(bestiaryDir, filename);
         const raw = await readFile(filePath, "utf-8");
-        const creature = parseCreature(filename, raw);
-        if (!creature) continue;
-        const frontmatter = parseEntity(filename, raw).frontmatter;
-        const syncId = await ensureSyncId(filePath, frontmatter.syncId);
-        const portrait = await stageArt(frontmatter.portrait, syncId, filePath);
-        creatures.push({
-            syncId,
-            slug: creature.slug,
-            name: creature.statblock.name,
-            statblock: creature.statblock,
-            portrait,
-            contentHash: hash(JSON.stringify([creature.statblock, portrait])),
-        });
+        const parsed = parseCreature(filename, raw);
+        if (!parsed) continue;
+
+        // Mint missing fence syncIds; splice them in bottom-up so earlier spans stay valid.
+        const minted: { at: number; text: string }[] = [];
+        for (const creature of parsed) {
+            if (creature.syncId) continue;
+            creature.syncId = mintSyncId();
+            minted.push({ at: creature.span.start, text: `syncId: ${creature.syncId}\n` });
+        }
+        if (minted.length > 0) {
+            let rewritten = raw;
+            for (const { at, text } of minted.sort((a, b) => b.at - a.at)) {
+                rewritten = rewritten.slice(0, at) + text + rewritten.slice(at);
+            }
+            await writeFile(filePath, rewritten);
+            mintedFiles.push(filePath);
+        }
+
+        for (const creature of parsed) {
+            const syncId = await ensureSyncId(filePath, creature.syncId);
+            const portrait = await stageArt(creature.portrait, syncId, filePath);
+            creatures.push({
+                syncId,
+                slug: creature.slug,
+                name: creature.statblock.name,
+                statblock: creature.statblock,
+                portrait,
+                contentHash: hash(JSON.stringify([creature.statblock, portrait])),
+            });
+        }
     }
 
     const manifestHash = hash(JSON.stringify([

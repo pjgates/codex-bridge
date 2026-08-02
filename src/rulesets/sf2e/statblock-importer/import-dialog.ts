@@ -5,9 +5,9 @@
  * actor-building core, but lenient about homebrew vocabulary and with no
  * module release required to add or update a monster.
  */
-import { load } from "js-yaml";
 import {
     buildActorDocument,
+    extractStatblocks,
     markdownToHtml,
     normaliseStatblock,
     type CreatureStatblock,
@@ -15,33 +15,39 @@ import {
 import { renderPreview } from "./preview.js";
 import { MODULE_ID } from "../../../constants.js";
 
-/** Split a markdown file into its YAML frontmatter block and body. */
-function splitFrontmatter(markdown: string): { yaml: string; body: string } {
-    const match = markdown.match(/^\ufeff?---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
-    if (!match) throw new Error(game.i18n!.localize(`${MODULE_ID}.statblockImporter.noFrontmatter`));
-    return { yaml: match[1], body: match[2].trim() };
-}
-
 interface ImportedCreature {
     statblock: CreatureStatblock;
     /** Sanitized HTML for the actor's public notes (markdown body). */
     publicNotes: string;
 }
 
-/** Parse a full pasted markdown file into a statblock + notes HTML. */
-export function parsePastedStatblock(markdown: string): ImportedCreature {
-    const { yaml, body } = splitFrontmatter(markdown);
-    const data = load(yaml);
-    if (data == null || typeof data !== "object" || Array.isArray(data)) {
-        throw new Error(game.i18n!.localize(`${MODULE_ID}.statblockImporter.noFrontmatter`));
-    }
-    const record = data as Record<string, unknown>;
-    if (record.statblock !== true) {
+/** List the creature ids declared in a pasted markdown file (empty if not a creature file). */
+export function listPastedCreatureIds(markdown: string): string[] {
+    return extractStatblocks("<pasted>", markdown)?.creatures.map((creature) => creature.id) ?? [];
+}
+
+/** Parse a pasted markdown file into a statblock + notes HTML. Multi-creature files require creatureId. */
+export function parsePastedStatblock(markdown: string, creatureId?: string): ImportedCreature {
+    const extracted = extractStatblocks("<pasted>", markdown);
+    if (!extracted) {
         throw new Error(game.i18n!.localize(`${MODULE_ID}.statblockImporter.notAStatblock`));
     }
-    const statblock = normaliseStatblock(record, "<pasted>", { lenient: true });
+    let creature = extracted.creatures[0];
+    if (extracted.creatures.length > 1 || creatureId !== undefined) {
+        const ids = extracted.creatures.map((candidate) => candidate.id).join(", ");
+        if (creatureId === undefined) {
+            throw new Error(game.i18n!.format(`${MODULE_ID}.statblockImporter.multipleStatblocks`, { ids }));
+        }
+        const found = extracted.creatures.find((candidate) => candidate.id === creatureId);
+        if (!found) {
+            throw new Error(game.i18n!.format(`${MODULE_ID}.statblockImporter.unknownCreatureId`, { id: creatureId, ids }));
+        }
+        creature = found;
+    }
+    const statblock = normaliseStatblock(creature.data, "<pasted>", { lenient: true });
     // Resolve Obsidian wikilinks to their display text before markdown conversion.
-    const plainBody = body.replace(/\[\[[^\]|]*\|([^\]]*)\]\]/g, "$1").replace(/\[\[([^\]]*)\]\]/g, "$1");
+    // ponytail: combined-file notes include every creature's prose; only the fences are stripped.
+    const plainBody = extracted.body.replace(/\[\[[^\]|]*\|([^\]]*)\]\]/g, "$1").replace(/\[\[([^\]]*)\]\]/g, "$1");
     return { statblock, publicNotes: plainBody ? markdownToHtml(plainBody) : "" };
 }
 
@@ -75,7 +81,24 @@ async function runImportFlow(): Promise<void> {
 
     let creature: ImportedCreature;
     try {
-        creature = parsePastedStatblock(pasted);
+        const ids = listPastedCreatureIds(pasted);
+        let chosen: string | undefined;
+        if (ids.length > 1) {
+            const options = ids.map((id) => `<option value="${id}">${id}</option>`).join("");
+            const picked = (await DialogV2.prompt({
+                window: { title: localize("pickCreatureTitle"), icon: "fa-solid fa-list" },
+                content: `<p>${localize("pickCreatureHint")}</p><select name="id">${options}</select>`,
+                ok: {
+                    label: localize("previewButton"),
+                    callback: (_event: Event, button: HTMLButtonElement) =>
+                        (button.form!.elements.namedItem("id") as HTMLSelectElement).value,
+                },
+                rejectClose: false,
+            })) as string | null;
+            if (!picked) return;
+            chosen = picked;
+        }
+        creature = parsePastedStatblock(pasted, chosen);
     } catch (error) {
         ui.notifications!.error(
             game.i18n!.format(`${MODULE_ID}.statblockImporter.parseFailed`, {

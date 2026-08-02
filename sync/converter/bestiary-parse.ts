@@ -1,38 +1,40 @@
 /**
- * Node-side wrapper: frontmatter extraction via gray-matter feeding the
+ * Node-side wrapper: statblock extraction via the shared extractor feeding the
  * shared statblock normaliser (strict mode — vault content is reviewed).
  */
-import matter from "gray-matter";
+import { extractStatblocks } from "../../src/rulesets/sf2e/statblock/extract.js";
 import { normaliseStatblock } from "../../src/rulesets/sf2e/statblock/parse.js";
 import type { ParsedCreature } from "../../src/rulesets/sf2e/statblock/types.js";
 
-export {
-    parseSensesString,
-    parseSpeedString,
-    parseAttackName,
-    parseAttackDesc,
-    parseDamageString,
-} from "../../src/rulesets/sf2e/statblock/parse.js";
+export interface ParsedVaultCreature extends ParsedCreature {
+    /** Fence-declared syncId (minted and written back at push time if absent). */
+    syncId?: string;
+    /** Bare art filename from the fence `portrait` field, if present. */
+    portrait?: string;
+    /** Fence-body character offsets in the raw file, for syncId write-back. */
+    span: { start: number; end: number };
+}
 
 /**
- * Parse a bestiary creature markdown file into structured data.
+ * Parse a bestiary markdown file into one creature per declared id.
  *
- * The creature's mechanical data lives entirely in the YAML frontmatter
- * using the Pathfinder 2e Creature Layout format. The markdown body is
- * ignored — it's for notes/lore viewed in Obsidian only.
+ * Creature mechanics live in ```statblock fences declared by the frontmatter
+ * `creatures: [id, …]` array; each fence carries its own `id`, `syncId`, and
+ * identity fields. The markdown body is prose for Obsidian only.
  *
- * Returns null if the file doesn't have `statblock: true` in frontmatter.
+ * Returns null if the file has no `creatures` array (not a creature file).
  */
 export function parseCreature(
     filename: string,
     raw: string,
-): ParsedCreature | null {
-    const slug = filename.replace(/\.md$/, "");
-    const { data } = matter(raw);
-
-    if (data.statblock == null || data.statblock === false) return null;
-    if (data.statblock !== true) throw new Error(`${filename}: statblock: expected a boolean`);
-
-    const statblock = normaliseStatblock(data, filename);
-    return { slug, statblock };
+): ParsedVaultCreature[] | null {
+    const extracted = extractStatblocks(filename, raw);
+    if (!extracted) return null;
+    return extracted.creatures.map((creature) => ({
+        slug: creature.id,
+        syncId: creature.syncId,
+        portrait: creature.portrait,
+        span: creature.span,
+        statblock: normaliseStatblock(creature.data, filename),
+    }));
 }
