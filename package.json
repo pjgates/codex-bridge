@@ -17,7 +17,6 @@
         "link": "echo 'Symlink to your Foundry modules folder: ln -s $(pwd) <foundryData>/Data/modules/sf2e-forge-custom'"
     },
     "devDependencies": {
-        "@foundryvtt/foundryvtt-cli": "^3.0.3",
         "@types/js-yaml": "^4.0.9",
         "@types/node": "^22.10.0",
         "@typescript-eslint/eslint-plugin": "^8.54.0",
