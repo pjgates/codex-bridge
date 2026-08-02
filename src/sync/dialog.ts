@@ -29,7 +29,7 @@ function ensureVaultUpdateNotificationHandler(): void {
     if (notificationClickBound) return;
     notificationClickBound = true;
     document.body.addEventListener("click", (event) => {
-        const button = (event.target as HTMLElement).closest("button.forge-sync-notification-open");
+        const button = (event.target as HTMLElement).closest("button.codex-sync-notification-open");
         if (!button) return;
         event.preventDefault();
         void openSyncDialog();
@@ -121,9 +121,9 @@ class SyncDialog extends SyncDialogBase {
     }
 
     static override DEFAULT_OPTIONS = {
-        id: "forge-sync-dialog",
+        id: "codex-sync-dialog",
         tag: "form",
-        classes: ["forge-sync-dialog-app"],
+        classes: ["codex-sync-dialog-app"],
         window: {
             title: `${MODULE_ID}.sync.dialogTitle`,
             icon: "fa-solid fa-cloud-arrow-down",
@@ -193,7 +193,7 @@ export async function checkForVaultUpdates(): Promise<void> {
         ensureVaultUpdateNotificationHandler();
         const openLabel = game.i18n!.localize(`${MODULE_ID}.sync.openDialog`);
         const summary = game.i18n!.localize(`${MODULE_ID}.sync.updated`);
-        const message = `${summary} <button type="button" class="forge-sync-notification-open">${openLabel}</button>`;
+        const message = `${summary} <button type="button" class="codex-sync-notification-open">${openLabel}</button>`;
         ui.notifications!.info(message, { escape: false, clean: false });
     } catch (error) {
         if (error instanceof PayloadUnavailableError) return;
@@ -212,14 +212,14 @@ export function registerSyncSettingsButton(): void {
     Hooks.on("renderSettingsConfig", (_app: object, html: HTMLElement) => {
         if (!game.user?.isGM) return;
         const root = html instanceof HTMLElement ? html : resolveHtmlRoot(html);
-        if (!root || root.querySelector(".forge-sync-settings-button")) return;
+        if (!root || root.querySelector(".codex-sync-settings-button")) return;
 
         const syncRow = root.querySelector(`input[name="${MODULE_ID}.${SETTING_ENABLE_SYNC}"]`)?.closest(".form-group");
         if (!syncRow) return;
 
         const button = document.createElement("button");
         button.type = "button";
-        button.className = "forge-sync-settings-button";
+        button.className = "codex-sync-settings-button";
         button.innerHTML = `<i class="fa-solid fa-cloud-arrow-down"></i> ${game.i18n!.localize(`${MODULE_ID}.sync.settingsButton`)}`;
         button.addEventListener("click", () => {
             void openSyncDialog();

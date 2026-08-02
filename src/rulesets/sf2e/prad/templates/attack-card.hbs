@@ -1,0 +1,63 @@
+<div class="pf2e chat-card item-card prad-attack-card"
+    data-attacker-id="{{attackerId}}"
+    data-attacker-token-id="{{attackerTokenId}}"
+>
+    <header class="card-header flexrow">
+        <img src="{{weaponImg}}" alt="{{weaponName}}" />
+        <h3>{{weaponName}}{{#if actionGlyph}} <span class="action-glyph">{{actionGlyph}}</span>{{/if}}</h3>
+        <h4 class="rank">{{typeLabel}}</h4>
+        <section class="tags paizo-style" data-tooltip-class="pf2e">
+            {{#each traits}}
+                <span class="tag" data-trait="{{this.slug}}">{{this.label}}</span>
+            {{/each}}
+        </section>
+    </header>
+
+    {{#if hasDetails}}
+    <section class="card-content">
+        {{#if hasRangeOrArea}}
+        <p class="item-block-line">
+            {{#if hasRange}}
+            <span>
+                <strong>{{localize "codex-foundry.prad.range"}}</strong>
+                {{rangeLabel}}{{#if hasArea}};{{/if}}
+            </span>
+            {{/if}}
+            {{#if hasArea}}
+            <span>
+                <strong>{{localize "codex-foundry.prad.area"}}</strong>
+                {{areaLabel}}
+            </span>
+            {{/if}}
+        </p>
+        {{/if}}
+        {{#if hasDamage}}
+        <hr class="item-block-divider">
+        <p>
+            <strong>{{localize "codex-foundry.prad.damage"}}</strong>
+            {{#each damageRolls}}
+                {{this.formula}} {{this.displayDamageType}}{{#unless @last}} {{localize "codex-foundry.prad.plus"}} {{/unless}}
+            {{/each}}
+        </p>
+        {{/if}}
+    </section>
+    {{/if}}
+
+    <section class="card-buttons">
+        <button type="button"
+            data-action="prad-armor-save"
+            data-dc="{{attackDC}}"
+            data-weapon="{{weaponName}}"
+            data-attacker-id="{{attackerId}}"
+        >
+            {{localize "codex-foundry.prad.armorSave"}} <span data-visibility="all">{{attackDC}}</span>
+        </button>
+        {{#if hasDamage}}
+        <section class="owner-buttons">
+            <div class="spell-button">
+                <button type="button" data-action="prad-roll-damage">{{localize "codex-foundry.prad.rollDamage"}}</button>
+            </div>
+        </section>
+        {{/if}}
+    </section>
+</div>

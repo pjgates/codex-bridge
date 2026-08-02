@@ -1,10 +1,10 @@
 {
-    "name": "sf2e-forge-custom",
-    "version": "0.3.0",
-    "description": "Custom rules module for Starfinder 2e in Foundry VTT",
+    "name": "codex-bridge",
+    "version": "1.0.0",
+    "description": "Codex bridge: Obsidian↔Foundry VTT content sync plus ruleset houserules",
     "type": "module",
     "scripts": {
-        "push": "tsx scripts/forge-sync.ts push",
+        "push": "tsx sync/push.ts push",
         "build": "vite build",
         "watch": "vite build --watch",
         "test": "vitest run",
@@ -14,7 +14,7 @@
         "typecheck": "npm run typecheck:runtime && npm run typecheck:scripts",
         "verify": "npm run typecheck && npm run lint && npm test && npm run build",
         "clean": "rm -rf dist",
-        "link": "echo 'Symlink to your Foundry modules folder: ln -s $(pwd) <foundryData>/Data/modules/sf2e-forge-custom'"
+        "link": "echo 'Symlink to your Foundry modules folder: ln -s $(pwd) <foundryData>/Data/modules/codex-foundry'"
     },
     "devDependencies": {
         "@types/js-yaml": "^4.0.9",

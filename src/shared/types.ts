@@ -114,7 +114,7 @@ export const SAVE_DETAILS: Record<string, SaveDisplayInfo> = {
     fortitude: { icon: "fa-solid fa-chess-rook", label: "PF2E.SavesFortitude" },
     reflex: { icon: "fa-solid fa-person-running", label: "PF2E.SavesReflex" },
     will: { icon: "fa-solid fa-brain", label: "PF2E.SavesWill" },
-    ac: { icon: "fa-solid fa-shield-halved", label: "sf2e-forge-custom.prad.armorSave" },
+    ac: { icon: "fa-solid fa-shield-halved", label: "codex-foundry.prad.armorSave" },
 };
 
 // ─── Chat Message Flags (used by Shared and PRAD) ────────────────────────────

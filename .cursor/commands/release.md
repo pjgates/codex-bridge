@@ -41,9 +41,9 @@ Tag and push a new release. This triggers the GitHub Actions release workflow wh
 
 8. **Confirm.** Tell me:
    - The version that was tagged
-   - A link to the Actions run: `https://github.com/pjgates/sf2e-forge-custom/actions`
-   - A link to where the release will appear: `https://github.com/pjgates/sf2e-forge-custom/releases/tag/v<version>`
-   - Remind me that the manifest URL for Foundry is: `https://github.com/pjgates/sf2e-forge-custom/releases/latest/download/module.json`
+   - A link to the Actions run: `https://github.com/pjgates/codex-bridge/actions`
+   - A link to where the release will appear: `https://github.com/pjgates/codex-bridge/releases/tag/v<version>`
+   - Remind me that the manifest URL for Foundry is: `https://github.com/pjgates/codex-bridge/releases/latest/download/module.json`
 
 ## Important
 

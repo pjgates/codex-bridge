@@ -6,6 +6,6 @@
  */
 
 @use '../src/shared/styles/variables';
-@use '../src/prad/styles/prad';
-@use '../src/target-helper/styles/target-helper';
-@use '../src/statblock-importer/styles/statblock-importer';
+@use '../src/rulesets/sf2e/prad/styles/prad';
+@use '../src/rulesets/sf2e/target-helper/styles/target-helper';
+@use '../src/rulesets/sf2e/statblock-importer/styles/statblock-importer';

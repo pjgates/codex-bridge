@@ -1,8 +1,8 @@
 {
-    "id": "sf2e-forge-custom",
-    "title": "SF2e Forge Custom Rules",
-    "description": "Custom rules and homebrew modifications for the Starfinder Second Edition system in Foundry VTT.",
-    "version": "0.3.0",
+    "id": "codex-foundry",
+    "title": "Codex Foundry",
+    "description": "Codex bridge for Foundry VTT: vault content sync plus ruleset houserules (currently Starfinder Second Edition).",
+    "version": "1.0.0",
     "authors": [
         {
             "name": "peterg"
@@ -24,9 +24,15 @@
             }
         ]
     },
-    "system": ["sf2e"],
-    "esmodules": ["dist/module.js"],
-    "styles": ["dist/module.css"],
+    "system": [
+        "sf2e"
+    ],
+    "esmodules": [
+        "dist/module.js"
+    ],
+    "styles": [
+        "dist/module.css"
+    ],
     "languages": [
         {
             "lang": "en",
@@ -34,9 +40,9 @@
             "path": "dist/lang/en.json"
         }
     ],
-    "url": "https://github.com/pjgates/sf2e-forge-custom",
-    "manifest": "https://github.com/pjgates/sf2e-forge-custom/releases/latest/download/module.json",
-    "download": "https://github.com/pjgates/sf2e-forge-custom/releases/download/v0.3.0/sf2e-forge-custom.zip",
-    "bugs": "https://github.com/pjgates/sf2e-forge-custom/issues",
-    "changelog": "https://github.com/pjgates/sf2e-forge-custom/releases"
+    "url": "https://github.com/pjgates/codex-bridge",
+    "manifest": "https://github.com/pjgates/codex-bridge/releases/latest/download/module.json",
+    "download": "https://github.com/pjgates/codex-bridge/releases/download/v1.0.0/codex-foundry.zip",
+    "bugs": "https://github.com/pjgates/codex-bridge/issues",
+    "changelog": "https://github.com/pjgates/codex-bridge/releases"
 }

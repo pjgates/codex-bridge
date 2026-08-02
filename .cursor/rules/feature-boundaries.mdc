@@ -23,8 +23,8 @@ If `src/shared/` needs a type that currently lives in a feature:
 1. Move the type definition to `src/shared/types.ts`
 2. Re-export it from the feature's `types.ts` so internal consumers don't break:
    ```typescript
-   // src/<feature>/types.ts
-   export type { MyType } from "../shared/types.js";
+   // src/rulesets/sf2e/<feature>/types.ts
+   export type { MyType } from "../../../shared/types.js";
    ```
 
 ## ESLint enforcement

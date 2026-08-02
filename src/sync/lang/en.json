@@ -1,13 +1,13 @@
 {
-    "sf2e-forge-custom": {
+    "codex-foundry": {
         "settings": {
-            "enableForgeSync": {
+            "enableCodexSync": {
                 "name": "Enable Vault Sync",
-                "hint": "Fetch vault content pushed to Data/forge-sync and offer world imports to the GM."
+                "hint": "Fetch vault content pushed to Data/codex-sync and offer world imports to the GM."
             },
-            "forgeSyncPassphrase": {
+            "codexSyncPassphrase": {
                 "name": "Vault Sync Passphrase",
-                "hint": "Stored in this browser only. Must match FORGE_SYNC_PASSPHRASE used by the push CLI."
+                "hint": "Stored in this browser only. Must match CODEX_SYNC_PASSPHRASE used by the push CLI."
             }
         },
         "sync": {

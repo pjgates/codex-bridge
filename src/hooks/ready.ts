@@ -4,9 +4,9 @@
  */
 
 import { MODULE_ID } from "../constants.js";
-import { activateHeroicRerolls, isHeroicRerollsEnabled } from "../heroic-rerolls/index.js";
-import { isPradEnabled, applyDCBaseSetting, registerAttackInterceptHook, registerPradSheetHooks } from "../prad/index.js";
-import { activateTargetHelper, setPradOvercomeEnabled } from "../target-helper/index.js";
+import { activateHeroicRerolls, isHeroicRerollsEnabled } from "../rulesets/sf2e/heroic-rerolls/index.js";
+import { isPradEnabled, applyDCBaseSetting, registerAttackInterceptHook, registerPradSheetHooks } from "../rulesets/sf2e/prad/index.js";
+import { activateTargetHelper, setPradOvercomeEnabled } from "../rulesets/sf2e/target-helper/index.js";
 import { checkForVaultUpdates } from "../sync/index.js";
 
 export function onReady(): void {
@@ -58,8 +58,8 @@ export function onReady(): void {
         registerPradSheetHooks();
 
         ui.notifications!.info(
-            game.i18n!.format("sf2e-forge-custom.prad.variantActive", {
-                name: game.i18n!.localize("sf2e-forge-custom.settings.playersRollAllDice.name"),
+            game.i18n!.format("codex-foundry.prad.variantActive", {
+                name: game.i18n!.localize("codex-foundry.settings.playersRollAllDice.name"),
             }),
         );
     }

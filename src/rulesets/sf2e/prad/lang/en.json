@@ -1,0 +1,70 @@
+{
+    "codex-foundry": {
+        "settings": {
+            "playersRollAllDice": {
+                "name": "Players Roll All Dice",
+                "hint": "Enable the 'Players Roll All Dice' variant rule. NPC attacks become player armor saves, and NPC saves become player overcome checks. Requires Target Helper to be enabled.",
+                "requiresTargetHelper": "Enable Target Helper first to use this setting."
+            },
+            "pradStrictDCs": {
+                "name": "Strict DC Mode (Exact Probabilities)",
+                "hint": "Use DC = 12 + modifier instead of the default 11 + modifier. The default (+11) gives players a small 5% edge; strict mode (+12) exactly preserves the original hit/miss/crit probabilities. Only applies when Players Roll All Dice is enabled."
+            }
+        },
+        "prad": {
+            "armorSave": "Armor Save",
+            "armorLabel": "Armor",
+            "overcomeCheck": "Overcome Check",
+            "attackDC": "Attack DC",
+            "saveDC": "Save DC",
+            "rollArmorSave": "Roll Armor Save",
+            "rollOvercome": "Roll Overcome",
+            "armorSaveLabel": "{name} rolls an Armor Save against {npcName}'s {weaponName}",
+            "overcomeLabel": "{name} rolls to Overcome {npcName}'s {saveType} save",
+            "variantActive": "{name} variant rule is active.",
+            "noToken": "No token selected. Select your character token first.",
+            "noOvercomeStatistic": "Cannot find a spellcasting or class DC statistic to roll with.",
+            "resultCriticalSuccess": "Critical Success",
+            "resultSuccess": "Success",
+            "resultFailure": "Failure",
+            "resultCriticalFailure": "Critical Failure",
+            "rollDamage": "Roll Damage",
+            "range": "Range",
+            "area": "Area",
+            "damage": "Damage",
+            "plus": "plus",
+            "strike": "Strike",
+            "meleeStrike": "Melee Strike",
+            "rangedStrike": "Ranged Strike",
+            "areaAttack": "Area Attack",
+            "attack": "Attack",
+            "rangeIncrement": "Range Increment {value} ft.",
+            "rangeFeet": "{value} feet",
+            "rangeMax": "{value} ft. max",
+            "areaFeet": "{value}-foot {type}",
+            "attacks": "attacks",
+            "with": "with",
+            "overcome": "Overcome",
+            "unknownNpc": "NPC",
+            "noDamageData": "No damage data is available for this attack.",
+            "categorizedDamageRequiresNative": "Categorized damage requires the system damage roller and cannot use the fallback roll.",
+            "damageTargetRequired": "Select exactly one target represented by this attack card before rolling damage.",
+            "damageGmOnly": "Only a GM can roll NPC damage.",
+            "attackCardFailed": "Could not create the player armor-save card.",
+            "attackRestored": "Could not create the player armor-save card. Restoring the original attack.",
+            "attackRestoreFailed": "Could not restore the original NPC attack. See the console for details.",
+            "npcAttackIntercepted": "Attack intercepted — player rolls armor save",
+            "npcSaveIntercepted": "Save intercepted — player rolls overcome check",
+            "targetEffect": {
+                "criticalHit": "Critical Hit!",
+                "hit": "Hit",
+                "miss": "Miss",
+                "criticalMiss": "Critical Miss",
+                "critFailSave": "Critical Failure on Save",
+                "failSave": "Failure on Save",
+                "successSave": "Success on Save",
+                "critSuccessSave": "Critical Success on Save"
+            }
+        }
+    }
+}

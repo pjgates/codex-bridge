@@ -6,33 +6,33 @@ import {
     rollOvercomeForTargets,
     rollSavesForTargets,
     updateTargets,
-} from "./target-helper/index.js";
+} from "./rulesets/sf2e/target-helper/index.js";
 import {
     postAttackCard,
     resolveAttackCardProvenance,
     rollAttackCardArmorSaves,
     rollWeaponDamage,
-} from "./prad/index.js";
+} from "./rulesets/sf2e/prad/index.js";
 
-export type Sf2eForgeCustomApiErrorCode =
+export type CodexFoundryApiErrorCode =
     | "disabled"
     | "unauthorized"
     | "not-found"
     | "invalid-argument"
     | "operation-failed";
 
-export interface Sf2eForgeCustomApiError {
-    readonly code: Sf2eForgeCustomApiErrorCode;
+export interface CodexFoundryApiError {
+    readonly code: CodexFoundryApiErrorCode;
     readonly message: string;
 }
 
-export interface Sf2eForgeCustomApiFailure {
+export interface CodexFoundryApiFailure {
     readonly ok: false;
-    readonly error: Sf2eForgeCustomApiError;
+    readonly error: CodexFoundryApiError;
 }
 
-export type Sf2eForgeCustomApiResult = { readonly ok: true } | Sf2eForgeCustomApiFailure;
-export type Sf2eForgeCustomCreatedMessageResult = { readonly ok: true; readonly messageUuid: string } | Sf2eForgeCustomApiFailure;
+export type CodexFoundryApiResult = { readonly ok: true } | CodexFoundryApiFailure;
+export type CodexFoundryCreatedMessageResult = { readonly ok: true; readonly messageUuid: string } | CodexFoundryApiFailure;
 
 export interface MessageRequest {
     readonly messageUuid: string;
@@ -56,23 +56,23 @@ export interface RollArmorSavesRequest extends MessageRequest {
     readonly targetTokenUuids: readonly string[];
 }
 
-export interface Sf2eForgeCustomApi {
+export interface CodexFoundryApi {
     readonly targetHelper: {
-        setTargets(request: SetTargetsRequest): Promise<Sf2eForgeCustomApiResult>;
-        rollPlayerSaves(request: RollTargetsRequest): Promise<Sf2eForgeCustomApiResult>;
-        rollNpcSaves(request: MessageRequest): Promise<Sf2eForgeCustomApiResult>;
-        rollOvercome(request: RollTargetsRequest): Promise<Sf2eForgeCustomApiResult>;
+        setTargets(request: SetTargetsRequest): Promise<CodexFoundryApiResult>;
+        rollPlayerSaves(request: RollTargetsRequest): Promise<CodexFoundryApiResult>;
+        rollNpcSaves(request: MessageRequest): Promise<CodexFoundryApiResult>;
+        rollOvercome(request: RollTargetsRequest): Promise<CodexFoundryApiResult>;
     };
     readonly prad: {
-        postAttackCard(request: PostAttackCardRequest): Promise<Sf2eForgeCustomCreatedMessageResult>;
-        rollArmorSaves(request: RollArmorSavesRequest): Promise<Sf2eForgeCustomApiResult>;
-        rollWeaponDamage(request: MessageRequest): Promise<Sf2eForgeCustomApiResult>;
+        postAttackCard(request: PostAttackCardRequest): Promise<CodexFoundryCreatedMessageResult>;
+        rollArmorSaves(request: RollArmorSavesRequest): Promise<CodexFoundryApiResult>;
+        rollWeaponDamage(request: MessageRequest): Promise<CodexFoundryApiResult>;
     };
 }
 
-const success: Sf2eForgeCustomApiResult = { ok: true };
+const success: CodexFoundryApiResult = { ok: true };
 
-function failure(code: Sf2eForgeCustomApiErrorCode, message: string): Sf2eForgeCustomApiFailure {
+function failure(code: CodexFoundryApiErrorCode, message: string): CodexFoundryApiFailure {
     return { ok: false, error: { code, message } };
 }
 
@@ -80,13 +80,13 @@ function isEnabled(setting: "enableCustomRules" | "enableTargetHelper" | "player
     return game.settings!.get(MODULE_ID, setting) === true;
 }
 
-function requireTargetHelperEnabled(): Sf2eForgeCustomApiFailure | undefined {
+function requireTargetHelperEnabled(): CodexFoundryApiFailure | undefined {
     if (!isEnabled("enableCustomRules")) return failure("disabled", "Custom rules are disabled.");
     if (!isEnabled("enableTargetHelper")) return failure("disabled", "Target Helper is disabled.");
     return undefined;
 }
 
-function requirePradEnabled(): Sf2eForgeCustomApiFailure | undefined {
+function requirePradEnabled(): CodexFoundryApiFailure | undefined {
     const targetHelperFailure = requireTargetHelperEnabled();
     if (targetHelperFailure) return targetHelperFailure;
     if (!isEnabled("playersRollAllDice")) return failure("disabled", "Players Roll All Dice is disabled.");
@@ -103,29 +103,29 @@ function isUuid(value: string): boolean {
         : parts.length >= 2 && parts.length % 2 === 0;
 }
 
-function requireUuid(uuid: unknown, name: string): Sf2eForgeCustomApiFailure | undefined {
+function requireUuid(uuid: unknown, name: string): CodexFoundryApiFailure | undefined {
     if (typeof uuid !== "string" || uuid.length > 512 || !isUuid(uuid)) {
         return failure("invalid-argument", `${name} must be a syntactically valid bounded UUID.`);
     }
     return undefined;
 }
 
-function resolveUuid(uuid: string): Sf2eResolvedUuidDocument | null {
+function resolveUuid(uuid: string): CodexFoundryResolvedUuidDocument | null {
     try {
-        return fromUuidSync(uuid) as Sf2eResolvedUuidDocument | null;
+        return fromUuidSync(uuid) as CodexFoundryResolvedUuidDocument | null;
     } catch {
         return null;
     }
 }
 
-function hasDocumentName<T extends Sf2eResolvedUuidDocumentName>(
-    document: Sf2eResolvedUuidDocument | null,
+function hasDocumentName<T extends CodexFoundryResolvedUuidDocumentName>(
+    document: CodexFoundryResolvedUuidDocument | null,
     name: T,
-): document is Extract<Sf2eResolvedUuidDocument, { readonly documentName: T }> {
+): document is Extract<CodexFoundryResolvedUuidDocument, { readonly documentName: T }> {
     return document?.documentName === name;
 }
 
-function resolveMessage(messageUuid: unknown): ChatMessage.Implementation | Sf2eForgeCustomApiFailure {
+function resolveMessage(messageUuid: unknown): ChatMessage.Implementation | CodexFoundryApiFailure {
     const invalid = requireUuid(messageUuid, "messageUuid");
     if (invalid) return invalid;
 
@@ -137,7 +137,7 @@ function resolveMessage(messageUuid: unknown): ChatMessage.Implementation | Sf2e
     return document;
 }
 
-function resolveActor(actorUuid: unknown, name = "actorUuid"): Actor.Implementation | Sf2eForgeCustomApiFailure {
+function resolveActor(actorUuid: unknown, name = "actorUuid"): Actor.Implementation | CodexFoundryApiFailure {
     const invalid = requireUuid(actorUuid, name);
     if (invalid) return invalid;
 
@@ -149,7 +149,7 @@ function resolveActor(actorUuid: unknown, name = "actorUuid"): Actor.Implementat
     return document;
 }
 
-function resolveItem(itemUuid: unknown): Item.Implementation | Sf2eForgeCustomApiFailure {
+function resolveItem(itemUuid: unknown): Item.Implementation | CodexFoundryApiFailure {
     const invalid = requireUuid(itemUuid, "weaponItemUuid");
     if (invalid) return invalid;
 
@@ -161,7 +161,7 @@ function resolveItem(itemUuid: unknown): Item.Implementation | Sf2eForgeCustomAp
     return document;
 }
 
-function resolveTokens(targetTokenUuids: unknown, allowEmpty: boolean): Sf2eTokenDocument[] | Sf2eForgeCustomApiFailure {
+function resolveTokens(targetTokenUuids: unknown, allowEmpty: boolean): Sf2eTokenDocument[] | CodexFoundryApiFailure {
     if (!Array.isArray(targetTokenUuids) || targetTokenUuids.length > 100 || (!allowEmpty && targetTokenUuids.length === 0)) {
         return failure("invalid-argument", `targetTokenUuids must be ${allowEmpty ? "an" : "a non-empty"} bounded array of token UUIDs.`);
     }
@@ -189,19 +189,19 @@ function resolveTokens(targetTokenUuids: unknown, allowEmpty: boolean): Sf2eToke
     return tokens;
 }
 
-function requireMessageAuthorization(message: ChatMessage.Implementation): Sf2eForgeCustomApiFailure | undefined {
+function requireMessageAuthorization(message: ChatMessage.Implementation): CodexFoundryApiFailure | undefined {
     if (!canUpdateMessage(message)) return failure("unauthorized", "The current user cannot update this chat message.");
     return undefined;
 }
 
-function requireTargetHelperFlags(message: ChatMessage.Implementation): Sf2eForgeCustomApiFailure | undefined {
+function requireTargetHelperFlags(message: ChatMessage.Implementation): CodexFoundryApiFailure | undefined {
     if (!getFlagData(message)) {
         return failure("invalid-argument", "The chat message does not contain Target Helper data.");
     }
     return undefined;
 }
 
-function requireSaveFlags(message: ChatMessage.Implementation): Sf2eForgeCustomApiFailure | undefined {
+function requireSaveFlags(message: ChatMessage.Implementation): CodexFoundryApiFailure | undefined {
     const flagData = getFlagData(message);
     if (!flagData?.save || flagData.pradOvercome) {
         return failure("invalid-argument", "The chat message is not configured for ordinary Target Helper save rolling.");
@@ -209,7 +209,7 @@ function requireSaveFlags(message: ChatMessage.Implementation): Sf2eForgeCustomA
     return undefined;
 }
 
-function requireFiniteDC(attackDC: unknown): Sf2eForgeCustomApiFailure | undefined {
+function requireFiniteDC(attackDC: unknown): CodexFoundryApiFailure | undefined {
     if (typeof attackDC !== "number" || !Number.isFinite(attackDC) || !Number.isInteger(attackDC) || attackDC < 0) {
         return failure("invalid-argument", "attackDC must be a non-negative integer.");
     }
@@ -217,7 +217,7 @@ function requireFiniteDC(attackDC: unknown): Sf2eForgeCustomApiFailure | undefin
 }
 
 
-function requireCardMembership(message: ChatMessage.Implementation, tokens: readonly Sf2eTokenDocument[]): Sf2eForgeCustomApiFailure | undefined {
+function requireCardMembership(message: ChatMessage.Implementation, tokens: readonly Sf2eTokenDocument[]): CodexFoundryApiFailure | undefined {
     const targetUuids = new Set(getFlagData(message)?.targets ?? []);
     if (tokens.some((token) => !targetUuids.has(token.uuid))) {
         return failure("invalid-argument", "Every target token must belong to the chat card target list.");
@@ -229,7 +229,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-async function invoke(operation: () => Promise<unknown>): Promise<Sf2eForgeCustomApiResult> {
+async function invoke(operation: () => Promise<unknown>): Promise<CodexFoundryApiResult> {
     try {
         await operation();
         return success;
@@ -239,7 +239,7 @@ async function invoke(operation: () => Promise<unknown>): Promise<Sf2eForgeCusto
     }
 }
 
-async function invokeOutcome(operation: () => Promise<boolean>): Promise<Sf2eForgeCustomApiResult> {
+async function invokeOutcome(operation: () => Promise<boolean>): Promise<CodexFoundryApiResult> {
     try {
         return await operation() ? success : failure("operation-failed", "The requested operation did not complete.");
     } catch (error) {
@@ -248,7 +248,7 @@ async function invokeOutcome(operation: () => Promise<boolean>): Promise<Sf2eFor
     }
 }
 
-async function invokeCreatedMessage(operation: () => Promise<string>): Promise<Sf2eForgeCustomCreatedMessageResult> {
+async function invokeCreatedMessage(operation: () => Promise<string>): Promise<CodexFoundryCreatedMessageResult> {
     try {
         const messageUuid = await operation();
         return { ok: true, messageUuid };
@@ -258,7 +258,7 @@ async function invokeCreatedMessage(operation: () => Promise<string>): Promise<S
     }
 }
 
-export function createRuntimeApi(): Sf2eForgeCustomApi {
+export function createRuntimeApi(): CodexFoundryApi {
     return {
         targetHelper: {
             async setTargets(request) {

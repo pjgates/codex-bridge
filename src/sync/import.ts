@@ -1,5 +1,5 @@
-import { MODULE_ID } from "../constants.js";
-import { buildActorDocument } from "../statblock/index.js";
+import { LEGACY_MODULE_ID, MODULE_ID } from "../constants.js";
+import { buildActorDocument } from "../rulesets/sf2e/statblock/index.js";
 import type { SyncCreature, SyncEntity, SyncPayload } from "./payload-types.js";
 import { SETTING_LAST_MANIFEST } from "./settings.js";
 import {
@@ -43,6 +43,7 @@ interface SyncModuleFlags {
 type ForgeDocument = Actor.Implementation | JournalEntry.Implementation;
 
 export function rewriteLinkPlaceholders(html: string, journalIdBySyncId: Map<string, string>): string {
+    // ponytail: @ForgeSync keeps its pre-rename wire name — the old module reads new payloads until every world is migrated; never persists in world docs
     return html.replace(/@ForgeSync\[([^\]]+)\]\{([^}]*)\}/g, (_all, syncId: string, display: string) => {
         const id = journalIdBySyncId.get(syncId);
         return id ? `@UUID[JournalEntry.${id}]{${display}}` : display;
@@ -114,8 +115,9 @@ function creatureFlags(syncId: string, importedHash: string, importedBaseline: s
     return { [MODULE_ID]: { syncId, syncKind: "creature-actor", importedHash, importedBaseline } };
 }
 
-function moduleFlags(doc: { flags: Record<string, unknown> }): SyncModuleFlags {
-    return (doc.flags[MODULE_ID] ?? {}) as SyncModuleFlags;
+export function moduleFlags(doc: { flags: Record<string, unknown> }): SyncModuleFlags {
+    // ponytail: legacy-key read fallback keeps pre-rename docs managed; removal = one-time flag-migration script if cleanup is ever wanted
+    return ((doc.flags[MODULE_ID] ?? doc.flags[LEGACY_MODULE_ID]) ?? {}) as SyncModuleFlags;
 }
 
 async function getOrCreateFolder(name: string, type: "JournalEntry" | "Actor"): Promise<string> {
@@ -176,8 +178,8 @@ export function journalAdoptUpdateData(syncId: string, syncKind: SyncKind): Reco
 /** Vault-owned fields written on EVERY people-actor sync (update-safe: never clobbers GM token tweaks like actorLink/disposition; note img is vault-owned — manual GM art on a placeholder actor reverts on the next content sync; set `portrait:` in the vault instead). */
 export function peopleActorVaultFields(entity: SyncEntity): Record<string, unknown> {
     const MYSTERY_MAN = "icons/svg/mystery-man.svg";
-    const img = entity.portrait ? `forge-sync/${entity.portrait}` : MYSTERY_MAN;
-    const ringSubjectTexture = entity.subject ? `forge-sync/${entity.subject}` : MYSTERY_MAN;
+    const img = entity.portrait ? `codex-sync/${entity.portrait}` : MYSTERY_MAN;
+    const ringSubjectTexture = entity.subject ? `codex-sync/${entity.subject}` : MYSTERY_MAN;
     return {
         name: entity.name,
         img,
@@ -218,7 +220,7 @@ function buildTranslatedCreature(creature: SyncCreature): Record<string, unknown
 }
 
 function creaturePortrait(creature: SyncCreature): string | undefined {
-    return creature.portrait ? `forge-sync/${creature.portrait}` : undefined;
+    return creature.portrait ? `codex-sync/${creature.portrait}` : undefined;
 }
 
 function getManagedDocument(docType: ManagedDocType, id: string): ForgeDocument | undefined {
