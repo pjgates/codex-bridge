@@ -13,6 +13,6 @@
         "declaration": false,
         "sourceMap": false
     },
-    "include": ["scripts/**/*.ts", "src/rulesets/sf2e/statblock/**/*.ts", "src/sync/**/*.ts", "src/types/**/*.d.ts"],
+    "include": ["sync/**/*.ts", "tests/**/*.ts", "src/rulesets/sf2e/statblock/**/*.ts", "src/sync/**/*.ts", "src/types/**/*.d.ts"],
     "exclude": ["node_modules"]
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isAreaContextType } from "../../src/shared/detect-logic.js";
+import { isAreaContextType } from "../../../src/shared/detect-logic.js";
 
 describe("isAreaContextType", () => {
     it.each(["area-save", "area-damage", "area-fire", "auto-fire", "autofire", "area-effect"])(

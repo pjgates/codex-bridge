@@ -3,7 +3,7 @@ import {
     activateHeroicRerolls,
     addHeroicRerollMinimum,
     onHeroicPreReroll,
-} from "../../src/rulesets/sf2e/heroic-rerolls/reroll.js";
+} from "../../../src/rulesets/sf2e/heroic-rerolls/reroll.js";
 
 interface TestDie {
     number: number;

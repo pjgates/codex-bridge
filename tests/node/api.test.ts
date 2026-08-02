@@ -1,17 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createRuntimeApi, installRuntimeApi } from "../src/api.js";
+import { createRuntimeApi, installRuntimeApi } from "../../src/api.js";
 import {
     canUpdateMessage,
     getFlagData,
     rollOvercomeForTargets,
     rollSavesForTargets,
     updateTargets,
-} from "../src/rulesets/sf2e/target-helper/index.js";
-import { postAttackCard, resolveAttackCardProvenance, rollAttackCardArmorSaves, rollWeaponDamage } from "../src/rulesets/sf2e/prad/index.js";
-import type { TargetHelperFlagData } from "../src/rulesets/sf2e/target-helper/index.js";
-import { MODULE_ID } from "../src/constants.js";
+} from "../../src/rulesets/sf2e/target-helper/index.js";
+import { postAttackCard, resolveAttackCardProvenance, rollAttackCardArmorSaves, rollWeaponDamage } from "../../src/rulesets/sf2e/prad/index.js";
+import type { TargetHelperFlagData } from "../../src/rulesets/sf2e/target-helper/index.js";
+import { MODULE_ID } from "../../src/constants.js";
 
-vi.mock("../src/rulesets/sf2e/target-helper/index.js", () => ({
+vi.mock("../../src/rulesets/sf2e/target-helper/index.js", () => ({
     canUpdateMessage: vi.fn(),
     getFlagData: vi.fn(),
     rollNpcSaves: vi.fn(),
@@ -20,7 +20,7 @@ vi.mock("../src/rulesets/sf2e/target-helper/index.js", () => ({
     updateTargets: vi.fn(),
 }));
 
-vi.mock("../src/rulesets/sf2e/prad/index.js", () => ({
+vi.mock("../../src/rulesets/sf2e/prad/index.js", () => ({
     postAttackCard: vi.fn(),
     resolveAttackCardProvenance: vi.fn(),
     rollAttackCardArmorSaves: vi.fn(),

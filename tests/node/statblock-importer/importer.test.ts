@@ -2,12 +2,12 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 // Side effect: inject happy-dom into the shared sanitizer for Node tests.
-import "../converter/dom.js";
-import { benchmark, averageDamage } from "../../src/rulesets/sf2e/statblock-importer/benchmarks.js";
-import { parsePastedStatblock, buildImportActorData } from "../../src/rulesets/sf2e/statblock-importer/import-dialog.js";
-import { renderPreview } from "../../src/rulesets/sf2e/statblock-importer/preview.js";
-import { normaliseStatblock } from "../../src/rulesets/sf2e/statblock/parse.js";
-import { parseIWRString } from "../../src/rulesets/sf2e/statblock/actor.js";
+import "../../../sync/converter/dom.js";
+import { benchmark, averageDamage } from "../../../src/rulesets/sf2e/statblock-importer/benchmarks.js";
+import { parsePastedStatblock, buildImportActorData } from "../../../src/rulesets/sf2e/statblock-importer/import-dialog.js";
+import { renderPreview } from "../../../src/rulesets/sf2e/statblock-importer/preview.js";
+import { normaliseStatblock } from "../../../src/rulesets/sf2e/statblock/parse.js";
+import { parseIWRString } from "../../../src/rulesets/sf2e/statblock/actor.js";
 import { load } from "js-yaml";
 
 const FIXTURE = readFileSync(path.join(import.meta.dirname, "fixtures", "converted-dust-manta.md"), "utf8");

@@ -4,7 +4,7 @@
     "description": "Custom rules module for Starfinder 2e in Foundry VTT",
     "type": "module",
     "scripts": {
-        "push": "tsx scripts/forge-sync.ts push",
+        "push": "tsx sync/push.ts push",
         "build": "vite build",
         "watch": "vite build --watch",
         "test": "vitest run",

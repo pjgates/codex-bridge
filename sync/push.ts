@@ -3,8 +3,8 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { Command } from "commander";
 import { encryptPayload } from "../src/sync/crypto.js";
-import { buildPayload } from "./sync/build-payload.js";
-import { deploy, stageSyncOut, type RemoteConfig } from "./sync/deploy.js";
+import { buildPayload } from "./lib/build-payload.js";
+import { deploy, stageSyncOut, type RemoteConfig } from "./lib/deploy.js";
 
 interface Config { vaultPath: string; campaign: string; remote: RemoteConfig; }
 
