@@ -3,8 +3,8 @@
 const REVISION = "11111111-1111-4111-8111-111111111111";
 
 import { beforeEach, describe, expect, it } from "vitest";
-import { buildTooltipHtml, escapeTooltipText, onRenderTargetHelper, reserveTargetRowsWrapper } from "../../src/target-helper/render.js";
-import { encodeTargetUuidSaveKey } from "../../src/target-helper/result-validation.js";
+import { buildTooltipHtml, escapeTooltipText, onRenderTargetHelper, reserveTargetRowsWrapper } from "../../src/rulesets/sf2e/target-helper/render.js";
+import { encodeTargetUuidSaveKey } from "../../src/rulesets/sf2e/target-helper/result-validation.js";
 
 beforeEach(() => {
     Object.assign(globalThis, {

@@ -45,7 +45,12 @@ export default [
                 },
                 {
                     type: "feature",
-                    pattern: "src/*",
+                    pattern: "src/sync",
+                    mode: "folder",
+                },
+                {
+                    type: "feature",
+                    pattern: "src/rulesets/sf2e/*",
                     mode: "folder",
                     capture: ["elementName"],
                 },

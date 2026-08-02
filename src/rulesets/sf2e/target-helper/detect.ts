@@ -17,8 +17,8 @@ import {
     REPOST_CHECK_REGEX,
     type InlineCheckDataset,
     type SpellData,
-} from "../shared/detect-logic.js";
-import { getSystemFlags } from "../shared/flags.js";
+} from "../../../shared/detect-logic.js";
+import { getSystemFlags } from "../../../shared/flags.js";
 import type {
     TargetHelperFlagData,
 } from "./types.js";
@@ -254,4 +254,4 @@ function resolveInlineCheckLink(
     return classifyInlineCheck(checkDataset);
 }
 
-export { getSystemFlags } from "../shared/flags.js";
+export { getSystemFlags } from "../../../shared/flags.js";

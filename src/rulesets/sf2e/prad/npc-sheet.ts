@@ -10,7 +10,7 @@ import { getAttackDC, getSaveDC, getSaveModifier } from "./dc.js";
 import { postAttackCard } from "./intercept-attack.js";
 import { SAVE_TYPES } from "./types.js";
 import type { SaveType } from "./types.js";
-import { resolveHtmlRoot } from "../shared/html.js";
+import { resolveHtmlRoot } from "../../../shared/html.js";
 
 /**
  * Handle rendering of an NPC actor sheet.

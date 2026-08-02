@@ -7,7 +7,7 @@
  */
 
 import { getArmorSaveModifier, getPcAC, getOvercomeModifier, getPcSpellDC } from "./dc.js";
-import { resolveHtmlRoot } from "../shared/html.js";
+import { resolveHtmlRoot } from "../../../shared/html.js";
 
 /**
  * Handle rendering of a PC character sheet.

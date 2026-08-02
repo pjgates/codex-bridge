@@ -5,10 +5,10 @@
  */
 
 import { MODULE_ID } from "../constants.js";
-import { registerPradSettings, registerPradTemplates, registerAttackCardTemplate } from "../prad/index.js";
-import { registerHeroicRerollsSetting } from "../heroic-rerolls/index.js";
-import { initTargetHelper } from "../target-helper/index.js";
-import { initStatblockImporter, registerStatblockImporterSetting } from "../statblock-importer/index.js";
+import { registerPradSettings, registerPradTemplates, registerAttackCardTemplate } from "../rulesets/sf2e/prad/index.js";
+import { registerHeroicRerollsSetting } from "../rulesets/sf2e/heroic-rerolls/index.js";
+import { initTargetHelper } from "../rulesets/sf2e/target-helper/index.js";
+import { initStatblockImporter, registerStatblockImporterSetting } from "../rulesets/sf2e/statblock-importer/index.js";
 import {
     registerSyncSettings,
     registerSyncSettingsButton,

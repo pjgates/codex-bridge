@@ -6,7 +6,7 @@
  * local development builds may still emit the legacy ActorSheet hook.
  */
 
-import { MODULE_ID } from "../constants.js";
+import { MODULE_ID } from "../../../constants.js";
 import { onRenderNpcSheet } from "./npc-sheet.js";
 import { onRenderPcSheet } from "./pc-sheet.js";
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { encodeTargetUuidSaveKey, normalizeSaveResult, normalizeSaveResults, normalizeTargetHelperFlagData } from "../../src/target-helper/result-validation.js";
+import { encodeTargetUuidSaveKey, normalizeSaveResult, normalizeSaveResults, normalizeTargetHelperFlagData } from "../../src/rulesets/sf2e/target-helper/result-validation.js";
 
 const REVISION = "11111111-1111-4111-8111-111111111111";
 

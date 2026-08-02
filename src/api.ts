@@ -6,13 +6,13 @@ import {
     rollOvercomeForTargets,
     rollSavesForTargets,
     updateTargets,
-} from "./target-helper/index.js";
+} from "./rulesets/sf2e/target-helper/index.js";
 import {
     postAttackCard,
     resolveAttackCardProvenance,
     rollAttackCardArmorSaves,
     rollWeaponDamage,
-} from "./prad/index.js";
+} from "./rulesets/sf2e/prad/index.js";
 
 export type Sf2eForgeCustomApiErrorCode =
     | "disabled"

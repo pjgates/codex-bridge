@@ -14,12 +14,12 @@ export type {
     DegreeOfSuccessString,
     SaveType,
     Sf2eChatMessageFlags,
-} from "../shared/types.js";
+} from "../../../shared/types.js";
 
 export {
     DEGREE_STRINGS,
     SAVE_TYPES,
-} from "../shared/types.js";
+} from "../../../shared/types.js";
 
 // ─── NPC System Data (partial) ───────────────────────────────────────────────
 
@@ -75,7 +75,7 @@ export interface StrikeSystemData {
 
 // ─── PRAD Roll Result ────────────────────────────────────────────────────────
 
-import type { DegreeOfSuccessIndex } from "../shared/types.js";
+import type { DegreeOfSuccessIndex } from "../../../shared/types.js";
 
 /** The kind of PRAD roll being made. */
 export type PradRollType = "armor-save" | "overcome";

@@ -7,15 +7,15 @@
  * Ported from PF2e Toolbelt's Target Helper rendering logic.
  */
 
-import { MODULE_ID } from "../constants.js";
-import { isCurrentUserDesignatedTargetRoller } from "../shared/authorized-roller.js";
-import { getNpcSaveModifier, getSaveDC } from "../shared/dc.js";
-import { resolveHtmlRoot } from "../shared/html.js";
+import { MODULE_ID } from "../../../constants.js";
+import { isCurrentUserDesignatedTargetRoller } from "../../../shared/authorized-roller.js";
+import { getNpcSaveModifier, getSaveDC } from "../../../shared/dc.js";
+import { resolveHtmlRoot } from "../../../shared/html.js";
 import {
     buildTargetRowViewModel,
     type RowRenderContext,
     type TargetTokenData,
-} from "../shared/render-logic.js";
+} from "../../../shared/render-logic.js";
 import { canUpdateMessage, getCurrentTargetUUIDs, getFlagData, updateTargets } from "./flags.js";
 import {
     canRollOvercomeAsCurrentUser,

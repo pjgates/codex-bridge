@@ -11,11 +11,11 @@
  * Both post the same chat card; the player then clicks the button.
  */
 
-import { MODULE_ID } from "../constants.js";
-import { isCurrentUserDesignatedTargetRollCreator } from "../shared/authorized-roller.js";
-import { getSystemFlags } from "../shared/flags.js";
-import { resolveHtmlRoot } from "../shared/html.js";
-import { getPublicSceneTokenUuids, getSceneTokenId, isSceneTokenUuid } from "../shared/token-uuid.js";
+import { MODULE_ID } from "../../../constants.js";
+import { isCurrentUserDesignatedTargetRollCreator } from "../../../shared/authorized-roller.js";
+import { getSystemFlags } from "../../../shared/flags.js";
+import { resolveHtmlRoot } from "../../../shared/html.js";
+import { getPublicSceneTokenUuids, getSceneTokenId, isSceneTokenUuid } from "../../../shared/token-uuid.js";
 import { createTargetRevision, normalizeTargetHelperFlagData, rollArmorSave } from "../target-helper/index.js";
 import { getAttackDC, getAttackModifierFromStrike } from "./dc.js";
 

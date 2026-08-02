@@ -11,9 +11,9 @@ import {
     resolveAttackCardProvenance,
     rollWeaponDamage,
     resolveNativeDamageTarget,
-} from "../../src/prad/intercept-attack.js";
-import { createPradChatMessage } from "../../src/prad/chat-cards.js";
-import { getPreparedStrikeVariantDC, onRenderNpcSheet } from "../../src/prad/npc-sheet.js";
+} from "../../src/rulesets/sf2e/prad/intercept-attack.js";
+import { createPradChatMessage } from "../../src/rulesets/sf2e/prad/chat-cards.js";
+import { getPreparedStrikeVariantDC, onRenderNpcSheet } from "../../src/rulesets/sf2e/prad/npc-sheet.js";
 
 const REVISION = "11111111-1111-4111-8111-111111111111";
 const weapon = { id: "laser", uuid: "Actor.npc.Item.laser", name: "Laser", type: "melee", system: { bonus: { value: 7 } }, getOriginData: () => ({ rollOptions: ["origin:item:trait:laser"] }) };
@@ -463,7 +463,7 @@ describe("postAttackCard", () => {
 
 describe("NPC sheet adapter", () => {
     it("snapshots ambient GM targets before calling the core attack-card API", () => {
-        const source = readFileSync(new URL("../../src/prad/npc-sheet.ts", import.meta.url), "utf8");
+        const source = readFileSync(new URL("../../src/rulesets/sf2e/prad/npc-sheet.ts", import.meta.url), "utf8");
 
         expect(source).toContain("const attackerTokenUUID =");
         expect(source).toContain("postAttackCard({ attacker, attackDC, attackerTokenUUID, weaponItem, targetTokenUUIDs })");
@@ -730,7 +730,7 @@ describe("rollArmorSavesForTargets", () => {
 });
 describe("attack card template", () => {
     it("keeps weapon-controlled fields on escaped Handlebars paths", () => {
-        const source = readFileSync(new URL("../../src/prad/templates/attack-card.hbs", import.meta.url), "utf8");
+        const source = readFileSync(new URL("../../src/rulesets/sf2e/prad/templates/attack-card.hbs", import.meta.url), "utf8");
 
         expect(source).toContain("{{weaponName}}");
         expect(source).toContain("{{typeLabel}}");
@@ -776,8 +776,8 @@ describe("overcome card localization", () => {
         expect(format).toHaveBeenCalledWith("sf2e-forge-custom.prad.overcomeLabel", { name: rollerName, npcName, saveType });
         expect(viewModel?.overcomeContext).toBe(formatted);
 
-        const template = readFileSync(new URL("../../src/prad/templates/overcome.hbs", import.meta.url), "utf8");
-        const localization = JSON.parse(readFileSync(new URL("../../src/prad/lang/en.json", import.meta.url), "utf8"));
+        const template = readFileSync(new URL("../../src/rulesets/sf2e/prad/templates/overcome.hbs", import.meta.url), "utf8");
+        const localization = JSON.parse(readFileSync(new URL("../../src/rulesets/sf2e/prad/lang/en.json", import.meta.url), "utf8"));
         expect(template).toContain("{{overcomeContext}}");
         expect(template).not.toContain("{{{");
         expect(template).not.toContain("</span>'s");

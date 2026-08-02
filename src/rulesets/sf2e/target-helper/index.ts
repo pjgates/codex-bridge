@@ -12,7 +12,7 @@
  *   4. Flag update → message re-renders → inline results appear
  */
 
-import { MODULE_ID } from "../constants.js";
+import { MODULE_ID } from "../../../constants.js";
 import { setSourceFlag, getCurrentTargetUUIDs, getFlagData } from "./flags.js";
 import {
     isAreaMessage, prepareAreaMessage,

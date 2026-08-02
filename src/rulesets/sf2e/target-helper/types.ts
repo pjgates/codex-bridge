@@ -9,17 +9,17 @@
  */
 
 // Re-export shared types so Target Helper consumers can import from here
-export type { DegreeOfSuccessString, SaveType } from "../shared/types.js";
-export { SAVE_TYPES } from "../shared/types.js";
-export type { SaveInfo, SaveResultData, PersistedSaveResultData, SaveDisplayInfo } from "../shared/types.js";
-export { SAVE_DETAILS } from "../shared/types.js";
+export type { DegreeOfSuccessString, SaveType } from "../../../shared/types.js";
+export { SAVE_TYPES } from "../../../shared/types.js";
+export type { SaveInfo, SaveResultData, PersistedSaveResultData, SaveDisplayInfo } from "../../../shared/types.js";
+export { SAVE_DETAILS } from "../../../shared/types.js";
 
 // Re-export shared degree inversion (string-based)
-export { invertDegreeString as invertDegree } from "../shared/degree.js";
+export { invertDegreeString as invertDegree } from "../../../shared/degree.js";
 
 // ─── Import shared types for use within this file ────────────────────────────
 
-import type { SaveInfo, PersistedSaveResultData } from "../shared/types.js";
+import type { SaveInfo, PersistedSaveResultData } from "../../../shared/types.js";
 
 // ─── Flag Data (stored on ChatMessage flags) ─────────────────────────────────
 

@@ -1,4 +1,4 @@
-import { getSceneTokenId, isSceneTokenUuid } from "../shared/token-uuid.js";
+import { getSceneTokenId, isSceneTokenUuid } from "../../../shared/token-uuid.js";
 import type { DegreeOfSuccessString, PersistedSaveResultData, SaveResultData, TargetHelperFlagData, TargetMessageType } from "./types.js";
 
 const MAX_MODIFIERS = 100;

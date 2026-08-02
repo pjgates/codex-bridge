@@ -3,8 +3,8 @@
  * shared statblock normaliser (strict mode — vault content is reviewed).
  */
 import matter from "gray-matter";
-import { normaliseStatblock } from "../../src/statblock/parse.js";
-import type { ParsedCreature } from "../../src/statblock/types.js";
+import { normaliseStatblock } from "../../src/rulesets/sf2e/statblock/parse.js";
+import type { ParsedCreature } from "../../src/rulesets/sf2e/statblock/types.js";
 
 export {
     parseSensesString,
@@ -12,7 +12,7 @@ export {
     parseAttackName,
     parseAttackDesc,
     parseDamageString,
-} from "../../src/statblock/parse.js";
+} from "../../src/rulesets/sf2e/statblock/parse.js";
 
 /**
  * Parse a bestiary creature markdown file into structured data.

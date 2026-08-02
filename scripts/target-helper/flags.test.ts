@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { canUpdateMessage, getCurrentTargetUUIDs, getFlagData, setSourceFlag, updateSaves, updateTargets } from "../../src/target-helper/flags.js";
-import { encodeTargetUuidSaveKey } from "../../src/target-helper/result-validation.js";
+import { canUpdateMessage, getCurrentTargetUUIDs, getFlagData, setSourceFlag, updateSaves, updateTargets } from "../../src/rulesets/sf2e/target-helper/flags.js";
+import { encodeTargetUuidSaveKey } from "../../src/rulesets/sf2e/target-helper/result-validation.js";
 
 const REVISION = "11111111-1111-4111-8111-111111111111";
 const NEXT_REVISION = "22222222-2222-4222-8222-222222222222";

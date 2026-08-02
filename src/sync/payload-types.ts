@@ -1,4 +1,4 @@
-import type { CreatureStatblock } from "../statblock/index.js";
+import type { CreatureStatblock } from "../rulesets/sf2e/statblock/index.js";
 
 export const PAYLOAD_FORMAT_VERSION = 1;
 

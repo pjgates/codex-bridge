@@ -5,7 +5,7 @@
  * localization key mappings for NPC-side outcomes.
  */
 
-import type { DegreeOfSuccessIndex } from "../shared/types.js";
+import type { DegreeOfSuccessIndex } from "../../../shared/types.js";
 
 // Re-export shared functions so existing PRAD consumers keep working
 export {
@@ -13,7 +13,7 @@ export {
     invertDegreeIndex as invertDegree,
     mapOvercomeDegree,
     degreeToString,
-} from "../shared/degree.js";
+} from "../../../shared/degree.js";
 
 // ─── PRAD-Specific Labels ────────────────────────────────────────────────────
 

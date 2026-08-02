@@ -13,7 +13,7 @@ import {
     type CreatureStatblock,
 } from "../statblock/index.js";
 import { renderPreview } from "./preview.js";
-import { MODULE_ID } from "../constants.js";
+import { MODULE_ID } from "../../../constants.js";
 
 /** Split a markdown file into its YAML frontmatter block and body. */
 function splitFrontmatter(markdown: string): { yaml: string; body: string } {

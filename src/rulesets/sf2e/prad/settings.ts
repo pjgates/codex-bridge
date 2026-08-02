@@ -5,8 +5,8 @@
  * the "Players Roll All Dice" variant rule and its DC mode.
  */
 
-import { MODULE_ID } from "../constants.js";
-import { DC_BASE_DEFAULT, DC_BASE_STRICT, setDCBase } from "../shared/dc.js";
+import { MODULE_ID } from "../../../constants.js";
+import { DC_BASE_DEFAULT, DC_BASE_STRICT, setDCBase } from "../../../shared/dc.js";
 
 /**
  * Register PRAD settings in Foundry's module configuration.

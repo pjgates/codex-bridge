@@ -10,10 +10,10 @@
  * Ported from PF2e Toolbelt's Target Helper save.ts.
  */
 
-import { MODULE_ID } from "../constants.js";
-import { isCurrentUserDesignatedActorRoller, isCurrentUserDesignatedTargetRoller } from "../shared/authorized-roller.js";
-import { getArmorSaveModifier, getPcAC, getSaveDC } from "../shared/dc.js";
-import { calculateDegree, degreeToString, invertDegreeString } from "../shared/degree.js";
+import { MODULE_ID } from "../../../constants.js";
+import { isCurrentUserDesignatedActorRoller, isCurrentUserDesignatedTargetRoller } from "../../../shared/authorized-roller.js";
+import { getArmorSaveModifier, getPcAC, getSaveDC } from "../../../shared/dc.js";
+import { calculateDegree, degreeToString, invertDegreeString } from "../../../shared/degree.js";
 import {
     filterUnrolledNpcTargets,
     filterEligibleActiveTokens,
@@ -24,7 +24,7 @@ import {
     type RollCallbackData,
     type TokenFilterData,
     type StatisticCandidate,
-} from "../shared/roll-logic.js";
+} from "../../../shared/roll-logic.js";
 import { canUpdateMessage, getFlagData, updateSaves } from "./flags.js";
 import { type PersistedSaveResultData, type SaveResultData, type DegreeOfSuccessString } from "./types.js";
 import { getTargetTokenId, normalizeSaveResult } from "./result-validation.js";

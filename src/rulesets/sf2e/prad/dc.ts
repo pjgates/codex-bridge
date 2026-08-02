@@ -21,4 +21,4 @@ export {
     getAllSaveDCs,
     getPcAC,
     getPcSpellDC,
-} from "../shared/dc.js";
+} from "../../../shared/dc.js";

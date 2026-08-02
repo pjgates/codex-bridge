@@ -5,8 +5,8 @@
  * All data is stored at: `flags[MODULE_ID].targetHelper`
  */
 
-import { MODULE_ID } from "../constants.js";
-import { getPublicSceneTokenUuids, isPublicSceneTokenUuid } from "../shared/token-uuid.js";
+import { MODULE_ID } from "../../../constants.js";
+import { getPublicSceneTokenUuids, isPublicSceneTokenUuid } from "../../../shared/token-uuid.js";
 import type {
     TargetHelperFlagData,
     PersistedSaveResultData,

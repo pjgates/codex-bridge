@@ -5,7 +5,7 @@
  * variant rule.
  */
 
-import { MODULE_ID } from "../constants.js";
+import { MODULE_ID } from "../../../constants.js";
 
 /** Register the Heroic Rerolls setting during the `init` hook. */
 export function registerHeroicRerollsSetting(): void {

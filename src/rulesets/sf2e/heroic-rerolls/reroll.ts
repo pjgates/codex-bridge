@@ -1,6 +1,6 @@
 /** Heroic Rerolls — Hero Point reroll floor. */
 
-import { MODULE_ID } from "../constants.js";
+import { MODULE_ID } from "../../../constants.js";
 
 const HEROIC_REROLL_MODIFIER = "min10";
 

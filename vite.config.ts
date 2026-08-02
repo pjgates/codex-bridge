@@ -71,8 +71,8 @@ export default defineConfig({
         viteStaticCopy({
             targets: [
                 // Feature-co-located templates
-                { src: "src/prad/templates/**/*", dest: "templates/prad" },
-                { src: "src/target-helper/templates/**/*", dest: "templates/target-helper" },
+                { src: "src/rulesets/sf2e/prad/templates/**/*", dest: "templates/prad" },
+                { src: "src/rulesets/sf2e/target-helper/templates/**/*", dest: "templates/target-helper" },
                 { src: "src/sync/templates/**/*", dest: "templates/sync" },
                 { src: "module.json", dest: "." },
             ],

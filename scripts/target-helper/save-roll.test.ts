@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { canRollOvercomeAsCurrentUser, onTargetHelperReroll, resolveOvercomeCasterActor, rollOvercomeForTargets, rollSavesForTargets } from "../../src/target-helper/save-roll.js";
-import { encodeTargetUuidSaveKey } from "../../src/target-helper/result-validation.js";
+import { canRollOvercomeAsCurrentUser, onTargetHelperReroll, resolveOvercomeCasterActor, rollOvercomeForTargets, rollSavesForTargets } from "../../src/rulesets/sf2e/target-helper/save-roll.js";
+import { encodeTargetUuidSaveKey } from "../../src/rulesets/sf2e/target-helper/result-validation.js";
 import { DC_BASE_DEFAULT, DC_BASE_STRICT, setDCBase } from "../../src/shared/dc.js";
 
 const REVISION = "11111111-1111-4111-8111-111111111111";

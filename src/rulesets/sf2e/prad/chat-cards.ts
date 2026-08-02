@@ -5,7 +5,7 @@
  * overcome check results.
  */
 
-import { MODULE_ID } from "../constants.js";
+import { MODULE_ID } from "../../../constants.js";
 import { ARMOR_SAVE_NPC_EFFECT_KEYS, OVERCOME_NPC_EFFECT_KEYS } from "./degree-of-success.js";
 import type { DegreeOfSuccessIndex, PradRollResult } from "./types.js";
 
