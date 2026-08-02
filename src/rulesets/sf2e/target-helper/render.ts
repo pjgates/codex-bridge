@@ -308,7 +308,7 @@ function canControlTargetHelperMessage(message: ChatMessage.Implementation, flag
 function handleTargetHelperAction(label: string, operation: Promise<unknown>): void {
     void operation.catch((error: unknown) => {
         console.error(`${MODULE_ID} | Target Helper: ${label} failed`, error);
-        ui.notifications!.error(game.i18n!.localize("sf2e-forge-custom.targetHelper.cannotPersist"));
+        ui.notifications!.error(game.i18n!.localize("codex-foundry.targetHelper.cannotPersist"));
     });
 }
 
@@ -397,7 +397,7 @@ async function replaceButton(
 
     if (isPradOvercome) {
         // Change text to "Roll Overcome" in PRAD mode
-        fakeBtn.textContent = game.i18n!.localize("sf2e-forge-custom.prad.rollOvercome");
+        fakeBtn.textContent = game.i18n!.localize("codex-foundry.prad.rollOvercome");
         fakeBtn.classList.add("th-overcome-btn");
     }
 
@@ -424,7 +424,7 @@ async function replaceButton(
     // Set Targets button
     const setTargetsBtn = document.createElement("button");
     setTargetsBtn.className = "th-set-targets";
-    setTargetsBtn.title = game.i18n!.localize("sf2e-forge-custom.targetHelper.setTargets");
+    setTargetsBtn.title = game.i18n!.localize("codex-foundry.targetHelper.setTargets");
     setTargetsBtn.innerHTML = '<i class="fa-solid fa-bullseye-arrow"></i>';
     setTargetsBtn.addEventListener("click", (event) => {
         event.stopPropagation();
@@ -438,7 +438,7 @@ async function replaceButton(
         if (hasUnrolledTargets(flagData)) {
             const rollAllBtn = document.createElement("button");
             rollAllBtn.className = "th-roll-npc-saves";
-            rollAllBtn.title = game.i18n!.localize("sf2e-forge-custom.targetHelper.rollOvercomeAll");
+            rollAllBtn.title = game.i18n!.localize("codex-foundry.targetHelper.rollOvercomeAll");
             rollAllBtn.innerHTML = '<i class="fa-duotone fa-solid fa-dice-d20"></i>';
             rollAllBtn.addEventListener("click", (event) => {
                 event.stopPropagation();
@@ -451,7 +451,7 @@ async function replaceButton(
         if (hasUnrolledNpcs(flagData)) {
             const rollNpcBtn = document.createElement("button");
             rollNpcBtn.className = "th-roll-npc-saves";
-            rollNpcBtn.title = game.i18n!.localize("sf2e-forge-custom.targetHelper.rollNpcSaves");
+            rollNpcBtn.title = game.i18n!.localize("codex-foundry.targetHelper.rollNpcSaves");
             rollNpcBtn.innerHTML = '<i class="fa-duotone fa-solid fa-dice-d20"></i>';
             rollNpcBtn.addEventListener("click", (event) => {
                 event.stopPropagation();
@@ -484,7 +484,7 @@ async function addActionButtons(
 
     const setTargetsBtn = document.createElement("button");
     setTargetsBtn.className = "th-set-targets";
-    setTargetsBtn.title = game.i18n!.localize("sf2e-forge-custom.targetHelper.setTargets");
+    setTargetsBtn.title = game.i18n!.localize("codex-foundry.targetHelper.setTargets");
     setTargetsBtn.innerHTML = '<i class="fa-solid fa-bullseye-arrow"></i>';
     setTargetsBtn.addEventListener("click", (event) => {
         event.stopPropagation();
@@ -497,7 +497,7 @@ async function addActionButtons(
         if (hasUnrolledTargets(flagData)) {
             const rollAllBtn = document.createElement("button");
             rollAllBtn.className = "th-roll-npc-saves";
-            rollAllBtn.title = game.i18n!.localize("sf2e-forge-custom.targetHelper.rollOvercomeAll");
+            rollAllBtn.title = game.i18n!.localize("codex-foundry.targetHelper.rollOvercomeAll");
             rollAllBtn.innerHTML = '<i class="fa-duotone fa-solid fa-dice-d20"></i>';
             rollAllBtn.addEventListener("click", (event) => {
                 event.stopPropagation();
@@ -508,7 +508,7 @@ async function addActionButtons(
     } else if (hasUnrolledNpcs(flagData)) {
         const rollNpcBtn = document.createElement("button");
         rollNpcBtn.className = "th-roll-npc-saves";
-        rollNpcBtn.title = game.i18n!.localize("sf2e-forge-custom.targetHelper.rollNpcSaves");
+        rollNpcBtn.title = game.i18n!.localize("codex-foundry.targetHelper.rollNpcSaves");
         rollNpcBtn.innerHTML = '<i class="fa-duotone fa-solid fa-dice-d20"></i>';
         rollNpcBtn.addEventListener("click", (event) => {
             event.stopPropagation();
@@ -544,7 +544,7 @@ async function addCheckButtons(
     if (isOwner) {
         const setTargetsBtn = document.createElement("button");
         setTargetsBtn.className = "th-set-targets";
-        setTargetsBtn.title = game.i18n!.localize("sf2e-forge-custom.targetHelper.setTargets");
+        setTargetsBtn.title = game.i18n!.localize("codex-foundry.targetHelper.setTargets");
         setTargetsBtn.innerHTML = '<i class="fa-solid fa-bullseye-arrow"></i>';
         setTargetsBtn.addEventListener("click", (event) => {
             event.stopPropagation();
@@ -559,7 +559,7 @@ async function addCheckButtons(
             // Overcome button (caster rolls against all targets)
             const overcomeBtn = document.createElement("button");
             overcomeBtn.className = "th-save-btn th-overcome-btn";
-            appendIconAndText(overcomeBtn, "fa-solid fa-burst", game.i18n!.localize("sf2e-forge-custom.prad.rollOvercome"));
+            appendIconAndText(overcomeBtn, "fa-solid fa-burst", game.i18n!.localize("codex-foundry.prad.rollOvercome"));
             overcomeBtn.addEventListener("click", (event) => {
                 event.preventDefault();
                 event.stopPropagation();
@@ -571,7 +571,7 @@ async function addCheckButtons(
             const saveBtn = document.createElement("button");
             saveBtn.className = "th-save-btn";
             const saveDisplay = SAVE_DETAILS[flagData.save.statistic] ?? SAVE_DETAILS.reflex;
-            appendIconAndText(saveBtn, saveDisplay.icon, game.i18n!.localize("sf2e-forge-custom.targetHelper.rollSave"));
+            appendIconAndText(saveBtn, saveDisplay.icon, game.i18n!.localize("codex-foundry.targetHelper.rollSave"));
             saveBtn.addEventListener("click", (event) => {
                 event.preventDefault();
                 event.stopPropagation();
@@ -585,7 +585,7 @@ async function addCheckButtons(
         if (isOwner && hasUnrolledTargets(flagData)) {
             const rollAllBtn = document.createElement("button");
             rollAllBtn.className = "th-roll-npc-saves";
-            rollAllBtn.title = game.i18n!.localize("sf2e-forge-custom.targetHelper.rollOvercomeAll");
+            rollAllBtn.title = game.i18n!.localize("codex-foundry.targetHelper.rollOvercomeAll");
             rollAllBtn.innerHTML = '<i class="fa-duotone fa-solid fa-dice-d20"></i>';
             rollAllBtn.addEventListener("click", (event) => {
                 event.stopPropagation();
@@ -596,7 +596,7 @@ async function addCheckButtons(
     } else if (isOwner && hasUnrolledNpcs(flagData)) {
         const rollNpcBtn = document.createElement("button");
         rollNpcBtn.className = "th-roll-npc-saves";
-        rollNpcBtn.title = game.i18n!.localize("sf2e-forge-custom.targetHelper.rollNpcSaves");
+        rollNpcBtn.title = game.i18n!.localize("codex-foundry.targetHelper.rollNpcSaves");
         rollNpcBtn.innerHTML = '<i class="fa-duotone fa-solid fa-dice-d20"></i>';
         rollNpcBtn.addEventListener("click", (event) => {
             event.stopPropagation();
@@ -642,10 +642,10 @@ function hasUnrolledTargets(flagData: TargetHelperFlagData): boolean {
 }
 function getSuccessLabel(success: DegreeOfSuccessString): string {
     const i18nKeys: Record<DegreeOfSuccessString, string> = {
-        criticalSuccess: "sf2e-forge-custom.degree.criticalSuccess",
-        success: "sf2e-forge-custom.degree.success",
-        failure: "sf2e-forge-custom.degree.failure",
-        criticalFailure: "sf2e-forge-custom.degree.criticalFailure",
+        criticalSuccess: "codex-foundry.degree.criticalSuccess",
+        success: "codex-foundry.degree.success",
+        failure: "codex-foundry.degree.failure",
+        criticalFailure: "codex-foundry.degree.criticalFailure",
     };
     return game.i18n!.localize(i18nKeys[success]) ?? success;
 }

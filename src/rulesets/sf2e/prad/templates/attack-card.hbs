@@ -19,13 +19,13 @@
         <p class="item-block-line">
             {{#if hasRange}}
             <span>
-                <strong>{{localize "sf2e-forge-custom.prad.range"}}</strong>
+                <strong>{{localize "codex-foundry.prad.range"}}</strong>
                 {{rangeLabel}}{{#if hasArea}};{{/if}}
             </span>
             {{/if}}
             {{#if hasArea}}
             <span>
-                <strong>{{localize "sf2e-forge-custom.prad.area"}}</strong>
+                <strong>{{localize "codex-foundry.prad.area"}}</strong>
                 {{areaLabel}}
             </span>
             {{/if}}
@@ -34,9 +34,9 @@
         {{#if hasDamage}}
         <hr class="item-block-divider">
         <p>
-            <strong>{{localize "sf2e-forge-custom.prad.damage"}}</strong>
+            <strong>{{localize "codex-foundry.prad.damage"}}</strong>
             {{#each damageRolls}}
-                {{this.formula}} {{this.displayDamageType}}{{#unless @last}} {{localize "sf2e-forge-custom.prad.plus"}} {{/unless}}
+                {{this.formula}} {{this.displayDamageType}}{{#unless @last}} {{localize "codex-foundry.prad.plus"}} {{/unless}}
             {{/each}}
         </p>
         {{/if}}
@@ -50,12 +50,12 @@
             data-weapon="{{weaponName}}"
             data-attacker-id="{{attackerId}}"
         >
-            {{localize "sf2e-forge-custom.prad.armorSave"}} <span data-visibility="all">{{attackDC}}</span>
+            {{localize "codex-foundry.prad.armorSave"}} <span data-visibility="all">{{attackDC}}</span>
         </button>
         {{#if hasDamage}}
         <section class="owner-buttons">
             <div class="spell-button">
-                <button type="button" data-action="prad-roll-damage">{{localize "sf2e-forge-custom.prad.rollDamage"}}</button>
+                <button type="button" data-action="prad-roll-damage">{{localize "codex-foundry.prad.rollDamage"}}</button>
             </div>
         </section>
         {{/if}}

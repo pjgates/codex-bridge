@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { hashCreatureImportData, journalAdoptUpdateData, journalShellCreateData, JOURNAL_SHELL_FOLDER, peopleActorCreateData, peopleActorUpdateData, rewriteLinkPlaceholders } from "./import.js";
+import { hashCreatureImportData, journalAdoptUpdateData, journalShellCreateData, JOURNAL_SHELL_FOLDER, moduleFlags, peopleActorCreateData, peopleActorUpdateData, rewriteLinkPlaceholders } from "./import.js";
 import type { SyncEntity } from "./payload-types.js";
 
 describe("rewriteLinkPlaceholders", () => {
@@ -172,15 +172,36 @@ describe("journal shell folder placement", () => {
         const create = journalShellCreateData(randall, "fld-entities");
         expect(create.folder).toBe("fld-entities");
         expect(create.flags).toEqual({
-            "sf2e-forge-custom": { syncId: "fs-randall1", syncKind: "entity-journal" },
+            "codex-foundry": { syncId: "fs-randall1", syncKind: "entity-journal" },
         });
 
         const adopt = journalAdoptUpdateData("fs-randall1", "entity-journal");
         expect(adopt).toEqual({
             flags: {
-                "sf2e-forge-custom": { syncId: "fs-randall1", syncKind: "entity-journal" },
+                "codex-foundry": { syncId: "fs-randall1", syncKind: "entity-journal" },
             },
         });
         expect(adopt).not.toHaveProperty("folder");
+    });
+});
+
+describe("legacy module flags", () => {
+    it("reads sync identity from the legacy sf2e-forge-custom flag key", () => {
+        const doc = {
+            flags: {
+                "sf2e-forge-custom": { syncId: "fs-abc123", syncKind: "entity-journal", importedHash: "h1" },
+            },
+        };
+        expect(moduleFlags(doc)).toEqual({ syncId: "fs-abc123", syncKind: "entity-journal", importedHash: "h1" });
+    });
+
+    it("prefers codex-foundry flags when both keys are present", () => {
+        const doc = {
+            flags: {
+                "codex-foundry": { syncId: "new-id" },
+                "sf2e-forge-custom": { syncId: "old-id" },
+            },
+        };
+        expect(moduleFlags(doc).syncId).toBe("new-id");
     });
 });

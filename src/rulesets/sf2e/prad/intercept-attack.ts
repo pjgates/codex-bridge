@@ -179,7 +179,7 @@ function _onPreCreateChatMessage(
     void postAttackCard(intercepted).catch(async (err: unknown) => {
         console.error(`${MODULE_ID} | PRAD: Error posting intercepted attack card`, err);
         try {
-            ui.notifications!.error(game.i18n!.localize("sf2e-forge-custom.prad.attackRestored"));
+            ui.notifications!.error(game.i18n!.localize("codex-foundry.prad.attackRestored"));
         } catch (notificationError) {
             console.error(`${MODULE_ID} | PRAD: Failed to notify GM about intercepted attack restoration`, notificationError);
         }
@@ -192,7 +192,7 @@ function _onPreCreateChatMessage(
             if (!restoredMessage) throw new Error("Restoring the intercepted attack returned no chat message");
         } catch (restoreError) {
             console.error(`${MODULE_ID} | PRAD: Failed to restore intercepted attack`, restoreError);
-            ui.notifications!.error(game.i18n!.localize("sf2e-forge-custom.prad.attackRestoreFailed"));
+            ui.notifications!.error(game.i18n!.localize("codex-foundry.prad.attackRestoreFailed"));
         }
     });
 
@@ -265,11 +265,11 @@ function extractWeaponData(weaponItem: Item.Implementation): WeaponDisplayData {
     const range = sys.range as { increment?: number; max?: number | null } | null;
     let typeLabel: string;
     if (action === "area-fire") {
-        typeLabel = game.i18n!.localize("sf2e-forge-custom.prad.areaAttack");
+        typeLabel = game.i18n!.localize("codex-foundry.prad.areaAttack");
     } else if (range?.increment) {
-        typeLabel = game.i18n!.localize("sf2e-forge-custom.prad.rangedStrike");
+        typeLabel = game.i18n!.localize("codex-foundry.prad.rangedStrike");
     } else {
-        typeLabel = game.i18n!.localize("sf2e-forge-custom.prad.meleeStrike");
+        typeLabel = game.i18n!.localize("codex-foundry.prad.meleeStrike");
     }
 
     // ── Damage rolls (extracted first so damage types can feed into traits) ──
@@ -310,7 +310,7 @@ function extractWeaponData(weaponItem: Item.Implementation): WeaponDisplayData {
     };
 
     // 1. "Attack" — every strike has this trait
-    addTrait("attack", game.i18n!.localize("sf2e-forge-custom.prad.attack"));
+    addTrait("attack", game.i18n!.localize("codex-foundry.prad.attack"));
 
     // 2. Weapon traits from item data (e.g. "sonic", "volley 30 ft.")
     for (const t of traitValues) {
@@ -324,7 +324,7 @@ function extractWeaponData(weaponItem: Item.Implementation): WeaponDisplayData {
 
     // 4. Range increment tag (matches what PF2e damage rolls show)
     if (range?.increment) {
-        addTrait("range-increment", game.i18n!.format("sf2e-forge-custom.prad.rangeIncrement", { value: String(range.increment) }));
+        addTrait("range-increment", game.i18n!.format("codex-foundry.prad.rangeIncrement", { value: String(range.increment) }));
     }
 
     const hasTraits = traits.length > 0;
@@ -333,11 +333,11 @@ function extractWeaponData(weaponItem: Item.Implementation): WeaponDisplayData {
     let rangeLabel = "";
     let hasRange = false;
     if (range?.increment) {
-        rangeLabel = game.i18n!.format("sf2e-forge-custom.prad.rangeFeet", { value: String(range.increment) });
-        if (range.max) rangeLabel += ` (${game.i18n!.format("sf2e-forge-custom.prad.rangeMax", { value: String(range.max) })})`;
+        rangeLabel = game.i18n!.format("codex-foundry.prad.rangeFeet", { value: String(range.increment) });
+        if (range.max) rangeLabel += ` (${game.i18n!.format("codex-foundry.prad.rangeMax", { value: String(range.max) })})`;
         hasRange = true;
     } else if (range?.max) {
-        rangeLabel = game.i18n!.format("sf2e-forge-custom.prad.rangeFeet", { value: String(range.max) });
+        rangeLabel = game.i18n!.format("codex-foundry.prad.rangeFeet", { value: String(range.max) });
         hasRange = true;
     }
 
@@ -345,7 +345,7 @@ function extractWeaponData(weaponItem: Item.Implementation): WeaponDisplayData {
     let areaLabel = "";
     let hasArea = false;
     if (area?.type && area?.value) {
-        areaLabel = game.i18n!.format("sf2e-forge-custom.prad.areaFeet", { value: String(area.value), type: area.type });
+        areaLabel = game.i18n!.format("codex-foundry.prad.areaFeet", { value: String(area.value), type: area.type });
         hasArea = true;
     }
 
@@ -455,7 +455,7 @@ export async function postAttackCard(params: AttackCardParams): Promise<string> 
     }
     const sf2eAttacker = attacker as Sf2eActor;
     const wd = extractWeaponData(weaponItem);
-    const weaponName = isBoundedString(weaponItem.name, 200) ? weaponItem.name : game.i18n!.localize("sf2e-forge-custom.prad.strike");
+    const weaponName = isBoundedString(weaponItem.name, 200) ? weaponItem.name : game.i18n!.localize("codex-foundry.prad.strike");
     const revision = createTargetRevision();
     const templateData = {
         attackerId: attacker.id,
@@ -465,7 +465,7 @@ export async function postAttackCard(params: AttackCardParams): Promise<string> 
         revision,
         weaponImg: wd?.weaponImg ?? sf2eAttacker.img ?? "icons/svg/mystery-man.svg",
         actionGlyph: wd?.actionGlyph ?? "",
-        typeLabel: wd?.typeLabel ?? game.i18n!.localize("sf2e-forge-custom.prad.strike"),
+        typeLabel: wd?.typeLabel ?? game.i18n!.localize("codex-foundry.prad.strike"),
         hasTraits: wd?.hasTraits ?? false,
         traits: wd?.traits ?? [],
         hasDetails: wd?.hasDetails ?? false,
@@ -485,7 +485,7 @@ export async function postAttackCard(params: AttackCardParams): Promise<string> 
             actor: attacker.id,
             token: attackerTokenUUID ? getSceneTokenId(attackerTokenUUID) ?? undefined : undefined,
             scene: attackerTokenUUID?.split(".")[1],
-            alias: attacker.name ?? game.i18n!.localize("sf2e-forge-custom.prad.unknownNpc"),
+            alias: attacker.name ?? game.i18n!.localize("codex-foundry.prad.unknownNpc"),
         },
         flags: {
             [MODULE_ID]: {
@@ -577,7 +577,7 @@ export function resolveAttackCardProvenance(message: ChatMessage.Implementation)
     const strike = Array.isArray(actions) ? actions.find((action) => action.item?.id === weaponItemId) : undefined;
     const weaponName = isBoundedString(weaponItem.name, 200)
         ? weaponItem.name
-        : game.i18n!.localize("sf2e-forge-custom.prad.strike");
+        : game.i18n!.localize("codex-foundry.prad.strike");
     return { attacker, ...(attackerToken ? { attackerToken } : {}), weaponItem, weaponName, weaponRollOptions: targetHelper.options, attackDC: attackDC as number, targetTokenUUIDs: targetHelper.targets, interceptedAttack: targetHelper.interceptedAttack === true, ...(targetHelper.contextualTargetAc ? { contextualTargetAc: targetHelper.contextualTargetAc } : {}), strike };
 }
 
@@ -655,7 +655,7 @@ export function getCardArmorSaveTargets(message: ChatMessage.Implementation): Sf
 function handleAsyncCardAction(label: string, operation: Promise<unknown>): void {
     void operation.catch((error: unknown) => {
         console.error(`${MODULE_ID} | PRAD: ${label} failed`, error);
-        ui.notifications!.error(game.i18n!.localize("sf2e-forge-custom.prad.attackCardFailed"));
+        ui.notifications!.error(game.i18n!.localize("codex-foundry.prad.attackCardFailed"));
     });
 }
 
@@ -737,13 +737,13 @@ export function resolveNativeDamageTarget(targetTokenUUIDs: readonly string[]): 
 
 export async function rollWeaponDamage(message: ChatMessage.Implementation): Promise<boolean> {
     if (!game.user?.isGM) {
-        ui.notifications!.warn(game.i18n!.localize("sf2e-forge-custom.prad.damageGmOnly"));
+        ui.notifications!.warn(game.i18n!.localize("codex-foundry.prad.damageGmOnly"));
         return false;
     }
 
     const provenance = resolveAttackCardProvenance(message);
     if (!provenance) {
-        ui.notifications!.warn(game.i18n!.localize("sf2e-forge-custom.prad.noDamageData"));
+        ui.notifications!.warn(game.i18n!.localize("codex-foundry.prad.noDamageData"));
         return false;
     }
 
@@ -751,7 +751,7 @@ export async function rollWeaponDamage(message: ChatMessage.Implementation): Pro
     if (typeof strike?.damage === "function") {
         const target = resolveNativeDamageTarget(provenance.targetTokenUUIDs);
         if (!target) {
-            ui.notifications!.warn(game.i18n!.localize("sf2e-forge-custom.prad.damageTargetRequired"));
+            ui.notifications!.warn(game.i18n!.localize("codex-foundry.prad.damageTargetRequired"));
             return false;
         }
         try {
@@ -767,11 +767,11 @@ export async function rollWeaponDamage(message: ChatMessage.Implementation): Pro
     // able to make a GM evaluate arbitrary Roll syntax.
     const damageRolls = extractWeaponData(weaponItem).damageRolls;
     if (damageRolls.length === 0) {
-        ui.notifications!.warn(game.i18n!.localize("sf2e-forge-custom.prad.noDamageData"));
+        ui.notifications!.warn(game.i18n!.localize("codex-foundry.prad.noDamageData"));
         return false;
     }
     if (damageRolls.some((damage) => damage.category !== undefined)) {
-        ui.notifications!.warn(game.i18n!.localize("sf2e-forge-custom.prad.categorizedDamageRequiresNative"));
+        ui.notifications!.warn(game.i18n!.localize("codex-foundry.prad.categorizedDamageRequiresNative"));
         return false;
     }
 
@@ -780,13 +780,13 @@ export async function rollWeaponDamage(message: ChatMessage.Implementation): Pro
     await roll.evaluate();
 
     const damageTypes = [...new Set(damageRolls.map((damage) => damage.damageType))].join(", ");
-    const damageLabel = game.i18n!.localize("sf2e-forge-custom.prad.damage");
+    const damageLabel = game.i18n!.localize("codex-foundry.prad.damage");
     const created = await roll.toMessage({
         speaker: {
             actor: attacker.id,
-            alias: attacker.name ?? game.i18n!.localize("sf2e-forge-custom.prad.unknownNpc"),
+            alias: attacker.name ?? game.i18n!.localize("codex-foundry.prad.unknownNpc"),
         },
-        flavor: `<strong>${escapeHtml(weaponItem.name ?? game.i18n!.localize("sf2e-forge-custom.prad.strike"))}</strong> ${escapeHtml(damageLabel)} (${escapeHtml(damageTypes)})`,
+        flavor: `<strong>${escapeHtml(weaponItem.name ?? game.i18n!.localize("codex-foundry.prad.strike"))}</strong> ${escapeHtml(damageLabel)} (${escapeHtml(damageTypes)})`,
     } as Record<string, unknown>);
     return created != null;
 }
@@ -809,7 +809,7 @@ export async function rollArmorSavesForTargets(
     if (contextualTargetAc !== undefined && (!isSceneTokenUuid(contextualTargetAc.targetUuid) || typeof contextualTargetAc.value !== "number" || !Number.isFinite(contextualTargetAc.value) || tokens.some((token) => token.uuid !== contextualTargetAc.targetUuid))) return false;
     if (attackerToken !== undefined && (!attacker || !isSceneTokenUuid(attackerToken.uuid) || attackerToken.actor !== attacker)) return false;
     if (tokens.length === 0) {
-        ui.notifications!.error(game.i18n!.localize("sf2e-forge-custom.prad.noToken"));
+        ui.notifications!.error(game.i18n!.localize("codex-foundry.prad.noToken"));
         return false;
     }
 

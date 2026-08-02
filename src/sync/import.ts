@@ -1,4 +1,4 @@
-import { MODULE_ID } from "../constants.js";
+import { LEGACY_MODULE_ID, MODULE_ID } from "../constants.js";
 import { buildActorDocument } from "../rulesets/sf2e/statblock/index.js";
 import type { SyncCreature, SyncEntity, SyncPayload } from "./payload-types.js";
 import { SETTING_LAST_MANIFEST } from "./settings.js";
@@ -114,8 +114,9 @@ function creatureFlags(syncId: string, importedHash: string, importedBaseline: s
     return { [MODULE_ID]: { syncId, syncKind: "creature-actor", importedHash, importedBaseline } };
 }
 
-function moduleFlags(doc: { flags: Record<string, unknown> }): SyncModuleFlags {
-    return (doc.flags[MODULE_ID] ?? {}) as SyncModuleFlags;
+export function moduleFlags(doc: { flags: Record<string, unknown> }): SyncModuleFlags {
+    // ponytail: legacy-key read fallback keeps pre-rename docs managed; removal = one-time flag-migration script if cleanup is ever wanted
+    return ((doc.flags[MODULE_ID] ?? doc.flags[LEGACY_MODULE_ID]) ?? {}) as SyncModuleFlags;
 }
 
 async function getOrCreateFolder(name: string, type: "JournalEntry" | "Actor"): Promise<string> {

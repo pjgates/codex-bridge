@@ -15,7 +15,7 @@ function createMessage(targetIds: string[] = [], pradOvercome = false) {
         isAuthor: true,
         canUserModify: vi.fn().mockReturnValue(true),
         flags: {
-            "sf2e-forge-custom": {
+            "codex-foundry": {
                 targetHelper: {
                     type: "spell",
                     targets: targetIds.map((id) => `Scene.scene.Token.${id}`),
@@ -79,7 +79,7 @@ describe("rollSavesForTargets", () => {
 
         expect(message.update).toHaveBeenCalledOnce();
         expect(message.update).toHaveBeenCalledWith({
-            [`flags.sf2e-forge-custom.targetHelper.saves.${encodeTargetUuidSaveKey("Scene.scene.Token.successful", 0, REVISION)}`]: {
+            [`flags.codex-foundry.targetHelper.saves.${encodeTargetUuidSaveKey("Scene.scene.Token.successful", 0, REVISION)}`]: {
                 value: 17,
                 die: 10,
                 success: "failure",
@@ -103,7 +103,7 @@ describe("rollSavesForTargets", () => {
         await rollSavesForTargets(EVENT, message as unknown as ChatMessage.Implementation, [target]);
 
         expect(message.update).toHaveBeenCalledWith({
-            [`flags.sf2e-forge-custom.targetHelper.saves.${encodeTargetUuidSaveKey("Scene.scene.Token.private", 0, REVISION)}`]: {
+            [`flags.codex-foundry.targetHelper.saves.${encodeTargetUuidSaveKey("Scene.scene.Token.private", 0, REVISION)}`]: {
                 private: true,
                 statistic: "reflex",
                 targetUuid: "Scene.scene.Token.private",
@@ -115,7 +115,7 @@ describe("rollSavesForTargets", () => {
 
     it("does not reroll a target with a redacted private completion marker", async () => {
         const message = createMessage(["private"]);
-        message.flags["sf2e-forge-custom"].targetHelper.saves = {
+        message.flags["codex-foundry"].targetHelper.saves = {
             [encodeTargetUuidSaveKey("Scene.scene.Token.private", 0, REVISION)]: {
                 private: true,
                 statistic: "reflex",
@@ -249,7 +249,7 @@ describe("rollSavesForTargets", () => {
         const target = { id: "target", uuid: "Scene.scene.Token.target", actor } as unknown as Sf2eTokenDocument;
         const message = createMessage(["target"]);
         Object.assign(message, { actor: origin, item });
-        Object.assign(message.flags["sf2e-forge-custom"].targetHelper, {
+        Object.assign(message.flags["codex-foundry"].targetHelper, {
             type: "prad-attack",
             item: item.uuid,
             options: ["origin:item:trait:laser"],
@@ -295,7 +295,7 @@ describe("rollSavesForTargets", () => {
         const originToken = { uuid: "Scene.scene.Token.npc", actor: origin };
         const item = { uuid: "Actor.npc.Item.laser", actor: origin, name: "Laser" };
         const message = createMessage(["target"]);
-        Object.assign(message.flags["sf2e-forge-custom"].targetHelper, {
+        Object.assign(message.flags["codex-foundry"].targetHelper, {
             type: "prad-attack",
             contextualTargetAc: { targetUuid: target.uuid, value: 33 },
             interceptedAttack: true,
@@ -332,7 +332,7 @@ describe("rollSavesForTargets", () => {
         const target = createTarget("shared", roll, "Scene.scene.Token.shared");
 
         const pending = rollSavesForTargets(EVENT, message as unknown as ChatMessage.Implementation, [target]);
-        message.flags["sf2e-forge-custom"].targetHelper.targets = ["Scene.reassigned.Token.shared"];
+        message.flags["codex-foundry"].targetHelper.targets = ["Scene.reassigned.Token.shared"];
         complete();
 
         await expect(pending).resolves.toBe(false);
@@ -351,7 +351,7 @@ describe("rollSavesForTargets", () => {
         const target = createTarget("shared", roll);
 
         const pending = rollSavesForTargets(EVENT, message as unknown as ChatMessage.Implementation, [target]);
-        message.flags["sf2e-forge-custom"].targetHelper.generation = 2;
+        message.flags["codex-foundry"].targetHelper.generation = 2;
         complete();
 
         await expect(pending).resolves.toBe(false);
@@ -370,7 +370,7 @@ describe("rollSavesForTargets", () => {
         const target = createTarget("shared", roll);
 
         const pending = rollSavesForTargets(EVENT, message as unknown as ChatMessage.Implementation, [target]);
-        message.flags["sf2e-forge-custom"].targetHelper.revision = "22222222-2222-4222-8222-222222222222";
+        message.flags["codex-foundry"].targetHelper.revision = "22222222-2222-4222-8222-222222222222";
         complete();
 
         await expect(pending).resolves.toBe(false);
@@ -394,7 +394,7 @@ describe("rollSavesForTargets", () => {
         const replacement = createTarget("shared", replacementRoll, "Scene.reassigned.Token.shared");
 
         const pendingOriginal = rollSavesForTargets(EVENT, message as unknown as ChatMessage.Implementation, [original]);
-        message.flags["sf2e-forge-custom"].targetHelper.targets = ["Scene.reassigned.Token.shared"];
+        message.flags["codex-foundry"].targetHelper.targets = ["Scene.reassigned.Token.shared"];
         await expect(rollSavesForTargets(EVENT, message as unknown as ChatMessage.Implementation, [replacement])).resolves.toBe(true);
         completeOriginal();
 
@@ -403,7 +403,7 @@ describe("rollSavesForTargets", () => {
         expect(replacementRoll).toHaveBeenCalledOnce();
         expect(message.update).toHaveBeenCalledOnce();
         expect(message.update).toHaveBeenCalledWith(expect.objectContaining({
-            [`flags.sf2e-forge-custom.targetHelper.saves.${encodeTargetUuidSaveKey("Scene.reassigned.Token.shared", 0, REVISION)}`]: expect.objectContaining({ targetUuid: "Scene.reassigned.Token.shared" }),
+            [`flags.codex-foundry.targetHelper.saves.${encodeTargetUuidSaveKey("Scene.reassigned.Token.shared", 0, REVISION)}`]: expect.objectContaining({ targetUuid: "Scene.reassigned.Token.shared" }),
         }));
     });
 
@@ -418,7 +418,7 @@ describe("rollSavesForTargets", () => {
         await rollSavesForTargets(EVENT, message as unknown as ChatMessage.Implementation, [duplicated]);
 
         expect(message.update).toHaveBeenCalledWith(expect.objectContaining({
-            [`flags.sf2e-forge-custom.targetHelper.saves.${encodeTargetUuidSaveKey("Scene.scene.Token.duplicated", 0, REVISION)}`]: expect.objectContaining({ success: "success" }),
+            [`flags.codex-foundry.targetHelper.saves.${encodeTargetUuidSaveKey("Scene.scene.Token.duplicated", 0, REVISION)}`]: expect.objectContaining({ success: "success" }),
         }));
     });
 
@@ -440,7 +440,7 @@ describe("rollSavesForTargets", () => {
 
     it("rejects distinct target UUIDs with colliding embedded token IDs", async () => {
         const message = createMessage(["target"]);
-        message.flags["sf2e-forge-custom"].targetHelper.targets.push("Scene.other.Token.target");
+        message.flags["codex-foundry"].targetHelper.targets.push("Scene.other.Token.target");
         const roll = vi.fn();
 
         await expect(rollSavesForTargets(EVENT, message as unknown as ChatMessage.Implementation, [
@@ -452,7 +452,7 @@ describe("rollSavesForTargets", () => {
 
     it("rejects a card with colliding resolved embedded token IDs before rolling a subset", async () => {
         const message = createMessage(["target"]);
-        message.flags["sf2e-forge-custom"].targetHelper.targets.push("Scene.other.Token.target");
+        message.flags["codex-foundry"].targetHelper.targets.push("Scene.other.Token.target");
         const roll = vi.fn();
         const target = createTarget("target", roll);
         const collision = createTarget("target", roll, "Scene.other.Token.target");
@@ -501,7 +501,7 @@ describe("rollSavesForTargets", () => {
         const message = createMessage(["target"]);
         const item = { uuid: "Actor.caster.Item.spell" };
         Object.assign(message, { item });
-        Object.assign(message.flags["sf2e-forge-custom"].targetHelper, { item: item.uuid, options: ["item:trait:incapacitation"] });
+        Object.assign(message.flags["codex-foundry"].targetHelper, { item: item.uuid, options: ["item:trait:incapacitation"] });
         const roll = vi.fn(async ({ callback }) => {
             callback?.(ROLL, "success", null);
             return ROLL;
@@ -520,7 +520,7 @@ describe("rollSavesForTargets", () => {
             traits: new Set(["consumable"]),
         };
         Object.assign(message, { item });
-        Object.assign(message.flags["sf2e-forge-custom"].targetHelper, { item: item.uuid, options: ["item:trait:area"] });
+        Object.assign(message.flags["codex-foundry"].targetHelper, { item: item.uuid, options: ["item:trait:area"] });
         const roll = vi.fn(async ({ callback }) => {
             callback?.(ROLL, "success", null);
             return ROLL;
@@ -588,7 +588,7 @@ describe("rollOvercomeForTargets", () => {
         const item = { uuid: "Actor.caster.Item.spell", actor: caster };
         const message = createMessage(["b"], true);
         Object.assign(message, { actor: caster, item, speaker: { scene: "scene", token: "caster" } });
-        Object.assign(message.flags["sf2e-forge-custom"].targetHelper, { item: item.uuid, options: ["item:trait:mental"] });
+        Object.assign(message.flags["codex-foundry"].targetHelper, { item: item.uuid, options: ["item:trait:mental"] });
         Object.assign(globalThis, { fromUuidSync: (uuid: string) => uuid === casterToken.uuid ? casterToken : uuid === tokenB.uuid ? tokenB : null });
 
         await rollOvercomeForTargets(EVENT, message as unknown as ChatMessage.Implementation, [tokenB]);
@@ -602,12 +602,12 @@ describe("rollOvercomeForTargets", () => {
             origin: { actor: caster, token: casterToken, item },
             target: { actor: npcActor, token: tokenB, statistic: contextualNpcStatistic },
             options: new Set(["item:trait:mental"]),
-            identifier: `sf2e-forge-custom:target-helper-overcome:v1|parent|${tokenB.uuid}|0|${REVISION}`,
+            identifier: `codex-foundry:target-helper-overcome:v1|parent|${tokenB.uuid}|0|${REVISION}`,
             createMessage: true,
         });
         expect(rawRoll.mock.calls[0][1].target.token).not.toBe(tokenA);
         expect(message.update).toHaveBeenCalledWith(expect.objectContaining({
-            [`flags.sf2e-forge-custom.targetHelper.saves.${encodeTargetUuidSaveKey(tokenB.uuid, 0, REVISION)}`]: expect.objectContaining({ overcomeDc: expectedDC, targetUuid: tokenB.uuid }),
+            [`flags.codex-foundry.targetHelper.saves.${encodeTargetUuidSaveKey(tokenB.uuid, 0, REVISION)}`]: expect.objectContaining({ overcomeDc: expectedDC, targetUuid: tokenB.uuid }),
         }));
     });
 
@@ -620,7 +620,7 @@ describe("rollOvercomeForTargets", () => {
         const consumable = { uuid: "Actor.caster.Item.grenade", actor: caster, quantity: 2, isOfType: (type: string) => type === "weapon", traits: new Set(["consumable"]) };
         const message = createMessage(["a", "b"], true);
         Object.assign(message, { actor: caster, item: consumable });
-        Object.assign(message.flags["sf2e-forge-custom"].targetHelper, { item: consumable.uuid, options: ["item:trait:area"] });
+        Object.assign(message.flags["codex-foundry"].targetHelper, { item: consumable.uuid, options: ["item:trait:area"] });
         Object.assign(globalThis, {
             fromUuidSync: (uuid: string) => targets.find((target) => target.uuid === uuid) ?? null,
         });
@@ -636,7 +636,7 @@ describe("rollOvercomeForTargets", () => {
         expect(rawRoll).toHaveBeenCalledTimes(2);
         const identifiers = rawRoll.mock.calls.map(([, context]) => context.identifier);
         expect(new Set(identifiers).size).toBe(2);
-        expect(identifiers).toEqual(targets.map((target) => `sf2e-forge-custom:target-helper-overcome:v1|parent|${target.uuid}|0|${REVISION}`));
+        expect(identifiers).toEqual(targets.map((target) => `codex-foundry:target-helper-overcome:v1|parent|${target.uuid}|0|${REVISION}`));
         for (const [, context] of rawRoll.mock.calls) {
             expect(context).not.toHaveProperty("item");
             expect(context).toMatchObject({ origin: { item: null }, options: new Set(["item:trait:area"]) });
@@ -668,7 +668,7 @@ describe("rollOvercomeForTargets", () => {
         const caster = { classDC: statistic(), testUserPermission: (user: { id: string }) => user.id === firstOwner.id || user.id === assignedOwner.id };
         Object.assign(assignedOwner, { character: caster });
         const message = createMessage(["npc"], true);
-        Object.assign(message.flags["sf2e-forge-custom"].targetHelper, { author: "Actor.caster" });
+        Object.assign(message.flags["codex-foundry"].targetHelper, { author: "Actor.caster" });
         const npcStatistic = statistic(17);
         const target = { id: "npc", uuid: "Scene.scene.Token.npc", actor: { name: "NPC", getStatistic: () => npcStatistic } } as unknown as Sf2eTokenDocument;
         Object.assign(globalThis, {
@@ -690,7 +690,7 @@ describe("native linked Overcome rerolls", () => {
     const saveKey = encodeTargetUuidSaveKey(targetUuid, 0, REVISION);
 
     function linkedIdentifier(uuid = targetUuid, generation = 0): string {
-        return `sf2e-forge-custom:target-helper-overcome:v1|parent|${uuid}|${generation}|${REVISION}`;
+        return `codex-foundry:target-helper-overcome:v1|parent|${uuid}|${generation}|${REVISION}`;
     }
 
     function linkedRoll(identifier: string, total = 30, die = 10): Roll {
@@ -709,7 +709,7 @@ describe("native linked Overcome rerolls", () => {
         const caster = {};
         const message = createMessage(["target"], true);
         Object.assign(message, { actor: caster });
-        message.flags["sf2e-forge-custom"].targetHelper.saves = {
+        message.flags["codex-foundry"].targetHelper.saves = {
             [saveKey]: {
                 value: 17,
                 die: 2,
@@ -739,7 +739,7 @@ describe("native linked Overcome rerolls", () => {
 
         await vi.waitFor(() => expect(message.update).toHaveBeenCalledOnce());
         expect(message.update).toHaveBeenCalledWith({
-            [`flags.sf2e-forge-custom.targetHelper.saves.${saveKey}`]: {
+            [`flags.codex-foundry.targetHelper.saves.${saveKey}`]: {
                 value: 30,
                 die: 10,
                 success: "criticalFailure",
@@ -761,13 +761,13 @@ describe("native linked Overcome rerolls", () => {
         { name: "stale", configure: (_message: ReturnType<typeof createMessage>) => linkedIdentifier(targetUuid, 1) },
         { name: "wrong-target", configure: (_message: ReturnType<typeof createMessage>) => linkedIdentifier("Scene.scene.Token.other") },
         { name: "private", configure: (message: ReturnType<typeof createMessage>) => {
-            message.flags["sf2e-forge-custom"].targetHelper.saves = {
+            message.flags["codex-foundry"].targetHelper.saves = {
                 [saveKey]: { private: true, statistic: "reflex", targetUuid, generation: 0, revision: REVISION },
             } as never;
             return linkedIdentifier();
         } },
         { name: "invalid-current-flags", configure: (message: ReturnType<typeof createMessage>) => {
-            message.flags["sf2e-forge-custom"].targetHelper.revision = "invalid";
+            message.flags["codex-foundry"].targetHelper.revision = "invalid";
             return linkedIdentifier();
         } },
         { name: "no-authority", configure: (message: ReturnType<typeof createMessage>) => {
@@ -801,7 +801,7 @@ describe("native linked Overcome rerolls", () => {
         expect(() => onTargetHelperReroll(linkedRoll(identifier, 17, 2), linkedRoll(identifier, 30, 10))).not.toThrow();
 
         await vi.waitFor(() => expect(consoleError).toHaveBeenCalledWith(
-            "sf2e-forge-custom | PRAD Overcome: Unable to persist native reroll result",
+            "codex-foundry | PRAD Overcome: Unable to persist native reroll result",
             error,
         ));
         consoleError.mockRestore();

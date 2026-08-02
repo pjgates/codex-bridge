@@ -173,7 +173,7 @@ describe("buildImportActorData", () => {
     it("builds a complete NPC actor without embedded pack ids", () => {
         expect(actor.type).toBe("npc");
         expect(actor._id).toBeUndefined();
-        expect(actor.flags["sf2e-forge-custom"].source).toBe("importer");
+        expect(actor.flags["codex-foundry"].source).toBe("importer");
         expect(actor.system.details.level.value).toBe(8);
         expect(actor.system.attributes.ac.value).toBe(26);
         expect(actor.system.attributes.hp.max).toBe(150);

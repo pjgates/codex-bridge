@@ -58,8 +58,8 @@ export function onReady(): void {
         registerPradSheetHooks();
 
         ui.notifications!.info(
-            game.i18n!.format("sf2e-forge-custom.prad.variantActive", {
-                name: game.i18n!.localize("sf2e-forge-custom.settings.playersRollAllDice.name"),
+            game.i18n!.format("codex-foundry.prad.variantActive", {
+                name: game.i18n!.localize("codex-foundry.settings.playersRollAllDice.name"),
             }),
         );
     }

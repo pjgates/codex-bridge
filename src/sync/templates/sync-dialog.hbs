@@ -1,16 +1,16 @@
 <div class="forge-sync-dialog">
     {{#if report}}
         <section class="forge-sync-report">
-            <h3>{{localize "sf2e-forge-custom.sync.reportTitle"}}</h3>
+            <h3>{{localize "codex-foundry.sync.reportTitle"}}</h3>
             <ul class="forge-sync-report-counts">
-                <li>{{localize "sf2e-forge-custom.sync.reportCreated" count=report.created}}</li>
-                <li>{{localize "sf2e-forge-custom.sync.reportUpdated" count=report.updated}}</li>
-                <li>{{localize "sf2e-forge-custom.sync.reportAdopted" count=report.adopted}}</li>
-                <li>{{localize "sf2e-forge-custom.sync.reportReimported" count=report.reimported}}</li>
-                <li>{{localize "sf2e-forge-custom.sync.reportDeleted" count=report.deleted}}</li>
+                <li>{{localize "codex-foundry.sync.reportCreated" count=report.created}}</li>
+                <li>{{localize "codex-foundry.sync.reportUpdated" count=report.updated}}</li>
+                <li>{{localize "codex-foundry.sync.reportAdopted" count=report.adopted}}</li>
+                <li>{{localize "codex-foundry.sync.reportReimported" count=report.reimported}}</li>
+                <li>{{localize "codex-foundry.sync.reportDeleted" count=report.deleted}}</li>
             </ul>
             {{#if report.failed.length}}
-                <h4>{{localize "sf2e-forge-custom.sync.reportFailuresTitle"}}</h4>
+                <h4>{{localize "codex-foundry.sync.reportFailuresTitle"}}</h4>
                 <ul class="forge-sync-report-failures">
                     {{#each report.failed}}
                         <li><strong>{{name}}</strong> — {{error}}</li>
@@ -20,12 +20,12 @@
         </section>
     {{else}}
         {{#if unchanged}}
-            <p class="forge-sync-unchanged">{{localize "sf2e-forge-custom.sync.unchanged" count=unchanged}}</p>
+            <p class="forge-sync-unchanged">{{localize "codex-foundry.sync.unchanged" count=unchanged}}</p>
         {{/if}}
 
         {{#if adopt.length}}
             <section class="forge-sync-section">
-                <h3>{{localize "sf2e-forge-custom.sync.sectionAdopt"}}</h3>
+                <h3>{{localize "codex-foundry.sync.sectionAdopt"}}</h3>
                 <ul>
                     {{#each adopt}}
                         <li>
@@ -41,7 +41,7 @@
 
         {{#if create.length}}
             <section class="forge-sync-section">
-                <h3>{{localize "sf2e-forge-custom.sync.sectionCreate"}}</h3>
+                <h3>{{localize "codex-foundry.sync.sectionCreate"}}</h3>
                 <ul>
                     {{#each create}}
                         <li>{{name}} <span class="forge-sync-meta">({{docType}})</span></li>
@@ -52,7 +52,7 @@
 
         {{#if update.length}}
             <section class="forge-sync-section">
-                <h3>{{localize "sf2e-forge-custom.sync.sectionUpdate"}}</h3>
+                <h3>{{localize "codex-foundry.sync.sectionUpdate"}}</h3>
                 <ul>
                     {{#each update}}
                         <li>{{name}} <span class="forge-sync-meta">({{docType}})</span></li>
@@ -63,7 +63,7 @@
 
         {{#if reimport.length}}
             <section class="forge-sync-section">
-                <h3>{{localize "sf2e-forge-custom.sync.sectionReimport"}}</h3>
+                <h3>{{localize "codex-foundry.sync.sectionReimport"}}</h3>
                 <ul>
                     {{#each reimport}}
                         <li>
@@ -71,8 +71,8 @@
                                 <input type="checkbox" name="reimport" value="{{key}}">
                                 {{name}}
                                 {{#if modifiedInFoundry}}
-                                    <i class="fa-solid fa-triangle-exclamation forge-sync-warning" title="{{localize "sf2e-forge-custom.sync.modifiedInFoundry"}}"></i>
-                                    <span class="forge-sync-warning-label">{{localize "sf2e-forge-custom.sync.modifiedInFoundry"}}</span>
+                                    <i class="fa-solid fa-triangle-exclamation forge-sync-warning" title="{{localize "codex-foundry.sync.modifiedInFoundry"}}"></i>
+                                    <span class="forge-sync-warning-label">{{localize "codex-foundry.sync.modifiedInFoundry"}}</span>
                                 {{/if}}
                             </label>
                         </li>
@@ -83,13 +83,13 @@
 
         {{#if stale.length}}
             <section class="forge-sync-section">
-                <h3>{{localize "sf2e-forge-custom.sync.sectionStale"}}</h3>
+                <h3>{{localize "codex-foundry.sync.sectionStale"}}</h3>
                 <ul>
                     {{#each stale}}
                         <li>
                             <label>
                                 <input type="checkbox" name="deleteStale" value="{{key}}">
-                                {{localize "sf2e-forge-custom.sync.staleDeleteLabel" name=name docType=docType}}
+                                {{localize "codex-foundry.sync.staleDeleteLabel" name=name docType=docType}}
                             </label>
                         </li>
                     {{/each}}
@@ -98,12 +98,12 @@
         {{/if}}
 
         {{#unless hasWork}}
-            <p class="forge-sync-empty">{{localize "sf2e-forge-custom.sync.nothingToApply"}}</p>
+            <p class="forge-sync-empty">{{localize "codex-foundry.sync.nothingToApply"}}</p>
         {{/unless}}
 
         <footer class="forge-sync-footer">
             <button type="submit" {{#unless hasWork}}disabled{{/unless}}>
-                <i class="fa-solid fa-check"></i> {{localize "sf2e-forge-custom.sync.apply"}}
+                <i class="fa-solid fa-check"></i> {{localize "codex-foundry.sync.apply"}}
             </button>
         </footer>
     {{/if}}

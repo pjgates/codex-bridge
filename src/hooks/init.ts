@@ -56,8 +56,8 @@ export function onInit(): void {
 function registerSettings(): void {
     // Master switch
     game.settings!.register(MODULE_ID, "enableCustomRules", {
-        name: "sf2e-forge-custom.settings.enableCustomRules.name",
-        hint: "sf2e-forge-custom.settings.enableCustomRules.hint",
+        name: "codex-foundry.settings.enableCustomRules.name",
+        hint: "codex-foundry.settings.enableCustomRules.hint",
         scope: "world",
         config: true,
         type: Boolean,
@@ -67,8 +67,8 @@ function registerSettings(): void {
 
     // Target Helper toggle (independent feature)
     game.settings!.register(MODULE_ID, "enableTargetHelper", {
-        name: "sf2e-forge-custom.settings.enableTargetHelper.name",
-        hint: "sf2e-forge-custom.settings.enableTargetHelper.hint",
+        name: "codex-foundry.settings.enableTargetHelper.name",
+        hint: "codex-foundry.settings.enableTargetHelper.hint",
         scope: "world",
         config: true,
         type: Boolean,
@@ -106,7 +106,7 @@ function onRenderSettingsConfig(
             if (shouldDisable) {
                 pradInput.closest(".form-group")?.classList.add("disabled");
                 pradInput.title = game.i18n!.localize(
-                    "sf2e-forge-custom.settings.playersRollAllDice.requiresTargetHelper",
+                    "codex-foundry.settings.playersRollAllDice.requiresTargetHelper",
                 );
             }
         }

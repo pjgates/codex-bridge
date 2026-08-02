@@ -39,7 +39,7 @@ function attackCardMessage(weaponItemId = weapon.id) {
     return {
         author: { isGM: true },
         flags: {
-            "sf2e-forge-custom": {
+            "codex-foundry": {
                 pradType: "attack-card",
                 attackDC: 20,
                 attackerId: attacker.id,
@@ -378,11 +378,11 @@ describe("postAttackCard", () => {
             targetTokenUUIDs: [targetToken.uuid],
         })).resolves.toBe("ChatMessage.created");
 
-        expect(create.mock.calls[0][0].flags["sf2e-forge-custom"].targetHelper.targets).toEqual([targetToken.uuid]);
-        expect(create.mock.calls[0][0].flags["sf2e-forge-custom"].targetHelper.generation).toBe(0);
-        expect(create.mock.calls[0][0].flags["sf2e-forge-custom"].targetHelper.revision).toMatch(/^[0-9a-f-]{36}$/);
-        expect(create.mock.calls[0][0].flags["sf2e-forge-custom"].targetHelper.item).toBe(weapon.uuid);
-        expect(create.mock.calls[0][0].flags["sf2e-forge-custom"].targetHelper.options).toEqual(["origin:item:trait:laser"]);
+        expect(create.mock.calls[0][0].flags["codex-foundry"].targetHelper.targets).toEqual([targetToken.uuid]);
+        expect(create.mock.calls[0][0].flags["codex-foundry"].targetHelper.generation).toBe(0);
+        expect(create.mock.calls[0][0].flags["codex-foundry"].targetHelper.revision).toMatch(/^[0-9a-f-]{36}$/);
+        expect(create.mock.calls[0][0].flags["codex-foundry"].targetHelper.item).toBe(weapon.uuid);
+        expect(create.mock.calls[0][0].flags["codex-foundry"].targetHelper.options).toEqual(["origin:item:trait:laser"]);
     });
 
     it("persists trusted contextual AC bound to its exact intercepted target", async () => {
@@ -402,8 +402,8 @@ describe("postAttackCard", () => {
             interceptedAttack: true,
         });
 
-        expect(create.mock.calls[0][0].flags["sf2e-forge-custom"].targetHelper.contextualTargetAc).toEqual({ targetUuid: targetToken.uuid, value: 31 });
-        expect(create.mock.calls[0][0].flags["sf2e-forge-custom"].targetHelper.interceptedAttack).toBe(true);
+        expect(create.mock.calls[0][0].flags["codex-foundry"].targetHelper.contextualTargetAc).toEqual({ targetUuid: targetToken.uuid, value: 31 });
+        expect(create.mock.calls[0][0].flags["codex-foundry"].targetHelper.interceptedAttack).toBe(true);
     });
 
     it("rejects an attacker-owned non-strike item", async () => {
@@ -440,7 +440,7 @@ describe("postAttackCard", () => {
         const createdData = create.mock.calls[0][0];
         const createdMessage = { author: { isGM: true }, flags: createdData.flags };
 
-        expect(createdData.flags["sf2e-forge-custom"].attackerTokenUUID).toBe(attackerToken.uuid);
+        expect(createdData.flags["codex-foundry"].attackerTokenUUID).toBe(attackerToken.uuid);
         expect(resolveAttackCardProvenance(createdMessage as never)?.attacker).toBe(syntheticAttacker);
         expect(resolveAttackCardProvenance(createdMessage as never)?.attackerToken).toBe(attackerToken);
     });
@@ -547,25 +547,25 @@ describe("DOM armor-save adapter", () => {
 
     it("ignores mutable DOM-style data because provenance comes from persisted flags", () => {
         const forgedFlags = attackCardMessage();
-        forgedFlags.flags["sf2e-forge-custom"].attackDC = 999;
+        forgedFlags.flags["codex-foundry"].attackDC = 999;
         expect(getCardArmorSaveTargets(forgedFlags as unknown as ChatMessage.Implementation)).toEqual([]);
     });
 
 
     it("rejects armor provenance whose exact weapon UUID or roll options are missing", () => {
         const wrongItem = attackCardMessage();
-        wrongItem.flags["sf2e-forge-custom"].targetHelper.item = "Actor.npc.Item.other";
+        wrongItem.flags["codex-foundry"].targetHelper.item = "Actor.npc.Item.other";
         const missingOptions = attackCardMessage();
-        delete (missingOptions.flags["sf2e-forge-custom"].targetHelper as { options?: string[] }).options;
+        delete (missingOptions.flags["codex-foundry"].targetHelper as { options?: string[] }).options;
 
         expect(resolveAttackCardProvenance(wrongItem as never)).toBeUndefined();
         expect(resolveAttackCardProvenance(missingOptions as never)).toBeUndefined();
 
         const forgedAc = attackCardMessage();
-        Object.assign(forgedAc.flags["sf2e-forge-custom"].targetHelper, { contextualTargetAc: { targetUuid: "Scene.scene.Token.other", value: 99 } });
+        Object.assign(forgedAc.flags["codex-foundry"].targetHelper, { contextualTargetAc: { targetUuid: "Scene.scene.Token.other", value: 99 } });
         expect(resolveAttackCardProvenance(forgedAc as never)).toBeUndefined();
         const missingInterceptedAc = attackCardMessage();
-        Object.assign(missingInterceptedAc.flags["sf2e-forge-custom"].targetHelper, { interceptedAttack: true });
+        Object.assign(missingInterceptedAc.flags["codex-foundry"].targetHelper, { interceptedAttack: true });
         expect(resolveAttackCardProvenance(missingInterceptedAc as never)).toBeUndefined();
     });
     it("keeps an empty active-token snapshot as the no-token failure", async () => {
@@ -574,7 +574,7 @@ describe("DOM armor-save adapter", () => {
         });
 
         await expect(rollArmorSavesForTargets(getCardArmorSaveTargets(message), 20, "Laser")).resolves.toBe(false);
-        expect(ui.notifications!.error).toHaveBeenCalledWith("sf2e-forge-custom.prad.noToken");
+        expect(ui.notifications!.error).toHaveBeenCalledWith("codex-foundry.prad.noToken");
     });
 
     it("rejects explicit owned tokens outside trusted card membership", async () => {
@@ -610,8 +610,8 @@ describe("DOM armor-save adapter", () => {
 
     it("uses the trusted intercepted contextual target AC instead of current actor AC", async () => {
         const intercepted = attackCardMessage();
-        Object.assign(intercepted.flags["sf2e-forge-custom"], { attackerTokenUUID: nativeAttackerToken.uuid });
-        Object.assign(intercepted.flags["sf2e-forge-custom"].targetHelper, { interceptedAttack: true, contextualTargetAc: { targetUuid: targetToken.uuid, value: 31 } });
+        Object.assign(intercepted.flags["codex-foundry"], { attackerTokenUUID: nativeAttackerToken.uuid });
+        Object.assign(intercepted.flags["codex-foundry"].targetHelper, { interceptedAttack: true, contextualTargetAc: { targetUuid: targetToken.uuid, value: 31 } });
         const authorized = { ...targetToken, isOwner: true, actor: { armorClass: { value: 26 } } };
         Object.assign(globalThis, {
             game: { ...game, user: { id: "gm", active: true, isGM: true } },
@@ -773,7 +773,7 @@ describe("overcome card localization", () => {
             npcDegree: 2,
         }, { toJSON: () => ({}) } as never);
 
-        expect(format).toHaveBeenCalledWith("sf2e-forge-custom.prad.overcomeLabel", { name: rollerName, npcName, saveType });
+        expect(format).toHaveBeenCalledWith("codex-foundry.prad.overcomeLabel", { name: rollerName, npcName, saveType });
         expect(viewModel?.overcomeContext).toBe(formatted);
 
         const template = readFileSync(new URL("../../../src/rulesets/sf2e/prad/templates/overcome.hbs", import.meta.url), "utf8");
@@ -782,7 +782,7 @@ describe("overcome card localization", () => {
         expect(template).not.toContain("{{{");
         expect(template).not.toContain("</span>'s");
         expect(template).not.toContain("{{saveType}}");
-        const contextFormat = localization["sf2e-forge-custom"].prad.overcomeLabel as string;
+        const contextFormat = localization["codex-foundry"].prad.overcomeLabel as string;
         expect(contextFormat).toContain("{name}");
         expect(contextFormat).toContain("{npcName}");
         expect(contextFormat).toContain("{saveType}");
@@ -816,10 +816,10 @@ describe("rollWeaponDamage", () => {
             Roll: vi.fn(() => ({ evaluate })),
         });
 
-        await rollWeaponDamage({ flags: { "sf2e-forge-custom": { damageRolls: [{ formula: "1d6", damageType: "fire" }] } } } as never);
+        await rollWeaponDamage({ flags: { "codex-foundry": { damageRolls: [{ formula: "1d6", damageType: "fire" }] } } } as never);
 
         expect(evaluate).not.toHaveBeenCalled();
-        expect(ui.notifications!.warn).toHaveBeenCalledWith("sf2e-forge-custom.prad.damageGmOnly");
+        expect(ui.notifications!.warn).toHaveBeenCalledWith("codex-foundry.prad.damageGmOnly");
     });
 
     it("derives fallback formulas and escaped flavor from the validated attacker-owned item", async () => {
@@ -848,7 +848,7 @@ describe("rollWeaponDamage", () => {
         });
 
         const message = attackCardMessage(maliciousWeapon.id);
-        (message.flags["sf2e-forge-custom"] as Record<string, unknown>).damageRolls = [{ formula: "999", damageType: "forged" }];
+        (message.flags["codex-foundry"] as Record<string, unknown>).damageRolls = [{ formula: "999", damageType: "forged" }];
         await expect(rollWeaponDamage(message as never)).resolves.toBe(true);
 
         expect(formulas).toEqual(["1"]);
@@ -885,7 +885,7 @@ describe("rollWeaponDamage", () => {
         await expect(rollWeaponDamage(attackCardMessage(persistentWeapon.id) as never)).resolves.toBe(false);
 
         expect(evaluate).not.toHaveBeenCalled();
-        expect(ui.notifications!.warn).toHaveBeenCalledWith("sf2e-forge-custom.prad.categorizedDamageRequiresNative");
+        expect(ui.notifications!.warn).toHaveBeenCalledWith("codex-foundry.prad.categorizedDamageRequiresNative");
     });
 
     it.each(["precision", "splash"])("refuses manual fallback for %s damage", async (category) => {
@@ -900,7 +900,7 @@ describe("rollWeaponDamage", () => {
         await expect(rollWeaponDamage(attackCardMessage(categorizedWeapon.id) as never)).resolves.toBe(false);
 
         expect(evaluate).not.toHaveBeenCalled();
-        expect(ui.notifications!.warn).toHaveBeenCalledWith("sf2e-forge-custom.prad.categorizedDamageRequiresNative");
+        expect(ui.notifications!.warn).toHaveBeenCalledWith("codex-foundry.prad.categorizedDamageRequiresNative");
     });
 
     it("passes the explicit card-authorized target to native strike damage", async () => {
@@ -928,7 +928,7 @@ describe("rollWeaponDamage", () => {
         await expect(rollWeaponDamage(attackCardMessage() as never)).resolves.toBe(false);
 
         expect(damage).not.toHaveBeenCalled();
-        expect(ui.notifications!.warn).toHaveBeenCalledWith("sf2e-forge-custom.prad.damageTargetRequired");
+        expect(ui.notifications!.warn).toHaveBeenCalledWith("codex-foundry.prad.damageTargetRequired");
     });
 
     it.each([

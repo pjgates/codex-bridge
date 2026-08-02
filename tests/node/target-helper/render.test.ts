@@ -53,7 +53,7 @@ describe("onRenderTargetHelper", () => {
         root.innerHTML = '<div class="message-content"><button data-action="spell-save">Native Save</button></div>';
         const message = {
             isAuthor: true,
-            flags: { "sf2e-forge-custom": { targetHelper: { type: "spell", targets: [], revision: REVISION, save: { statistic: "reflex", dc: 20, basic: true } } } },
+            flags: { "codex-foundry": { targetHelper: { type: "spell", targets: [], revision: REVISION, save: { statistic: "reflex", dc: 20, basic: true } } } },
         } as unknown as ChatMessage.Implementation;
 
         await onRenderTargetHelper(message, root, {});
@@ -69,7 +69,7 @@ describe("onRenderTargetHelper", () => {
         const token = { id: "token", name: "Target", actor: { hasPlayerOwner: false } };
         const message = {
             isAuthor: true,
-            flags: { "sf2e-forge-custom": { targetHelper: { type: "spell", targets: ["Scene.scene.Token.token"], revision: REVISION, save: { statistic: "reflex", dc: 20, basic: true } } } },
+            flags: { "codex-foundry": { targetHelper: { type: "spell", targets: ["Scene.scene.Token.token"], revision: REVISION, save: { statistic: "reflex", dc: 20, basic: true } } } },
         } as unknown as ChatMessage.Implementation;
         Object.assign(globalThis, {
             fromUuidSync: () => token,
@@ -93,7 +93,7 @@ describe("onRenderTargetHelper", () => {
         root.innerHTML = '<div class="message-content"><button data-action="spell-save">Native Save</button></div>';
         const message = {
             isAuthor: false,
-            flags: { "sf2e-forge-custom": { targetHelper: { type: "spell", targets: [], revision: REVISION, save: { statistic: "reflex", dc: 20, basic: true } } } },
+            flags: { "codex-foundry": { targetHelper: { type: "spell", targets: [], revision: REVISION, save: { statistic: "reflex", dc: 20, basic: true } } } },
         } as unknown as ChatMessage.Implementation;
         Object.assign(globalThis, { game: { user: { isGM: false }, i18n: { localize: (key: string) => key } } });
 
@@ -109,7 +109,7 @@ describe("onRenderTargetHelper", () => {
         const message = {
             actor: {},
             isAuthor: true,
-            flags: { "sf2e-forge-custom": { targetHelper: {
+            flags: { "codex-foundry": { targetHelper: {
                 type: "spell",
                 targets: [],
                 revision: REVISION,
@@ -131,7 +131,7 @@ describe("onRenderTargetHelper", () => {
         const malicious = '<img src=x onerror="alert(1)">';
         const message = {
             isAuthor: true,
-            flags: { "sf2e-forge-custom": { targetHelper: { type: "check", targets: [], revision: REVISION, save: { statistic: "reflex", dc: 20, basic: true } } } },
+            flags: { "codex-foundry": { targetHelper: { type: "check", targets: [], revision: REVISION, save: { statistic: "reflex", dc: 20, basic: true } } } },
         } as unknown as ChatMessage.Implementation;
         Object.assign(globalThis, { game: { user: { isGM: false }, i18n: { localize: () => malicious } } });
 
@@ -157,7 +157,7 @@ describe("onRenderTargetHelper", () => {
         });
         const message = {
             isAuthor: false,
-            flags: { "sf2e-forge-custom": { targetHelper: {
+            flags: { "codex-foundry": { targetHelper: {
                 type: "spell",
                 targets: ["Scene.scene.Token.token"],
                 revision: REVISION,

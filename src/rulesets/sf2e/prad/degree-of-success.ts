@@ -23,10 +23,10 @@ export {
  * appropriate localization key.
  */
 export const ARMOR_SAVE_NPC_EFFECT_KEYS: Record<DegreeOfSuccessIndex, string> = {
-    0: "sf2e-forge-custom.prad.targetEffect.criticalMiss",
-    1: "sf2e-forge-custom.prad.targetEffect.miss",
-    2: "sf2e-forge-custom.prad.targetEffect.hit",
-    3: "sf2e-forge-custom.prad.targetEffect.criticalHit",
+    0: "codex-foundry.prad.targetEffect.criticalMiss",
+    1: "codex-foundry.prad.targetEffect.miss",
+    2: "codex-foundry.prad.targetEffect.hit",
+    3: "codex-foundry.prad.targetEffect.criticalHit",
 };
 
 /**
@@ -35,8 +35,8 @@ export const ARMOR_SAVE_NPC_EFFECT_KEYS: Record<DegreeOfSuccessIndex, string> = 
  * appropriate localization key.
  */
 export const OVERCOME_NPC_EFFECT_KEYS: Record<DegreeOfSuccessIndex, string> = {
-    0: "sf2e-forge-custom.prad.targetEffect.critFailSave",
-    1: "sf2e-forge-custom.prad.targetEffect.failSave",
-    2: "sf2e-forge-custom.prad.targetEffect.successSave",
-    3: "sf2e-forge-custom.prad.targetEffect.critSuccessSave",
+    0: "codex-foundry.prad.targetEffect.critFailSave",
+    1: "codex-foundry.prad.targetEffect.failSave",
+    2: "codex-foundry.prad.targetEffect.successSave",
+    3: "codex-foundry.prad.targetEffect.critSuccessSave",
 };

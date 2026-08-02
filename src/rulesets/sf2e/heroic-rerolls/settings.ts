@@ -10,8 +10,8 @@ import { MODULE_ID } from "../../../constants.js";
 /** Register the Heroic Rerolls setting during the `init` hook. */
 export function registerHeroicRerollsSetting(): void {
     game.settings!.register(MODULE_ID, "heroicRerolls", {
-        name: "sf2e-forge-custom.settings.heroicRerolls.name",
-        hint: "sf2e-forge-custom.settings.heroicRerolls.hint",
+        name: "codex-foundry.settings.heroicRerolls.name",
+        hint: "codex-foundry.settings.heroicRerolls.hint",
         scope: "world",
         config: true,
         type: Boolean,

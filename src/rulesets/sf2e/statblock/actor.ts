@@ -9,7 +9,7 @@ import type {
     StrikeData,
 } from "./types.js";
 
-const MODULE_ID = "sf2e-forge-custom";
+const MODULE_ID = "codex-foundry";
 
 /** Options controlling how the actor document is materialised. */
 export interface BuildActorOptions {

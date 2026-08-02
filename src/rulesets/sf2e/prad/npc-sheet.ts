@@ -173,7 +173,7 @@ function onStrikeDCClick(
 
     const attackerTokenUUID = (attacker as Sf2eActor & { readonly token?: Sf2eTokenDocument | null }).token?.uuid;
     void postAttackCard({ attacker, attackDC, attackerTokenUUID, weaponItem, targetTokenUUIDs }).catch((err: unknown) => {
-        console.error("sf2e-forge-custom | PRAD: Error posting NPC-sheet attack card", err);
-        ui.notifications!.error(game.i18n!.localize("sf2e-forge-custom.prad.attackCardFailed"));
+        console.error("codex-foundry | PRAD: Error posting NPC-sheet attack card", err);
+        ui.notifications!.error(game.i18n!.localize("codex-foundry.prad.attackCardFailed"));
     });
 }

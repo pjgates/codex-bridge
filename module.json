@@ -1,8 +1,8 @@
 {
-    "id": "sf2e-forge-custom",
-    "title": "SF2e Forge Custom Rules",
-    "description": "Custom rules and homebrew modifications for the Starfinder Second Edition system in Foundry VTT.",
-    "version": "0.3.0",
+    "id": "codex-foundry",
+    "title": "Codex Foundry",
+    "description": "Codex bridge for Foundry VTT: vault content sync plus ruleset houserules (currently Starfinder Second Edition).",
+    "version": "1.0.0",
     "authors": [
         {
             "name": "peterg"
@@ -24,9 +24,15 @@
             }
         ]
     },
-    "system": ["sf2e"],
-    "esmodules": ["dist/module.js"],
-    "styles": ["dist/module.css"],
+    "system": [
+        "sf2e"
+    ],
+    "esmodules": [
+        "dist/module.js"
+    ],
+    "styles": [
+        "dist/module.css"
+    ],
     "languages": [
         {
             "lang": "en",

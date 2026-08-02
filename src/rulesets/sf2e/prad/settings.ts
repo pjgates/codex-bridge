@@ -14,8 +14,8 @@ import { DC_BASE_DEFAULT, DC_BASE_STRICT, setDCBase } from "../../../shared/dc.j
  */
 export function registerPradSettings(): void {
     game.settings!.register(MODULE_ID, "playersRollAllDice", {
-        name: "sf2e-forge-custom.settings.playersRollAllDice.name",
-        hint: "sf2e-forge-custom.settings.playersRollAllDice.hint",
+        name: "codex-foundry.settings.playersRollAllDice.name",
+        hint: "codex-foundry.settings.playersRollAllDice.hint",
         scope: "world",
         config: true,
         type: Boolean,
@@ -24,8 +24,8 @@ export function registerPradSettings(): void {
     });
 
     game.settings!.register(MODULE_ID, "pradStrictDCs", {
-        name: "sf2e-forge-custom.settings.pradStrictDCs.name",
-        hint: "sf2e-forge-custom.settings.pradStrictDCs.hint",
+        name: "codex-foundry.settings.pradStrictDCs.name",
+        hint: "codex-foundry.settings.pradStrictDCs.hint",
         scope: "world",
         config: true,
         type: Boolean,

@@ -23,7 +23,7 @@ const SIBLING_SAVE_KEY = encodeTargetUuidSaveKey(SIBLING_UUID, 0, REVISION);
 function createMessage() {
     return {
         flags: {
-            "sf2e-forge-custom": {
+            "codex-foundry": {
                 targetHelper: {
                     type: "spell",
                     targets: [SIBLING_UUID, "Scene.scene.Token.tokenA"],
@@ -54,7 +54,7 @@ describe("target-helper flags", () => {
         await updateSaves(message as unknown as ChatMessage.Implementation, { tokenA: { ...VALID_RESULT, targetUuid: "Scene.scene.Token.tokenA" } });
 
         expect(message.update).toHaveBeenCalledWith({
-            [`flags.sf2e-forge-custom.targetHelper.saves.${encodeTargetUuidSaveKey("Scene.scene.Token.tokenA", 0, REVISION)}`]: { ...VALID_RESULT, targetUuid: "Scene.scene.Token.tokenA" },
+            [`flags.codex-foundry.targetHelper.saves.${encodeTargetUuidSaveKey("Scene.scene.Token.tokenA", 0, REVISION)}`]: { ...VALID_RESULT, targetUuid: "Scene.scene.Token.tokenA" },
         });
     });
 
@@ -66,7 +66,7 @@ describe("target-helper flags", () => {
         });
 
         expect(message.update).toHaveBeenCalledWith({
-            [`flags.sf2e-forge-custom.targetHelper.saves.${encodeTargetUuidSaveKey("Scene.scene.Token.tokenA", 0, REVISION)}`]: {
+            [`flags.codex-foundry.targetHelper.saves.${encodeTargetUuidSaveKey("Scene.scene.Token.tokenA", 0, REVISION)}`]: {
                 private: true,
                 statistic: "reflex",
                 targetUuid: "Scene.scene.Token.tokenA",
@@ -86,7 +86,7 @@ describe("target-helper flags", () => {
 
     it("discards malformed persisted siblings before callers render them", () => {
         const message = createMessage();
-        message.flags["sf2e-forge-custom"].targetHelper.saves = {
+        message.flags["codex-foundry"].targetHelper.saves = {
             [SIBLING_SAVE_KEY]: { ...VALID_RESULT, modifiers: [{ label: "<img src=x onerror=alert(1)>", modifier: Number.NaN }] },
         };
 
@@ -109,46 +109,46 @@ describe("target-helper flags", () => {
 
     it("discards a saved result when the same token ID is reassigned to another scene", async () => {
         const message = createMessage();
-        message.flags["sf2e-forge-custom"].targetHelper.targets = ["Scene.first.Token.sibling"];
-        message.flags["sf2e-forge-custom"].targetHelper.saves = { [encodeTargetUuidSaveKey("Scene.first.Token.sibling", 0, REVISION)]: { ...VALID_RESULT, targetUuid: "Scene.first.Token.sibling" } };
+        message.flags["codex-foundry"].targetHelper.targets = ["Scene.first.Token.sibling"];
+        message.flags["codex-foundry"].targetHelper.saves = { [encodeTargetUuidSaveKey("Scene.first.Token.sibling", 0, REVISION)]: { ...VALID_RESULT, targetUuid: "Scene.first.Token.sibling" } };
 
         await updateTargets(message as unknown as ChatMessage.Implementation, ["Scene.second.Token.sibling"]);
 
         expect(message.update).toHaveBeenCalledWith({
-            "flags.sf2e-forge-custom.targetHelper.targets": ["Scene.second.Token.sibling"],
-            "flags.sf2e-forge-custom.targetHelper.generation": 1,
-            "flags.sf2e-forge-custom.targetHelper.revision": NEXT_REVISION,
-            [`flags.sf2e-forge-custom.targetHelper.saves.-=${encodeTargetUuidSaveKey("Scene.first.Token.sibling", 0, REVISION)}`]: null,
+            "flags.codex-foundry.targetHelper.targets": ["Scene.second.Token.sibling"],
+            "flags.codex-foundry.targetHelper.generation": 1,
+            "flags.codex-foundry.targetHelper.revision": NEXT_REVISION,
+            [`flags.codex-foundry.targetHelper.saves.-=${encodeTargetUuidSaveKey("Scene.first.Token.sibling", 0, REVISION)}`]: null,
         });
     });
 
     it("cleans a retained target's stale-generation save leaf without replacing sibling maps", async () => {
         const message = createMessage();
-        message.flags["sf2e-forge-custom"].targetHelper.targets = ["Scene.first.Token.sibling"];
-        message.flags["sf2e-forge-custom"].targetHelper.saves = { [encodeTargetUuidSaveKey("Scene.first.Token.sibling", 0, REVISION)]: { ...VALID_RESULT, targetUuid: "Scene.first.Token.sibling" } };
+        message.flags["codex-foundry"].targetHelper.targets = ["Scene.first.Token.sibling"];
+        message.flags["codex-foundry"].targetHelper.saves = { [encodeTargetUuidSaveKey("Scene.first.Token.sibling", 0, REVISION)]: { ...VALID_RESULT, targetUuid: "Scene.first.Token.sibling" } };
 
         await updateTargets(message as unknown as ChatMessage.Implementation, ["Scene.first.Token.sibling", "Scene.second.Token.added"]);
 
         expect(message.update).toHaveBeenCalledWith({
-            "flags.sf2e-forge-custom.targetHelper.targets": ["Scene.first.Token.sibling", "Scene.second.Token.added"],
-            "flags.sf2e-forge-custom.targetHelper.generation": 1,
-            "flags.sf2e-forge-custom.targetHelper.revision": NEXT_REVISION,
-            [`flags.sf2e-forge-custom.targetHelper.saves.-=${encodeTargetUuidSaveKey("Scene.first.Token.sibling", 0, REVISION)}`]: null,
+            "flags.codex-foundry.targetHelper.targets": ["Scene.first.Token.sibling", "Scene.second.Token.added"],
+            "flags.codex-foundry.targetHelper.generation": 1,
+            "flags.codex-foundry.targetHelper.revision": NEXT_REVISION,
+            [`flags.codex-foundry.targetHelper.saves.-=${encodeTargetUuidSaveKey("Scene.first.Token.sibling", 0, REVISION)}`]: null,
         });
     });
 
     it("uses distinct persisted leaves when an old generation write settles after its replacement", async () => {
         const message = createMessage();
         let settleOldWrite!: () => void;
-        message.flags["sf2e-forge-custom"].targetHelper.targets = ["Scene.old.Token.shared"];
-        message.flags["sf2e-forge-custom"].targetHelper.saves = {};
+        message.flags["codex-foundry"].targetHelper.targets = ["Scene.old.Token.shared"];
+        message.flags["codex-foundry"].targetHelper.saves = {};
         message.update.mockImplementationOnce(() => new Promise<void>((resolve) => { settleOldWrite = resolve; }));
 
         const oldWrite = updateSaves(message as unknown as ChatMessage.Implementation, {
             shared: { ...VALID_RESULT, targetUuid: "Scene.old.Token.shared" },
         });
-        message.flags["sf2e-forge-custom"].targetHelper.targets = ["Scene.new.Token.shared"];
-        message.flags["sf2e-forge-custom"].targetHelper.generation = 1;
+        message.flags["codex-foundry"].targetHelper.targets = ["Scene.new.Token.shared"];
+        message.flags["codex-foundry"].targetHelper.generation = 1;
         await updateSaves(message as unknown as ChatMessage.Implementation, {
             shared: { ...VALID_RESULT, generation: 1, targetUuid: "Scene.new.Token.shared" },
         });
@@ -156,18 +156,18 @@ describe("target-helper flags", () => {
         await oldWrite;
 
         expect(message.update).toHaveBeenNthCalledWith(1, {
-            [`flags.sf2e-forge-custom.targetHelper.saves.${encodeTargetUuidSaveKey("Scene.old.Token.shared", 0, REVISION)}`]: expect.objectContaining({ targetUuid: "Scene.old.Token.shared" }),
+            [`flags.codex-foundry.targetHelper.saves.${encodeTargetUuidSaveKey("Scene.old.Token.shared", 0, REVISION)}`]: expect.objectContaining({ targetUuid: "Scene.old.Token.shared" }),
         });
         expect(message.update).toHaveBeenNthCalledWith(2, {
-            [`flags.sf2e-forge-custom.targetHelper.saves.${encodeTargetUuidSaveKey("Scene.new.Token.shared", 1, REVISION)}`]: expect.objectContaining({ targetUuid: "Scene.new.Token.shared", generation: 1 }),
+            [`flags.codex-foundry.targetHelper.saves.${encodeTargetUuidSaveKey("Scene.new.Token.shared", 1, REVISION)}`]: expect.objectContaining({ targetUuid: "Scene.new.Token.shared", generation: 1 }),
         });
     });
 
     it("deletes a hidden old-generation leaf before retargeting can surface it", async () => {
         const message = createMessage();
         const oldUuid = "Scene.old.Token.shared";
-        message.flags["sf2e-forge-custom"].targetHelper.targets = ["Scene.new.Token.shared"];
-        message.flags["sf2e-forge-custom"].targetHelper.saves = {
+        message.flags["codex-foundry"].targetHelper.targets = ["Scene.new.Token.shared"];
+        message.flags["codex-foundry"].targetHelper.saves = {
             [encodeTargetUuidSaveKey(oldUuid, 0, REVISION)]: { ...VALID_RESULT, targetUuid: oldUuid },
         };
 
@@ -175,10 +175,10 @@ describe("target-helper flags", () => {
         await updateTargets(message as unknown as ChatMessage.Implementation, [oldUuid]);
 
         expect(message.update).toHaveBeenCalledWith({
-            "flags.sf2e-forge-custom.targetHelper.targets": [oldUuid],
-            "flags.sf2e-forge-custom.targetHelper.generation": 1,
-            "flags.sf2e-forge-custom.targetHelper.revision": NEXT_REVISION,
-            [`flags.sf2e-forge-custom.targetHelper.saves.-=${encodeTargetUuidSaveKey(oldUuid, 0, REVISION)}`]: null,
+            "flags.codex-foundry.targetHelper.targets": [oldUuid],
+            "flags.codex-foundry.targetHelper.generation": 1,
+            "flags.codex-foundry.targetHelper.revision": NEXT_REVISION,
+            [`flags.codex-foundry.targetHelper.saves.-=${encodeTargetUuidSaveKey(oldUuid, 0, REVISION)}`]: null,
         });
     });
 
@@ -193,8 +193,8 @@ describe("target-helper flags", () => {
         await updateTargets(first as unknown as ChatMessage.Implementation, ["Scene.scene.Token.first"]);
         await updateTargets(second as unknown as ChatMessage.Implementation, ["Scene.scene.Token.second"]);
 
-        expect(first.update).toHaveBeenCalledWith(expect.objectContaining({ "flags.sf2e-forge-custom.targetHelper.revision": NEXT_REVISION }));
-        expect(second.update).toHaveBeenCalledWith(expect.objectContaining({ "flags.sf2e-forge-custom.targetHelper.revision": "33333333-3333-4333-8333-333333333333" }));
+        expect(first.update).toHaveBeenCalledWith(expect.objectContaining({ "flags.codex-foundry.targetHelper.revision": NEXT_REVISION }));
+        expect(second.update).toHaveBeenCalledWith(expect.objectContaining({ "flags.codex-foundry.targetHelper.revision": "33333333-3333-4333-8333-333333333333" }));
     });
 
     it("initializes newly normalized source flags at generation zero", () => {
@@ -206,7 +206,7 @@ describe("target-helper flags", () => {
         });
 
         expect(updateSource).toHaveBeenCalledWith({
-            "flags.sf2e-forge-custom.targetHelper": {
+            "flags.codex-foundry.targetHelper": {
                 type: "spell",
                 targets: ["Scene.scene.Token.target"],
                 generation: 0,
@@ -258,10 +258,10 @@ describe("target-helper flags", () => {
         await updateTargets(message as unknown as ChatMessage.Implementation, [publicUuid, hiddenUuid, unnoticedUuid]);
 
         expect(updateSource).toHaveBeenCalledWith(expect.objectContaining({
-            "flags.sf2e-forge-custom.targetHelper": expect.objectContaining({ targets: [publicUuid] }),
+            "flags.codex-foundry.targetHelper": expect.objectContaining({ targets: [publicUuid] }),
         }));
         expect(message.update).toHaveBeenCalledWith(expect.objectContaining({
-            "flags.sf2e-forge-custom.targetHelper.targets": [publicUuid],
+            "flags.codex-foundry.targetHelper.targets": [publicUuid],
         }));
     });
 

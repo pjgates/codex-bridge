@@ -32,10 +32,10 @@ const DEGREE_CSS: Record<DegreeOfSuccessIndex, string> = {
 };
 
 const DEGREE_LABEL_KEYS: Record<DegreeOfSuccessIndex, string> = {
-    0: "sf2e-forge-custom.prad.resultCriticalFailure",
-    1: "sf2e-forge-custom.prad.resultFailure",
-    2: "sf2e-forge-custom.prad.resultSuccess",
-    3: "sf2e-forge-custom.prad.resultCriticalSuccess",
+    0: "codex-foundry.prad.resultCriticalFailure",
+    1: "codex-foundry.prad.resultFailure",
+    2: "codex-foundry.prad.resultSuccess",
+    3: "codex-foundry.prad.resultCriticalSuccess",
 };
 
 /**
@@ -66,7 +66,7 @@ export async function createPradChatMessage(
     const npcEffectKeys = isArmorSave ? ARMOR_SAVE_NPC_EFFECT_KEYS : OVERCOME_NPC_EFFECT_KEYS;
     const npcEffectLabel = game.i18n!.localize(npcEffectKeys[result.npcDegree]);
     const playerDegreeLabel = game.i18n!.localize(DEGREE_LABEL_KEYS[result.playerDegree]);
-    const overcomeContext = isArmorSave ? undefined : game.i18n!.format("sf2e-forge-custom.prad.overcomeLabel", {
+    const overcomeContext = isArmorSave ? undefined : game.i18n!.format("codex-foundry.prad.overcomeLabel", {
         name: result.roller.name,
         npcName: result.npc.name,
         saveType: result.source,

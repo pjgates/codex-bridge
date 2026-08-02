@@ -1,5 +1,5 @@
 /**
- * Foundry VTT type augmentations for sf2e-forge-custom.
+ * Foundry VTT type augmentations for codex-foundry.
  *
  * Extends the fvtt-types definitions with module-specific settings,
  * flags, and SF2e/PF2e system data helpers.  These augmentations
@@ -15,15 +15,15 @@ declare global {
     // ─── Module Settings Registration ────────────────────────────────────
 
     interface SettingConfig {
-        "sf2e-forge-custom.enableCustomRules": boolean;
-        "sf2e-forge-custom.enableStatblockImporter": boolean;
-        "sf2e-forge-custom.enableTargetHelper": boolean;
-        "sf2e-forge-custom.heroicRerolls": boolean;
-        "sf2e-forge-custom.playersRollAllDice": boolean;
-        "sf2e-forge-custom.pradStrictDCs": boolean;
-        "sf2e-forge-custom.enableForgeSync": boolean;
-        "sf2e-forge-custom.forgeSyncPassphrase": string;
-        "sf2e-forge-custom.forgeSyncLastManifest": string;
+        "codex-foundry.enableCustomRules": boolean;
+        "codex-foundry.enableStatblockImporter": boolean;
+        "codex-foundry.enableTargetHelper": boolean;
+        "codex-foundry.heroicRerolls": boolean;
+        "codex-foundry.playersRollAllDice": boolean;
+        "codex-foundry.pradStrictDCs": boolean;
+        "codex-foundry.enableForgeSync": boolean;
+        "codex-foundry.forgeSyncPassphrase": string;
+        "codex-foundry.forgeSyncLastManifest": string;
     }
 
     // ─── Callback & Options Types ────────────────────────────────────────
@@ -259,20 +259,20 @@ declare global {
     }
 
     /** UUID-resolvable document types accepted by the public runtime API. */
-    type Sf2eResolvedUuidDocumentName = "Actor" | "ChatMessage" | "Item" | "Token";
+    type CodexFoundryResolvedUuidDocumentName = "Actor" | "ChatMessage" | "Item" | "Token";
 
-    type Sf2eResolvedUuidDocument =
+    type CodexFoundryResolvedUuidDocument =
         | (Actor.Implementation & { readonly documentName: "Actor" })
         | (ChatMessage.Implementation & { readonly documentName: "ChatMessage" })
         | (Item.Implementation & { readonly documentName: "Item" })
         | Sf2eTokenDocument;
 
     /** API attached to this module's Foundry package entry during init. */
-    type Sf2eForgeCustomApi = import("../api.js").Sf2eForgeCustomApi;
+    type CodexFoundryApi = import("../api.js").CodexFoundryApi;
 
-    interface Sf2eGameModule {
+    interface CodexFoundryGameModule {
         readonly active: boolean;
-        api?: Sf2eForgeCustomApi;
+        api?: CodexFoundryApi;
     }
 
     /** SF2e game.pf2e / game.sf2e namespace. */
@@ -306,7 +306,7 @@ declare global {
             targets?: Iterable<Sf2eUserTargetToken>;
             getActiveTokens?(): Sf2eActiveToken[];
         } | null;
-        modules?: ReadonlyMap<string, Sf2eGameModule>;
+        modules?: ReadonlyMap<string, CodexFoundryGameModule>;
         users?: {
             get(id: string): { isGM: boolean } | undefined;
         };
@@ -426,8 +426,8 @@ declare global {
 
 declare module "fvtt-types/configuration" {
     interface ModuleConfig {
-        "sf2e-forge-custom": {
-            api: Sf2eForgeCustomApi;
+        "codex-foundry": {
+            api: CodexFoundryApi;
         };
     }
 

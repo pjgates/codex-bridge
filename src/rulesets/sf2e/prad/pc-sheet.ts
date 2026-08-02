@@ -58,7 +58,7 @@ function injectArmorSave(root: HTMLElement, actor: Actor): void {
         // Replace the label
         const labelEl = acElement.querySelector<HTMLElement>('.sidebar_label');
         if (labelEl) {
-            labelEl.textContent = game.i18n!.localize("sf2e-forge-custom.prad.armorLabel");
+            labelEl.textContent = game.i18n!.localize("codex-foundry.prad.armorLabel");
             labelEl.classList.add("prad-modified");
         }
         
@@ -138,7 +138,7 @@ function injectOvercomeModifier(root: HTMLElement, actor: Actor): void {
             if (el.querySelector(".prad-overcome-badge")) continue;
 
             const badge = createModifierBadge(
-                game.i18n!.localize("sf2e-forge-custom.prad.overcomeCheck"),
+                game.i18n!.localize("codex-foundry.prad.overcomeCheck"),
                 modStr
             );
             badge.classList.add("prad-overcome-badge");

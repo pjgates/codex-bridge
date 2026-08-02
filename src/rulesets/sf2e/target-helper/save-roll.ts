@@ -59,7 +59,7 @@ function extractRollCallbackData(roll: Roll, msg: ChatMessage.Implementation | n
 const inFlightTokenRolls = new WeakMap<object, Set<string>>();
 
 function notifyPersistenceUnavailable(): void {
-    const key = "sf2e-forge-custom.targetHelper.cannotPersist";
+    const key = "codex-foundry.targetHelper.cannotPersist";
     ui.notifications?.error(game.i18n?.localize?.(key) ?? key);
 }
 
@@ -325,7 +325,7 @@ export async function rollArmorSave(options: ArmorSaveRollOptions): Promise<Roll
     const { actor, token, attackDC, weaponName, armorClass, origin = null, originToken = null, item = null } = options;
     if (armorClass !== undefined && !Number.isFinite(armorClass)) return null;
     if (token.actor !== actor || (originToken && (!origin || originToken.actor !== origin))) return null;
-    const armorSaveLabel = game.i18n!.localize("sf2e-forge-custom.prad.armorSave");
+    const armorSaveLabel = game.i18n!.localize("codex-foundry.prad.armorSave");
     const modifier = new pf2e.Modifier({
         label: armorSaveLabel,
         modifier: getArmorSaveModifier(armorClass ?? actor.armorClass?.value ?? getPcAC(actor)),
@@ -560,7 +560,7 @@ export async function rollSaveForActiveTokens(
 
     if (eligible.length === 0) {
         if (activeTokens.length > 0) {
-            ui.notifications!.info(game.i18n!.localize("sf2e-forge-custom.targetHelper.notInTargetList"));
+            ui.notifications!.info(game.i18n!.localize("codex-foundry.targetHelper.notInTargetList"));
         }
         return false;
     }
@@ -647,7 +647,7 @@ export async function rollOvercomeForTargets(
     const casterStatistic = findBestOvercomeStatistic(casterActor);
     if (!casterStatistic?.check?.roll) {
         console.warn(`${MODULE_ID} | PRAD Overcome: No rollable statistic found for caster`);
-        ui.notifications!.warn(game.i18n!.localize("sf2e-forge-custom.prad.noOvercomeStatistic"));
+        ui.notifications!.warn(game.i18n!.localize("codex-foundry.prad.noOvercomeStatistic"));
         return false;
     }
 
