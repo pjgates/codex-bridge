@@ -15,9 +15,6 @@ dist/
 .DS_Store
 Thumbs.db
 
-# Generated compendium packs
-packs/
-
 # Environment
 .env
 .env.local
