@@ -36,7 +36,7 @@ jobs:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
           TAG="$(jq -rn --arg tag "$GITHUB_REF_NAME" '$tag | @uri')"
-          DOWNLOAD="https://github.com/${{ github.repository }}/releases/download/${TAG}/sf2e-forge-custom.zip"
+          DOWNLOAD="https://github.com/${{ github.repository }}/releases/download/${TAG}/codex-foundry.zip"
 
           # Update version and download URL in module.json
           jq --arg ver "$VERSION" --arg dl "$DOWNLOAD" \
@@ -48,8 +48,8 @@ jobs:
 
       - name: Package release zip
         run: |
-          rm -f sf2e-forge-custom.zip
-          zip -r sf2e-forge-custom.zip \
+          rm -f codex-foundry.zip
+          zip -r codex-foundry.zip \
             dist/ \
             module.json \
             README.md \
@@ -60,6 +60,6 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            sf2e-forge-custom.zip
+            codex-foundry.zip
             module.json
           generate_release_notes: true

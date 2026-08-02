@@ -5,10 +5,10 @@ alwaysApply: true
 
 # Feature Folder Structure
 
-Each feature lives in `src/<feature>/` and co-locates all its assets:
+Each feature lives in `src/rulesets/sf2e/<feature>/` and co-locates all its assets:
 
 ```
-src/<feature>/
+src/rulesets/sf2e/<feature>/
   lang/en.json              # i18n strings (auto-merged into dist/lang/en.json at build)
   styles/<feature>.scss     # Scoped styles
   templates/<name>.hbs      # Handlebars templates
@@ -30,8 +30,8 @@ Cross-cutting utilities go in `src/shared/` (same sub-structure for lang/styles)
 
 ## i18n conventions
 
-- Nest all keys under `sf2e-forge-custom.<feature>.*`
-- Feature-specific settings go in the feature's `lang/en.json` under `sf2e-forge-custom.settings.*`
+- Nest all keys under `codex-foundry.<feature>.*`
+- Feature-specific settings go in the feature's `lang/en.json` under `codex-foundry.settings.*`
 - Shared keys (core settings, degree labels) go in `src/shared/lang/en.json`
 
 ## Template path constants

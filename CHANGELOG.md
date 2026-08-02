@@ -5,6 +5,45 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## 1.0.0
+
+**Breaking rename:** `sf2e-forge-custom` is now **codex-bridge** (module id `codex-foundry`, pipeline `codex-sync`).
+
+### Migration (one-time, ~5 minutes)
+
+1. **Before uninstalling** (old module still enabled), dump all old settings to a file. In the world, open the browser console and run:
+   ```js
+   const dump = {};
+   for (const key of game.settings.settings.keys()) {
+       if (!key.startsWith("sf2e-forge-custom.")) continue;
+       const short = key.split(".")[1];
+       try { dump[short] = game.settings.get("sf2e-forge-custom", short); } catch {}
+   }
+   console.log(JSON.stringify(dump));
+   ```
+   Copy the JSON somewhere safe. This captures all 7 world settings, the hidden `forgeSyncLastManifest`, and this browser's client passphrase. Without it, prior state is unrecoverable.
+2. In Foundry **Setup**, uninstall `SF2e Forge Custom Rules`.
+3. Install from the new manifest URL: `https://github.com/pjgates/codex-bridge/releases/latest/download/module.json`
+4. Enable **Codex Foundry** in your world, reload, then restore the dump in the console:
+   ```js
+   const dump = { /* pasted JSON */ };
+   const keyMap = { enableForgeSync: "enableCodexSync", forgeSyncPassphrase: "codexSyncPassphrase", forgeSyncLastManifest: "codexSyncLastManifest" };
+   for (const [short, value] of Object.entries(dump)) {
+       await game.settings.set("codex-foundry", keyMap[short] ?? short, value);
+   }
+   ```
+   Other GM browsers re-enter their own passphrase (client-scoped by design). An empty/absent `forgeSyncLastManifest` is fine to restore as-is.
+5. Run a Vault Sync from the sync dialog. Expect **0 creates and 0 stale**; updates only where art URLs changed. If you see creates, stop and report — do not apply.
+6. Historical chat cards keep working; their old flags are simply inert.
+
+Self-hosting note: pre-rename world documents referencing `forge-sync/art/...` keep resolving via a server-side compatibility symlink (see the restructure spec).
+
+### Changed
+
+- Repository renamed to `pjgates/codex-bridge`; release zip is now `codex-foundry.zip`.
+- Push pipeline: `forge-sync.config.json` → `codex-sync.config.json`, `FORGE_SYNC_PASSPHRASE` → `CODEX_SYNC_PASSPHRASE`, remote dir `Data/forge-sync/` → `Data/codex-sync/`.
+- SF2e houserule features moved to `src/rulesets/sf2e/`; node-side tests to `tests/node/`; push CLI to `sync/`.
+
 ## 0.3.0 - 2026-08-02
 
 ### Added
