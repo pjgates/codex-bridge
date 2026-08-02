@@ -21,10 +21,10 @@ Cross-cutting utilities go in `src/shared/` (same sub-structure for lang/styles)
 
 ## Adding a new feature
 
-1. Create `src/<feature>/` with the sub-structure above
-2. Add `@use '../src/<feature>/styles/<feature>'` to `styles/module.scss`
+1. Create `src/rulesets/sf2e/<feature>/` with the sub-structure above
+2. Add `@use '../src/rulesets/sf2e/<feature>/styles/<feature>'` to `styles/module.scss`
 3. Add a static-copy target in `vite.config.ts`:
-   `{ src: "src/<feature>/templates/**/*", dest: "templates/<feature>" }`
+   `{ src: "src/rulesets/sf2e/<feature>/templates/**/*", dest: "templates/<feature>" }`
 4. Lang merging is automatic (the build plugin globs `src/**/lang/*.json`)
 5. Wire the feature's init/ready exports into `src/hooks/init.ts` / `src/hooks/ready.ts`
 
