@@ -51,7 +51,7 @@ https://github.com/pjgates/codex-bridge/releases/latest/download/module.json
 
 ## Configuration
 
-All settings are world-scoped (GM only) and found under **Module Settings > Codex Foundry**.
+Found under **Module Settings > Codex Foundry**. All settings are world-scoped (GM only) except the Vault Sync Passphrase, which is client-scoped by design — it lives in the GM's browser localStorage and is never replicated to other clients.
 
 | Setting | Description | Default |
 |---|---|---|
@@ -59,8 +59,10 @@ All settings are world-scoped (GM only) and found under **Module Settings > Code
 | **Enable Target Helper** | Adds per-target rows to chat cards. Requires reload. | On |
 | **Heroic Rerolls** | Raises Hero Point d20 rerolls below 10 to 10. Requires reload. | Off |
 | **Players Roll All Dice** | Enables the PRAD variant. Requires Target Helper to be on. | Off |
-| **Enable Vault Sync** | Fetch vault content pushed to `Data/codex-sync`. Requires reload. | Off |
-| **Vault Sync Passphrase** | Decrypts the pushed payload. | — |
+| **Strict DC Mode (Exact Probabilities)** | Uses DC = 12 + modifier instead of 11 + modifier under PRAD, exactly preserving original probabilities. | Off |
+| **Statblock Importer** | Adds an Import Statblock button to the Actors sidebar (GM only). | On |
+| **Enable Vault Sync** | Fetch vault content pushed to `Data/codex-sync`. Requires reload. | On |
+| **Vault Sync Passphrase** | Decrypts the pushed payload. Client-scoped (this browser only). | — |
 
 ## Development
 

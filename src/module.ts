@@ -1,9 +1,9 @@
 /**
- * SF2e Forge Custom Rules
+ * Codex Foundry
  * Main entry point for the Foundry VTT module.
  *
- * This module adds custom rules and homebrew modifications
- * to the Starfinder Second Edition system.
+ * Codex bridge for Foundry VTT: vault content sync plus
+ * ruleset houserules (currently Starfinder Second Edition).
  */
 
 import { onInit } from "./hooks/init.js";
@@ -18,13 +18,13 @@ import { MODULE_ID } from "./constants.js";
 // ─── Initialization ──────────────────────────────────────────────────────────
 
 Hooks.once("init", () => {
-    console.log(`${MODULE_ID} | Initializing SF2e Forge Custom Rules`);
+    console.log(`${MODULE_ID} | Initializing Codex Foundry`);
     installRuntimeApi();
     onInit();
 });
 
 Hooks.once("ready", () => {
-    console.log(`${MODULE_ID} | SF2e Forge Custom Rules ready`);
+    console.log(`${MODULE_ID} | Codex Foundry ready`);
     onReady();
 });
 
