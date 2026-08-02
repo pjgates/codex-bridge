@@ -70,6 +70,7 @@ Found under **Module Settings > Codex Foundry**. All settings are world-scoped (
 
 - Node.js 22.13+
 - A local Foundry VTT installation
+- `gitleaks` (e.g. `brew install gitleaks`) — the pre-commit hook in `.githooks/` (auto-wired by `npm install`) blocks sensitive paths and scans staged changes for secrets; this repo is public.
 
 ### Setup
 

@@ -4,6 +4,7 @@
     "description": "Codex bridge: Obsidian↔Foundry VTT content sync plus ruleset houserules",
     "type": "module",
     "scripts": {
+        "prepare": "git config core.hooksPath .githooks",
         "push": "tsx sync/push.ts push",
         "build": "vite build",
         "watch": "vite build --watch",

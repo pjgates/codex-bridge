@@ -1,0 +1,19 @@
+#!/bin/sh
+# pre-commit: leak guard for this PUBLIC repo.
+# 1. Hard-block paths that must never be committed (even via git add -f; .gitignore is only the first layer).
+# 2. Scan staged changes with gitleaks.
+# Installed via `core.hooksPath` (npm `prepare` wires it on install).
+
+blocked='^\.env($|\.)|^codex-sync\.config\.json$|^forge-sync\.config\.json$|^payload\.enc$|^sync-out/'
+hits=$(git diff --cached --name-only --diff-filter=ACMR | grep -E "$blocked")
+if [ -n "$hits" ]; then
+    echo "pre-commit: BLOCKED sensitive path staged (never committed by design):" >&2
+    echo "$hits" >&2
+    exit 1
+fi
+
+if command -v gitleaks >/dev/null 2>&1; then
+    gitleaks git --staged --redact --exit-code 1 . || exit 1
+else
+    echo "pre-commit: gitleaks not installed, skipping secret scan (brew install gitleaks)" >&2
+fi
