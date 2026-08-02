@@ -21,9 +21,9 @@ declare global {
         "codex-foundry.heroicRerolls": boolean;
         "codex-foundry.playersRollAllDice": boolean;
         "codex-foundry.pradStrictDCs": boolean;
-        "codex-foundry.enableForgeSync": boolean;
-        "codex-foundry.forgeSyncPassphrase": string;
-        "codex-foundry.forgeSyncLastManifest": string;
+        "codex-foundry.enableCodexSync": boolean;
+        "codex-foundry.codexSyncPassphrase": string;
+        "codex-foundry.codexSyncLastManifest": string;
     }
 
     // ─── Callback & Options Types ────────────────────────────────────────

@@ -43,6 +43,7 @@ interface SyncModuleFlags {
 type ForgeDocument = Actor.Implementation | JournalEntry.Implementation;
 
 export function rewriteLinkPlaceholders(html: string, journalIdBySyncId: Map<string, string>): string {
+    // ponytail: @ForgeSync keeps its pre-rename wire name — the old module reads new payloads until every world is migrated; never persists in world docs
     return html.replace(/@ForgeSync\[([^\]]+)\]\{([^}]*)\}/g, (_all, syncId: string, display: string) => {
         const id = journalIdBySyncId.get(syncId);
         return id ? `@UUID[JournalEntry.${id}]{${display}}` : display;
@@ -177,8 +178,8 @@ export function journalAdoptUpdateData(syncId: string, syncKind: SyncKind): Reco
 /** Vault-owned fields written on EVERY people-actor sync (update-safe: never clobbers GM token tweaks like actorLink/disposition; note img is vault-owned — manual GM art on a placeholder actor reverts on the next content sync; set `portrait:` in the vault instead). */
 export function peopleActorVaultFields(entity: SyncEntity): Record<string, unknown> {
     const MYSTERY_MAN = "icons/svg/mystery-man.svg";
-    const img = entity.portrait ? `forge-sync/${entity.portrait}` : MYSTERY_MAN;
-    const ringSubjectTexture = entity.subject ? `forge-sync/${entity.subject}` : MYSTERY_MAN;
+    const img = entity.portrait ? `codex-sync/${entity.portrait}` : MYSTERY_MAN;
+    const ringSubjectTexture = entity.subject ? `codex-sync/${entity.subject}` : MYSTERY_MAN;
     return {
         name: entity.name,
         img,
@@ -219,7 +220,7 @@ function buildTranslatedCreature(creature: SyncCreature): Record<string, unknown
 }
 
 function creaturePortrait(creature: SyncCreature): string | undefined {
-    return creature.portrait ? `forge-sync/${creature.portrait}` : undefined;
+    return creature.portrait ? `codex-sync/${creature.portrait}` : undefined;
 }
 
 function getManagedDocument(docType: ManagedDocType, id: string): ForgeDocument | undefined {

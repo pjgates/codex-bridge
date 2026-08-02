@@ -88,10 +88,10 @@ describe("peopleActor placeholder portraits", () => {
         expect((create.prototypeToken as { texture: { src: string } }).texture.src).toBe("icons/svg/mystery-man.svg");
     });
 
-    it("uses forge-sync paths for portrait-bearing Character create data", () => {
+    it("uses codex-sync paths for portrait-bearing Character create data", () => {
         const create = peopleActorCreateData(randall);
-        expect(create.img).toBe("forge-sync/art/fs-randall1.webp");
-        expect((create.prototypeToken as { texture: { src: string } }).texture.src).toBe("forge-sync/art/fs-randall1.webp");
+        expect(create.img).toBe("codex-sync/art/fs-randall1.webp");
+        expect((create.prototypeToken as { texture: { src: string } }).texture.src).toBe("codex-sync/art/fs-randall1.webp");
     });
 
     it("uses mystery-man for portrait-less Character update data", () => {
@@ -105,7 +105,7 @@ describe("peopleActorCreateData", () => {
     it("composes full prototypeToken on create but vault-only on update", () => {
         const create = peopleActorCreateData(randall);
         expect(create.prototypeToken).toEqual({
-            texture: { src: "forge-sync/art/fs-randall1.webp" },
+            texture: { src: "codex-sync/art/fs-randall1.webp" },
             ring: {
                 enabled: true,
                 subject: { texture: "icons/svg/mystery-man.svg", scale: 1 },
@@ -116,7 +116,7 @@ describe("peopleActorCreateData", () => {
 
         const update = peopleActorUpdateData(randall);
         expect(update.prototypeToken).toEqual({
-            texture: { src: "forge-sync/art/fs-randall1.webp" },
+            texture: { src: "codex-sync/art/fs-randall1.webp" },
             ring: {
                 enabled: true,
                 subject: { texture: "icons/svg/mystery-man.svg", scale: 1 },
@@ -137,7 +137,7 @@ describe("peopleActor ring subject art", () => {
         };
         expect(token.ring.enabled).toBe(true);
         expect(token.ring.subject).toEqual({
-            texture: "forge-sync/art/fs-subj0001-subject.png",
+            texture: "codex-sync/art/fs-subj0001-subject.png",
             scale: 1,
         });
         expect(token.texture.src).toBe(MYSTERY_MAN);
@@ -149,7 +149,7 @@ describe("peopleActor ring subject art", () => {
             texture: { src: string };
             ring: { subject: { texture: string } };
         };
-        expect(token.texture.src).toBe("forge-sync/art/fs-randall1.webp");
+        expect(token.texture.src).toBe("codex-sync/art/fs-randall1.webp");
         expect(token.ring.subject.texture).toBe(MYSTERY_MAN);
         expect(token.ring.subject.texture).not.toBe(token.texture.src);
     });

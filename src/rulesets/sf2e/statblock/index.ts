@@ -1,6 +1,6 @@
 /**
  * Statblock core — browser-safe parsing, enrichment, and actor building
- * shared by forge-sync vault parsing and the
+ * shared by codex-sync vault parsing and the
  * runtime statblock importer feature.
  *
  * Nothing in this feature may import Node builtins or Node-only packages;

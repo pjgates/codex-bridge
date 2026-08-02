@@ -20,7 +20,7 @@ export async function stageSyncOut(result: BuildResult, blob: string, outDir: st
 }
 
 export async function deploy(outDir: string, remote: RemoteConfig, run: RunCommand = defaultRun): Promise<void> {
-    const target = `${remote.dataPath}/forge-sync`;
+    const target = `${remote.dataPath}/codex-sync`;
     await run("ssh", [remote.host, "mkdir", "-p", `${target}/art`]);
     // Art first, payload last — a client never sees a payload referencing missing art.
     await run("rsync", ["-az", "--delete", `${outDir}/art/`, `${remote.host}:${target}/art/`]);

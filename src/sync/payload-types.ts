@@ -12,9 +12,9 @@ export interface SyncEntity {
     /** HTML with @ForgeSync[<syncId>]{Display} link placeholders */
     playerHtml: string;
     gmHtml: string | null;
-    /** Path relative to Data/forge-sync/, e.g. "art/fs-7k2m9p.webp"; null = no portrait */
+    /** Path relative to Data/codex-sync/, e.g. "art/fs-7k2m9p.webp"; null = no portrait */
     portrait: string | null;
-    /** Path relative to Data/forge-sync/, e.g. "art/fs-7k2m9p-subject.png"; null = ring uses mystery-man */
+    /** Path relative to Data/codex-sync/, e.g. "art/fs-7k2m9p-subject.png"; null = ring uses mystery-man */
     subject: string | null;
     contentHash: string;
 }

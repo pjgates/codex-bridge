@@ -30,7 +30,7 @@ function hash(value: string): string {
 /**
  * Content resolution, in order:
  * 1. Embeds `![[file.webp|200]]` — every image embed in synced prose is an art dependency: staged
- *    (deduped with portraits) and rewritten to `<img src="forge-sync/art/…">`. Unsupported embeds
+ *    (deduped with portraits) and rewritten to `<img src="codex-sync/art/…">`. Unsupported embeds
  *    (non-image extensions, e.g. `![[note.md]]`) are stripped with a build warning; a missing image
  *    file fails the build. `portrait:` frontmatter drives Actor/token texture art; `subject:` drives ring subject art.
  * 2. Links `[[slug]]` / `[[slug|Display]]` → `@ForgeSync[syncId]{Display}` for synced ENTITY slugs
@@ -44,7 +44,7 @@ export function resolveLinkPlaceholders(
 ): string {
     const withoutEmbeds = markdown.replace(/!\[\[([^\]|]+?)(?:\|[^\]]*)?\]\]/g, (_all, file: string) => {
         const staged = stagedArtByFilename.get(file.trim());
-        return staged ? `<img src="forge-sync/${staged}" />` : "";
+        return staged ? `<img src="codex-sync/${staged}" />` : "";
     });
     return withoutEmbeds.replace(/\[\[([^\]|]+?)(?:\|([^\]]*))?\]\]/g, (_all, slug: string, display?: string) => {
         const text = display?.trim() || slug.trim();

@@ -1,8 +1,8 @@
-<div class="forge-sync-dialog">
+<div class="codex-sync-dialog">
     {{#if report}}
-        <section class="forge-sync-report">
+        <section class="codex-sync-report">
             <h3>{{localize "codex-foundry.sync.reportTitle"}}</h3>
-            <ul class="forge-sync-report-counts">
+            <ul class="codex-sync-report-counts">
                 <li>{{localize "codex-foundry.sync.reportCreated" count=report.created}}</li>
                 <li>{{localize "codex-foundry.sync.reportUpdated" count=report.updated}}</li>
                 <li>{{localize "codex-foundry.sync.reportAdopted" count=report.adopted}}</li>
@@ -11,7 +11,7 @@
             </ul>
             {{#if report.failed.length}}
                 <h4>{{localize "codex-foundry.sync.reportFailuresTitle"}}</h4>
-                <ul class="forge-sync-report-failures">
+                <ul class="codex-sync-report-failures">
                     {{#each report.failed}}
                         <li><strong>{{name}}</strong> — {{error}}</li>
                     {{/each}}
@@ -20,18 +20,18 @@
         </section>
     {{else}}
         {{#if unchanged}}
-            <p class="forge-sync-unchanged">{{localize "codex-foundry.sync.unchanged" count=unchanged}}</p>
+            <p class="codex-sync-unchanged">{{localize "codex-foundry.sync.unchanged" count=unchanged}}</p>
         {{/if}}
 
         {{#if adopt.length}}
-            <section class="forge-sync-section">
+            <section class="codex-sync-section">
                 <h3>{{localize "codex-foundry.sync.sectionAdopt"}}</h3>
                 <ul>
                     {{#each adopt}}
                         <li>
                             <label>
                                 <input type="checkbox" name="adopt" value="{{key}}" checked>
-                                {{name}} <span class="forge-sync-meta">({{docType}})</span>
+                                {{name}} <span class="codex-sync-meta">({{docType}})</span>
                             </label>
                         </li>
                     {{/each}}
@@ -40,29 +40,29 @@
         {{/if}}
 
         {{#if create.length}}
-            <section class="forge-sync-section">
+            <section class="codex-sync-section">
                 <h3>{{localize "codex-foundry.sync.sectionCreate"}}</h3>
                 <ul>
                     {{#each create}}
-                        <li>{{name}} <span class="forge-sync-meta">({{docType}})</span></li>
+                        <li>{{name}} <span class="codex-sync-meta">({{docType}})</span></li>
                     {{/each}}
                 </ul>
             </section>
         {{/if}}
 
         {{#if update.length}}
-            <section class="forge-sync-section">
+            <section class="codex-sync-section">
                 <h3>{{localize "codex-foundry.sync.sectionUpdate"}}</h3>
                 <ul>
                     {{#each update}}
-                        <li>{{name}} <span class="forge-sync-meta">({{docType}})</span></li>
+                        <li>{{name}} <span class="codex-sync-meta">({{docType}})</span></li>
                     {{/each}}
                 </ul>
             </section>
         {{/if}}
 
         {{#if reimport.length}}
-            <section class="forge-sync-section">
+            <section class="codex-sync-section">
                 <h3>{{localize "codex-foundry.sync.sectionReimport"}}</h3>
                 <ul>
                     {{#each reimport}}
@@ -71,8 +71,8 @@
                                 <input type="checkbox" name="reimport" value="{{key}}">
                                 {{name}}
                                 {{#if modifiedInFoundry}}
-                                    <i class="fa-solid fa-triangle-exclamation forge-sync-warning" title="{{localize "codex-foundry.sync.modifiedInFoundry"}}"></i>
-                                    <span class="forge-sync-warning-label">{{localize "codex-foundry.sync.modifiedInFoundry"}}</span>
+                                    <i class="fa-solid fa-triangle-exclamation codex-sync-warning" title="{{localize "codex-foundry.sync.modifiedInFoundry"}}"></i>
+                                    <span class="codex-sync-warning-label">{{localize "codex-foundry.sync.modifiedInFoundry"}}</span>
                                 {{/if}}
                             </label>
                         </li>
@@ -82,7 +82,7 @@
         {{/if}}
 
         {{#if stale.length}}
-            <section class="forge-sync-section">
+            <section class="codex-sync-section">
                 <h3>{{localize "codex-foundry.sync.sectionStale"}}</h3>
                 <ul>
                     {{#each stale}}
@@ -98,10 +98,10 @@
         {{/if}}
 
         {{#unless hasWork}}
-            <p class="forge-sync-empty">{{localize "codex-foundry.sync.nothingToApply"}}</p>
+            <p class="codex-sync-empty">{{localize "codex-foundry.sync.nothingToApply"}}</p>
         {{/unless}}
 
-        <footer class="forge-sync-footer">
+        <footer class="codex-sync-footer">
             <button type="submit" {{#unless hasWork}}disabled{{/unless}}>
                 <i class="fa-solid fa-check"></i> {{localize "codex-foundry.sync.apply"}}
             </button>

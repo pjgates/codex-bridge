@@ -18,5 +18,5 @@ Thumbs.db
 # Environment
 .env
 .env.local
-forge-sync.config.json
+codex-sync.config.json
 sync-out/

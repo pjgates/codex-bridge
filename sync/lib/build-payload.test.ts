@@ -7,7 +7,7 @@ import { buildPayload } from "./build-payload.js";
 let vault: string;
 
 beforeEach(async () => {
-    vault = await mkdtemp(path.join(os.tmpdir(), "forge-sync-"));
+    vault = await mkdtemp(path.join(os.tmpdir(), "codex-sync-"));
     await mkdir(path.join(vault, "codex/the-forge/entities"), { recursive: true });
     await mkdir(path.join(vault, "codex/the-forge/bestiary"), { recursive: true });
     await mkdir(path.join(vault, "codex/assets"), { recursive: true });
@@ -170,8 +170,8 @@ syncId: fs-rand0001
         const result = await buildPayload({ vaultPath: vault, campaign: "the-forge" });
         const randall = result.payload.entities.find((entry) => entry.slug === "randall")!;
 
-        expect(randall.playerHtml).toContain('<img src="forge-sync/art/');
-        expect(randall.playerHtml).not.toMatch(/(?<!<img src="forge-sync\/art\/[^"]*")randall-20260726\.webp/);
+        expect(randall.playerHtml).toContain('<img src="codex-sync/art/');
+        expect(randall.playerHtml).not.toMatch(/(?<!<img src="codex-sync\/art\/[^"]*")randall-20260726\.webp/);
         expect(randall.playerHtml).not.toContain("![[");
         expect(randall.playerHtml).not.toMatch(/(?<!<img[^>]*>)\s*!/);
     });
@@ -193,7 +193,7 @@ syncId: fs-guide001
         const guide = result.payload.entities.find((entry) => entry.slug === "guide")!;
 
         expect(result.artFiles.get(path.join(vault, "codex/assets/town-map.webp"))).toBe("art/town-map.webp");
-        expect(guide.playerHtml).toContain('src="forge-sync/art/town-map.webp"');
+        expect(guide.playerHtml).toContain('src="codex-sync/art/town-map.webp"');
     });
 
     it("strips unsupported embeds with a warning", async () => {
@@ -312,7 +312,7 @@ syncId: fs-ring0001
         const ring = result.payload.entities.find((entry) => entry.slug === "ring")!;
         expect(ring.subject).toBe("art/fs-ring0001-subject.png");
         expect(result.artFiles.get(path.join(vault, "codex/assets/shared-subject.png"))).toBe("art/fs-ring0001-subject.png");
-        expect(ring.playerHtml).toContain('src="forge-sync/art/fs-ring0001-subject.png"');
+        expect(ring.playerHtml).toContain('src="codex-sync/art/fs-ring0001-subject.png"');
         expect(result.artFiles.size).toBe(1);
     });
 });
