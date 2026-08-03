@@ -5,7 +5,7 @@ import {
     TFile,
     setIcon,
 } from "obsidian";
-import type { CardSettings } from "./defaults.js";
+import { clampDescriptionLines, type CardSettings } from "./defaults.js";
 import { splitSecret } from "./core/secretSplit.js";
 import type { EntityRecord } from "./core/roster.js";
 import type { RevealState } from "./revealState.js";
@@ -106,7 +106,10 @@ export async function renderCard(
     renderChips(bodyEl, record, ctx.settings.excludeTags);
 
     const descEl = bodyEl.createDiv({ cls: `${CARD_CLASS}__desc`, text: split.description });
-    descEl.style.setProperty("-webkit-line-clamp", String(ctx.settings.descriptionLines));
+    descEl.style.setProperty(
+        "-webkit-line-clamp",
+        String(clampDescriptionLines(ctx.settings.descriptionLines)),
+    );
     descEl.style.setProperty("display", "-webkit-box");
     descEl.style.setProperty("-webkit-box-orient", "vertical");
     descEl.style.setProperty("overflow", "hidden");

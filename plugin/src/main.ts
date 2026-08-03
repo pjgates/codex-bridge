@@ -1,8 +1,16 @@
 import { Plugin, TFile } from "obsidian";
-import { DEFAULT_CARD_SETTINGS } from "./defaults.js";
+import {
+    DEFAULT_CARD_SETTINGS,
+    normalizeCardSettings,
+    type CardSettings,
+} from "./defaults.js";
 import { EntityIndex } from "./entityIndex.js";
-import { registerNoteCardPostProcessor } from "./noteCardPostProcessor.js";
+import {
+    registerNoteCardPostProcessor,
+    refreshNoteCardPreviews,
+} from "./noteCardPostProcessor.js";
 import { SessionRevealState } from "./revealState.js";
+import { CodexDashboardSettingTab } from "./settings.js";
 import {
     activateCodexDashboard,
     CodexDashboardView,
@@ -15,6 +23,8 @@ export default class CodexDashboardPlugin extends Plugin {
     readonly cardSettings = { ...DEFAULT_CARD_SETTINGS };
 
     async onload(): Promise<void> {
+        await this.loadSettings();
+
         this.entityIndex = new EntityIndex(this.app);
 
         this.registerIndexMaintenanceEvents();
@@ -37,6 +47,8 @@ export default class CodexDashboardPlugin extends Plugin {
             (leaf) => new CodexDashboardView(leaf, this),
         );
 
+        this.addSettingTab(new CodexDashboardSettingTab(this.app, this));
+
         this.addRibbonIcon("users", "Open Codex Dashboard", () => {
             void activateCodexDashboard(this);
         });
@@ -54,6 +66,34 @@ export default class CodexDashboardPlugin extends Plugin {
 
     onunload(): void {
         this.entityIndex?.destroy();
+    }
+
+    async loadSettings(): Promise<void> {
+        const stored = await this.loadData();
+        Object.assign(this.cardSettings, normalizeCardSettings(stored));
+    }
+
+    async saveSettings(): Promise<void> {
+        const payload: CardSettings = {
+            showNoteCards: this.cardSettings.showNoteCards,
+            excludeTags: [...this.cardSettings.excludeTags],
+            descriptionLines: this.cardSettings.descriptionLines,
+        };
+
+        Object.assign(this.cardSettings, payload);
+        await this.saveData(payload);
+        this.refreshCardSurfaces();
+    }
+
+    private refreshCardSurfaces(): void {
+        refreshNoteCardPreviews(this.app, this.cardSettings);
+
+        for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_CODEX_DASHBOARD)) {
+            const view = leaf.view;
+            if (view instanceof CodexDashboardView) {
+                view.refreshFromSettings();
+            }
+        }
     }
 
     private registerIndexMaintenanceEvents(): void {

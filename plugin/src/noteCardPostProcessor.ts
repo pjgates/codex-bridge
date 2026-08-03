@@ -1,11 +1,18 @@
-import { type MarkdownPostProcessorContext, Component, Plugin, TFile } from "obsidian";
+import {
+    type App,
+    type MarkdownPostProcessorContext,
+    Component,
+    MarkdownView,
+    Plugin,
+    TFile,
+} from "obsidian";
 import { renderCard, type CardRenderContext } from "./card.js";
 import type { CardSettings } from "./defaults.js";
 import { buildEntityRecord, type EntityIndex } from "./entityIndex.js";
 import type { RevealState } from "./revealState.js";
 
-const CARD_HOST_CLASS = "codex-dashboard-card-host";
-const DOC_MARKER_ATTR = "data-codex-dashboard-card-injected";
+export const CARD_HOST_CLASS = "codex-dashboard-card-host";
+export const DOC_MARKER_ATTR = "data-codex-dashboard-card-injected";
 
 export interface NoteCardPostProcessorOptions {
     entityIndex: EntityIndex;
@@ -81,6 +88,34 @@ export function registerNoteCardPostProcessor(
         };
 
         await renderCard(host, record, cardCtx);
+    });
+}
+
+export function refreshNoteCardPreviews(
+    app: App,
+    settings: Pick<CardSettings, "showNoteCards">,
+): void {
+    app.workspace.iterateAllLeaves((leaf) => {
+        const view = leaf.view;
+        if (!(view instanceof MarkdownView)) {
+            return;
+        }
+
+        const previewEl = view.containerEl.querySelector(
+            ".markdown-preview-view",
+        ) as HTMLElement | null;
+        if (!previewEl) {
+            return;
+        }
+
+        previewEl.querySelectorAll(`.${CARD_HOST_CLASS}`).forEach((host) => {
+            host.remove();
+        });
+        previewEl.removeAttribute(DOC_MARKER_ATTR);
+
+        if (settings.showNoteCards) {
+            view.previewMode.rerender(true);
+        }
     });
 }
 

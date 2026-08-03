@@ -85,6 +85,10 @@ export class CodexDashboardView extends ItemView {
         this.ui = null;
     }
 
+    refreshFromSettings(): void {
+        this.refresh();
+    }
+
     private buildUi(container: HTMLElement): ViewUi {
         container.empty();
         const root = container.createDiv({ cls: PANEL_CLASS });
