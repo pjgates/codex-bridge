@@ -17,21 +17,70 @@ export interface CardRenderContext {
     revealState: RevealState;
     settings: Pick<CardSettings, "excludeTags" | "descriptionLines">;
     addChild: (child: MarkdownRenderChild) => void;
+    removeChild: (child: MarkdownRenderChild) => void;
     onRevealChange?: () => void;
 }
 
 const CARD_CLASS = "codex-dashboard-card";
 const PORTRAIT_WIKILINK_RE = /^\[\[([^\]|]+?)(?:\|[^\]]*)?\]\]$/;
 
+interface CardRuntimeState {
+    generation: number;
+    secretChild: MarkdownRenderChild | null;
+}
+
+const cardRuntime = new WeakMap<HTMLElement, CardRuntimeState>();
+
+function getCardRuntime(el: HTMLElement): CardRuntimeState {
+    let runtime = cardRuntime.get(el);
+    if (!runtime) {
+        runtime = { generation: 0, secretChild: null };
+        cardRuntime.set(el, runtime);
+    }
+    return runtime;
+}
+
+function bumpCardGeneration(el: HTMLElement): number {
+    const runtime = getCardRuntime(el);
+    runtime.generation += 1;
+    return runtime.generation;
+}
+
+function isCardRenderStale(el: HTMLElement, generation: number): boolean {
+    if (!el.isConnected) {
+        return true;
+    }
+
+    const runtime = cardRuntime.get(el);
+    return !runtime || runtime.generation !== generation;
+}
+
+function unloadSecretRenderChild(el: HTMLElement, ctx: CardRenderContext): void {
+    const runtime = cardRuntime.get(el);
+    if (!runtime?.secretChild) {
+        return;
+    }
+
+    runtime.secretChild.unload();
+    ctx.removeChild(runtime.secretChild);
+    runtime.secretChild = null;
+}
+
 export async function renderCard(
     el: HTMLElement,
     record: EntityRecord,
     ctx: CardRenderContext,
 ): Promise<void> {
+    const generation = bumpCardGeneration(el);
+    unloadSecretRenderChild(el, ctx);
     el.empty();
     el.addClass(CARD_CLASS);
 
     const fileText = await ctx.app.vault.cachedRead(ctx.file);
+    if (isCardRenderStale(el, generation)) {
+        return;
+    }
+
     const split = splitSecret(fileText);
     const revealed = ctx.revealState.isRevealed(ctx.sourcePath);
     const hasSecret = split.secret !== null;
@@ -90,15 +139,25 @@ export async function renderCard(
             secretEl.toggle(isRevealed);
         };
 
-                const setRevealed = async (next: boolean): Promise<void> => {
-                    ctx.revealState.setRevealed(ctx.sourcePath, next);
-                    syncRevealUi();
-                    if (next && split.secret) {
-                        await renderSecretBlock(secretEl, split.secret, ctx);
-                    } else {
-                        secretEl.empty();
-                    }
-                };
+        const setRevealed = async (next: boolean): Promise<void> => {
+            const opGeneration = bumpCardGeneration(el);
+            ctx.revealState.setRevealed(ctx.sourcePath, next);
+
+            if (isCardRenderStale(el, opGeneration)) {
+                return;
+            }
+
+            syncRevealUi();
+
+            if (next && split.secret) {
+                await renderSecretBlock(el, secretEl, split.secret, ctx, setRevealed);
+            } else {
+                unloadSecretRenderChild(el, ctx);
+                if (!isCardRenderStale(el, opGeneration)) {
+                    secretEl.empty();
+                }
+            }
+        };
 
         revealBtn.addEventListener("click", () => {
             void setRevealed(!ctx.revealState.isRevealed(ctx.sourcePath));
@@ -106,7 +165,10 @@ export async function renderCard(
 
         syncRevealUi();
         if (revealed && split.secret) {
-            await renderSecretBlock(secretEl, split.secret, ctx);
+            await renderSecretBlock(el, secretEl, split.secret, ctx, setRevealed);
+            if (isCardRenderStale(el, generation)) {
+                return;
+            }
         }
     }
 }
@@ -181,11 +243,19 @@ function renderChips(bodyEl: HTMLElement, record: EntityRecord, excludeTags: str
 }
 
 async function renderSecretBlock(
+    cardEl: HTMLElement,
     secretEl: HTMLElement,
     secretMarkdown: string,
     ctx: CardRenderContext,
+    setRevealed: (next: boolean) => Promise<void>,
 ): Promise<void> {
+    const generation = bumpCardGeneration(cardEl);
+    unloadSecretRenderChild(cardEl, ctx);
     secretEl.empty();
+
+    if (isCardRenderStale(cardEl, generation)) {
+        return;
+    }
 
     const headerEl = secretEl.createDiv({ cls: `${CARD_CLASS}__secret-header` });
     headerEl.createSpan({ text: "GM ONLY — REVEALED" });
@@ -197,14 +267,19 @@ async function renderSecretBlock(
     setIcon(hideBtn.createSpan(), "eye-off");
     hideBtn.createSpan({ text: "Hide" });
     hideBtn.addEventListener("click", () => {
-        ctx.revealState.setRevealed(ctx.sourcePath, false);
-        ctx.onRevealChange?.();
+        void setRevealed(false);
     });
 
     const bodyEl = secretEl.createDiv({ cls: `${CARD_CLASS}__secret-body` });
     const renderChild = new MarkdownRenderChild(bodyEl);
+    getCardRuntime(cardEl).secretChild = renderChild;
     ctx.addChild(renderChild);
+
     await MarkdownRenderer.renderMarkdown(secretMarkdown, bodyEl, ctx.sourcePath, renderChild);
+    if (isCardRenderStale(cardEl, generation)) {
+        unloadSecretRenderChild(cardEl, ctx);
+        return;
+    }
 
     const footerEl = secretEl.createDiv({ cls: `${CARD_CLASS}__secret-footer` });
     const openLink = footerEl.createEl("a", {

@@ -1,4 +1,4 @@
-import { type MarkdownPostProcessorContext, Plugin, TFile } from "obsidian";
+import { type MarkdownPostProcessorContext, Component, Plugin, TFile } from "obsidian";
 import { renderCard, type CardRenderContext } from "./card.js";
 import type { CardSettings } from "./defaults.js";
 import { buildEntityRecord, type EntityIndex } from "./entityIndex.js";
@@ -77,9 +77,7 @@ export function registerNoteCardPostProcessor(
                 descriptionLines: options.settings.descriptionLines,
             },
             addChild: (child) => ctx.addChild(child),
-        };
-        cardCtx.onRevealChange = () => {
-            void renderCard(host, record, cardCtx);
+            removeChild: (child) => (ctx as unknown as Component).removeChild(child),
         };
 
         await renderCard(host, record, cardCtx);
