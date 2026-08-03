@@ -194,7 +194,7 @@ function renderPortrait(portraitEl: HTMLElement, record: EntityRecord, ctx: Card
     fallback.setText("⚔");
 }
 
-function resolvePortraitTarget(portrait: string | undefined): string | undefined {
+export function resolvePortraitTarget(portrait: string | undefined): string | undefined {
     if (!portrait) {
         return undefined;
     }

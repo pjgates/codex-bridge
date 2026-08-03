@@ -5,7 +5,7 @@ import {
     WorkspaceLeaf,
     type MarkdownRenderChild,
 } from "obsidian";
-import { renderCard, type CardRenderContext } from "./card.js";
+import { renderCard, resolvePortraitTarget, type CardRenderContext } from "./card.js";
 import { parseCampaigns, slugToLabel, type CampaignRef } from "./core/campaign.js";
 import {
     filterRoster,
@@ -17,7 +17,6 @@ import type CodexDashboardPlugin from "./main.js";
 export const VIEW_TYPE_CODEX_DASHBOARD = "codex-dashboard";
 
 const PANEL_CLASS = "codex-dashboard-panel";
-const PORTRAIT_WIKILINK_RE = /^\[\[([^\]|]+?)(?:\|[^\]]*)?\]\]$/;
 
 interface ViewUi {
     root: HTMLElement;
@@ -47,6 +46,7 @@ export class CodexDashboardView extends ItemView {
     private readonly depthFilters = new Set<number>();
     private selectedPath: string | null = null;
     private listScrollTop = 0;
+    private detailRenderSeq = 0;
 
     constructor(
         leaf: WorkspaceLeaf,
@@ -225,7 +225,7 @@ export class CodexDashboardView extends ItemView {
 
         if (this.selectedPath) {
             const record = this.findRecord(this.selectedPath);
-            if (!record) {
+            if (!record || !this.isSelectedRecordInCampaignRoster(record)) {
                 this.selectedPath = null;
                 this.showListView();
                 return;
@@ -330,8 +330,20 @@ export class CodexDashboardView extends ItemView {
     }
 
     private async renderDetail(record: EntityRecord): Promise<void> {
+        const renderSeq = ++this.detailRenderSeq;
         const ui = this.ui;
-        if (!ui) {
+        if (!ui || !this.isDetailRenderCurrent(record, renderSeq)) {
+            return;
+        }
+
+        const file = this.app.vault.getAbstractFileByPath(record.path);
+        if (!(file instanceof TFile)) {
+            this.selectedPath = null;
+            this.showListView();
+            return;
+        }
+
+        if (!this.isDetailRenderCurrent(record, renderSeq)) {
             return;
         }
 
@@ -348,8 +360,7 @@ export class CodexDashboardView extends ItemView {
         this.clearCardChildren();
         ui.cardHostEl.empty();
 
-        const file = this.app.vault.getAbstractFileByPath(record.path);
-        if (!(file instanceof TFile)) {
+        if (!this.isDetailRenderCurrent(record, renderSeq)) {
             return;
         }
 
@@ -363,6 +374,9 @@ export class CodexDashboardView extends ItemView {
                 descriptionLines: this.plugin.cardSettings.descriptionLines,
             },
             addChild: (child) => {
+                if (!this.isDetailRenderCurrent(record, renderSeq)) {
+                    return;
+                }
                 this.cardChildren.push(child);
                 this.addChild(child);
             },
@@ -376,6 +390,21 @@ export class CodexDashboardView extends ItemView {
         };
 
         await renderCard(ui.cardHostEl, record, cardCtx);
+        if (!this.isDetailRenderCurrent(record, renderSeq)) {
+            return;
+        }
+    }
+
+    private isDetailRenderCurrent(record: EntityRecord, renderSeq: number): boolean {
+        return this.ui !== null && this.selectedPath === record.path && this.detailRenderSeq === renderSeq;
+    }
+
+    private isSelectedRecordInCampaignRoster(record: EntityRecord): boolean {
+        if (!this.campaignKey) {
+            return true;
+        }
+
+        return filterRoster([record], { campaignKey: this.campaignKey }).length > 0;
     }
 
     private showListView(): void {
@@ -494,16 +523,5 @@ function detailCampaignLabel(record: EntityRecord, campaignKey: string | null): 
     }
 
     return record.campaigns[0]?.label ?? "All campaigns";
-}
-
-function resolvePortraitTarget(portrait: string | undefined): string | undefined {
-    if (!portrait) {
-        return undefined;
-    }
-
-    const trimmed = portrait.trim();
-    const match = PORTRAIT_WIKILINK_RE.exec(trimmed);
-    const target = (match?.[1] ?? trimmed).trim();
-    return target.length > 0 ? target : undefined;
 }
 
