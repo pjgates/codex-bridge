@@ -1,4 +1,4 @@
-# Task 2 Report: Move push-side to `sync/` and node tests to `tests/node/`
+# Task 2 Report: Pure core + tests
 
 ## Status
 
@@ -6,63 +6,85 @@
 
 ## Commit
 
-- **SHA:** `870f946`
-- **Subject:** `refactor: scripts/ → sync/ push CLI + tests/node/ feature tests`
+- **SHA:** `e3231ee948ad2017cc41f8b100689f0461e6fed4`
+- **Subject:** `feat(plugin): add dashboard pure core modules and tests`
 
 ## Summary
 
-Completed Steps 1–5 from the task brief:
+Implemented the codex-dashboard pure logic core with TDD:
 
-1. **git mv** — All listed files moved from `scripts/` to `sync/`, `sync/lib/`, `sync/converter/`, and `tests/node/`. Removed leftover `scripts/` directory (contained only `.DS_Store`).
-2. **Import depth fixes** — Updated relative imports per brief:
-   - `sync/push.ts`: `./sync/*` → `./lib/*`
-   - `tests/node/api.test.ts`: `../src/` → `../../src/` (imports + `vi.mock`)
-   - Feature test subdirs: `../../src/` → `../../../src/`
-   - `tests/node/statblock-importer/importer.test.ts`: `../converter/dom.js` → `../../../sync/converter/dom.js`
-   - `sync/lib/*` and `sync/converter/*`: no changes (depth unchanged)
-3. **Configs** — `package.json`, `tsconfig.scripts.json`, `vitest.config.ts` updated per brief.
-4. **Verify** — `npm run verify` PASS.
-5. **Commit** — Single commit with specified message.
+- `splitSecret(fileText)` — strips frontmatter, leading H1, and portrait `![[...]]` embed; extracts first description paragraph; splits on a line whose trimmed content is exactly `%%Secret%%`; fail-safe `secret: null` when absent; `gmSectionCount` = `## ` H2 count below marker.
+- `parseCampaigns(frontmatterValue)` — wikilink parse + Decision 2 slug normalizer (`codex/` prefix strip, `/index` or `.index` suffix strip); label from alias or title-cased slug.
+- `EntityRecord` + `filterRoster` / `sortRoster` — campaign/onstage/depth/query filters; depth-desc then name sort; case-insensitive name+alias search.
 
-## Verification (`npm run verify`)
+No Obsidian imports in `plugin/src/core/`.
 
-```
-> npm run typecheck && npm run lint && npm test && npm run build
+## Files changed
 
-typecheck:runtime — PASS
-typecheck:scripts — PASS
-lint — PASS
-test — 19 files, 380 passed (380)
-build — vite build PASS (55 modules, dist/module.js 295.65 kB)
-```
+| Path | Change |
+|------|--------|
+| `plugin/src/core/secretSplit.ts` | Created |
+| `plugin/src/core/campaign.ts` | Created |
+| `plugin/src/core/roster.ts` | Created |
+| `plugin/src/core/index.ts` | Created (barrel) |
+| `tests/node/dashboard/secret-split.test.ts` | Created |
+| `tests/node/dashboard/campaign.test.ts` | Created |
+| `tests/node/dashboard/roster.test.ts` | Created |
+| `tests/node/dashboard/fixtures/randall.md` | Created (vault copy for realistic split fixture) |
 
-## `git show --stat HEAD`
+## Self-review
 
-```
- package.json                                               |  2 +-
- scripts/converter/... → sync/converter/...                 | (renames, 0 content delta)
- scripts/sync/... → sync/lib/...                           | (renames, 0 content delta)
- scripts/forge-sync.ts => sync/push.ts                      |  4 ++--
- scripts/api.test.ts → tests/node/api.test.ts               | 14 +++++++-------
- ... (remaining test renames with import path updates only)
- tsconfig.scripts.json                                      |  2 +-
- vitest.config.ts                                           |  2 +-
- 29 files changed, 35 insertions(+), 35 deletions(-)
-```
-
-## Import edits note
-
-No unexpected import fixes were required in `sync/lib/*` or `sync/converter/*`.
-
-## Test file recovery
-
-Three test files (`api.test.ts`, `prad/intercept-attack.test.ts`, `target-helper/save-roll.test.ts`) had been corrupted with read-tool artifact prefixes during an interrupted prior edit. Restored from the staged rename (pre-import-fix) and reapplied **only** the brief-mandated import path depth changes. No assertions or test logic were modified.
-
-## Non-goals confirmed
-
-- No `sf2e-forge-custom` or `forge-sync` string/identifier renames in the diff (file move `forge-sync.ts` → `push.ts` preserves in-file strings for a later task).
-- No files outside the brief's Files list were modified beyond the three config files.
+| Area | Finding |
+|------|---------|
+| Completeness | All brief interfaces implemented; census campaign variants, valor list, randall-shaped split, marker absent/variant cases covered. |
+| Quality | Pure functions only; no Obsidian deps; normalizer matches Decision 2. |
+| Discipline | TDD order followed (tests before implementation); single commit. |
+| Testing | 19 new dashboard tests; full `npm run verify` green (411 tests). |
 
 ## Concerns
 
-None.
+None. Randall fixture reports 11 GM H2 sections (Voice Card subsections included) — matches spec rule counting all `## ` headings below the marker.
+
+## TDD evidence
+
+### RED
+
+Command: `npm test -- tests/node/dashboard`
+
+```
+ FAIL  tests/node/dashboard/campaign.test.ts
+Error: Cannot find module '../../../plugin/src/core/campaign.js'
+
+ FAIL  tests/node/dashboard/roster.test.ts
+Error: Cannot find module '../../../plugin/src/core/roster.js'
+
+ FAIL  tests/node/dashboard/secret-split.test.ts
+Error: Cannot find module '../../../plugin/src/core/secretSplit.js'
+
+ Test Files  3 failed (3)
+      Tests  no tests
+```
+
+Expected: modules did not exist yet; import resolution fails before any assertions run.
+
+### GREEN
+
+Command: `npm test -- tests/node/dashboard`
+
+```
+ Test Files  3 passed (3)
+      Tests  19 passed (19)
+```
+
+Command: `npm run verify`
+
+```
+ Test Files  22 passed (22)
+      Tests  411 passed (411)
+ typecheck:runtime — PASS
+ typecheck:scripts — PASS
+ typecheck:plugin — PASS
+ lint — PASS
+ build — PASS
+ plugin:build — PASS
+```
