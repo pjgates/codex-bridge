@@ -32,55 +32,30 @@ export function registerNoteCardPostProcessor(
             return;
         }
 
-        // Post-processors receive .el-* render chunks inside one
-        // .markdown-preview-section sizer — gate on contains, not identity.
-        const section = element.closest(".markdown-preview-section") as HTMLElement | null;
-        if (!section) {
+        // Post-processors receive .el-* render chunks that are NOT yet attached
+        // to the preview tree — ancestor traversal is useless here. Inject into
+        // the first chunk (source line 0: the frontmatter chunk when frontmatter
+        // exists, else the first content chunk); afterbegin lands the card at
+        // the top of the note content, below Obsidian's title/properties chrome
+        // and above the H1. Exactly one chunk has lineStart 0, so this is also
+        // the per-render dedupe.
+        const info = ctx.getSectionInfo(element);
+        if (!info || info.lineStart !== 0) {
             return;
-        }
-        const preview = section.closest(".markdown-preview-view") as HTMLElement | null;
-        if (!preview) {
-            return;
-        }
-        if (preview.querySelector(`.${CARD_HOST_CLASS}`)) {
-            return;
-        }
-
-        const hasH1InSource =
-            plugin.app.metadataCache.getCache(ctx.sourcePath)?.headings?.some((h) => h.level === 1) ??
-            false;
-        const firstH1 = section.querySelector("h1");
-
-        let host: HTMLElement;
-        if (hasH1InSource) {
-            // Wait for the chunk that actually contains the H1 (guarantees it exists in DOM).
-            if (!firstH1 || !element.contains(firstH1)) {
-                return;
-            }
-            host = preview.createDiv({ cls: CARD_HOST_CLASS });
-            firstH1.insertAdjacentElement("beforebegin", host);
-        } else {
-            // Genuinely H1-less note (cache, not DOM timing): anchor after the frontmatter chunk.
-            const anchor = section.querySelector(".el-pre") ?? section.querySelector(".mod-header");
-            host = preview.createDiv({ cls: CARD_HOST_CLASS });
-            if (anchor) {
-                anchor.insertAdjacentElement("afterend", host);
-            } else {
-                section.insertAdjacentElement("afterbegin", host);
-            }
         }
 
         const record = lookupRecord(options.entityIndex, plugin, ctx.sourcePath);
         if (!record) {
-            host.remove();
             return;
         }
 
         const file = plugin.app.vault.getAbstractFileByPath(ctx.sourcePath);
         if (!(file instanceof TFile)) {
-            host.remove();
             return;
         }
+
+        const host = element.createDiv({ cls: CARD_HOST_CLASS });
+        element.insertAdjacentElement("afterbegin", host);
 
         const cardCtx: CardRenderContext = {
             app: plugin.app,
@@ -95,7 +70,18 @@ export function registerNoteCardPostProcessor(
             removeChild: (child) => (ctx as unknown as Component).removeChild(child),
         };
 
-        await renderCard(host, record, cardCtx);
+        // renderCard treats a disconnected host as stale — defer until Obsidian
+        // has attached the chunk; the isConnected check also covers host
+        // removal (settings refresh) racing the deferred render.
+        setTimeout(() => {
+            if (!host.isConnected) {
+                console.error("codex-dashboard: card host never attached", ctx.sourcePath);
+                return;
+            }
+            renderCard(host, record, cardCtx).catch((error: unknown) => {
+                console.error("codex-dashboard: renderCard threw", ctx.sourcePath, error);
+            });
+        }, 0);
     });
 }
 
