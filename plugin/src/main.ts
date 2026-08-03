@@ -9,17 +9,13 @@ export default class CodexDashboardPlugin extends Plugin {
 
         this.registerIndexMaintenanceEvents();
 
-        const runInitialBuild = (): void => {
-            if (this.entityIndex.hasInitialBuild()) {
-                return;
-            }
-
-            this.entityIndex.markInitialBuildDone();
+        const rebuildIndex = (): void => {
             this.entityIndex.rebuild();
         };
 
-        this.registerEvent(this.app.metadataCache.on("resolved", runInitialBuild));
-        this.app.workspace.onLayoutReady(runInitialBuild);
+        this.registerEvent(this.app.metadataCache.on("resolved", rebuildIndex));
+        // onLayoutReady returns void (not EventRef), so it stays outside registerEvent.
+        this.app.workspace.onLayoutReady(rebuildIndex);
 
         console.info("codex-dashboard: loaded");
     }

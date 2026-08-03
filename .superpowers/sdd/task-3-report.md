@@ -15,10 +15,10 @@ Concern: Step 2 dev check (scratch Character create/edit/rename/delete in Obsidi
 
 Implemented `EntityIndex` in `plugin/src/entityIndex.ts` and wired lifecycle in `plugin/src/main.ts`:
 
-- **Initial build:** waits for metadata cache readiness via `metadataCache.on("resolved")` with `workspace.onLayoutReady` fallback; guarded to run once.
+- **Initial build:** `metadataCache.on("resolved")` and `workspace.onLayoutReady` each call `rebuild()` unconditionally (whichever runs last wins with complete cache data).
 - **Maintenance:** `metadataCache.on("changed")`, `vault.on("rename")`, `vault.on("delete")` — all via `this.registerEvent`.
 - **API:** `records()`, `campaigns()` (unique `{key, label}` sorted by label), `onChanged()` subscription, `destroy()` on unload.
-- **Mapping:** `buildEntityRecord(path, cache)` produces `EntityRecord` for `type: Character` only; uses `parseCampaigns`, `getAllTags` (#-stripped, deduped), portrait wikilink strip, defaults (`depth` 1, `status` "active", `onstage` only when `true`); skips non-integer depth; no body reads.
+- **Mapping:** `buildEntityRecord(path, cache)` produces `EntityRecord` for `type: Character` only; uses `parseCampaigns`, `getAllTags` (#-stripped, deduped), portrait wikilink strip; missing/invalid depth → `null` (note stays indexed); missing/whitespace-only status → `null`; `onstage` only when `true`; no body reads.
 
 ## Files changed
 
@@ -65,8 +65,6 @@ Suggested console snippet: `app.plugins.plugins['codex-dashboard'].entityIndex.r
 ## Concerns
 
 - Manual dev-check not executed in this session (blocked on Obsidian UI).
-- Invalid `depth` frontmatter excludes the note from the index (fail-safe; matches sync converter strictness without throwing).
-
 
 ## Fix wave 1
 
@@ -94,6 +92,32 @@ New cases:
 - `keeps null-depth records when no depth filter is applied`
 - `excludes null-depth records when a depth filter is active`
 - `sorts null-depth records after every numeric depth`
+
+Command: `npm run verify`
+
+```
+ Test Files  22 passed (22)
+      Tests  414 passed (414)
+ typecheck:runtime — PASS
+ typecheck:scripts — PASS
+ typecheck:plugin — PASS
+ lint — PASS
+ build — PASS
+ plugin:build — PASS
+```
+
+## Fix wave 2
+
+**Commit:** `019ea9f67bd113034b88ef91cd83cde16b4d3d50`
+
+Reviewer fixes: remove first-wins initial-build guard (race with `onLayoutReady` vs cache resolution); trim `parseStatus`; symmetric `replaceRecords` removal detection.
+
+### Changes
+
+- `main.ts`: both `metadataCache.on("resolved")` and `onLayoutReady` call `rebuild()` unconditionally; removed `hasInitialBuild` / `markInitialBuildDone`
+- `entityIndex.ts`: `parseStatus` trims and treats whitespace-only as `null`; `replaceRecords` detects removed paths
+
+### Test evidence
 
 Command: `npm run verify`
 

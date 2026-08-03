@@ -17,7 +17,6 @@ const PORTRAIT_WIKILINK_RE = /^\[\[([^\]|]+?)(?:\|[^\]]*)?\]\]$/;
 export class EntityIndex {
     private readonly recordsByPath = new Map<string, EntityRecord>();
     private readonly changeHandlers = new Set<ChangeHandler>();
-    private initialBuildDone = false;
 
     constructor(private readonly app: App) {}
 
@@ -109,14 +108,6 @@ export class EntityIndex {
         }
     }
 
-    markInitialBuildDone(): void {
-        this.initialBuildDone = true;
-    }
-
-    hasInitialBuild(): boolean {
-        return this.initialBuildDone;
-    }
-
     private recordFromFile(file: TFile): EntityRecord | null {
         return buildEntityRecord(file.path, this.app.metadataCache.getFileCache(file));
     }
@@ -127,7 +118,8 @@ export class EntityIndex {
             Array.from(next.entries()).some(([path, record]) => {
                 const previous = this.recordsByPath.get(path);
                 return !previous || !recordsEqual(previous, record);
-            });
+            }) ||
+            Array.from(this.recordsByPath.keys()).some((path) => !next.has(path));
 
         this.recordsByPath.clear();
         for (const [path, record] of next) {
@@ -214,11 +206,12 @@ function parseDepth(value: unknown): number | null {
 }
 
 function parseStatus(value: unknown): string | null {
-    if (typeof value !== "string" || value.trim().length === 0) {
+    if (typeof value !== "string") {
         return null;
     }
 
-    return value;
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : null;
 }
 
 function toStringArray(value: unknown): string[] {
