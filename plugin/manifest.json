@@ -1,0 +1,9 @@
+{
+    "id": "codex-dashboard",
+    "name": "Codex Dashboard",
+    "version": "0.1.0",
+    "minAppVersion": "1.5.0",
+    "description": "Character cards and GM roster for the Silverhold codex.",
+    "author": "peterg",
+    "isDesktopOnly": true
+}

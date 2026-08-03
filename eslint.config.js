@@ -116,7 +116,30 @@ export default [
         },
     },
     {
+        files: ["plugin/src/**/*.ts"],
+        languageOptions: {
+            parser: tsparser,
+            parserOptions: {
+                ecmaVersion: "latest",
+                sourceType: "module",
+            },
+        },
+        plugins: {
+            "@typescript-eslint": tseslint,
+        },
+        rules: {
+            "@typescript-eslint/no-explicit-any": "warn",
+            "@typescript-eslint/no-unused-vars": [
+                "warn",
+                { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
+            ],
+            "no-console": ["warn", { allow: ["warn", "error", "info", "log"] }],
+            "prefer-const": "warn",
+            "no-var": "error",
+        },
+    },
+    {
         // Ignore build output and config files
-        ignores: ["dist/**", "node_modules/**", "*.config.*"],
+        ignores: ["dist/**", "plugin/dist/**", "node_modules/**", "*.config.*"],
     },
 ];
