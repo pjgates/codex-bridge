@@ -1,13 +1,23 @@
 import { Plugin, TFile } from "obsidian";
+import { DEFAULT_CARD_SETTINGS } from "./defaults.js";
 import { EntityIndex } from "./entityIndex.js";
+import { registerNoteCardPostProcessor } from "./noteCardPostProcessor.js";
+import { SessionRevealState } from "./revealState.js";
 
 export default class CodexDashboardPlugin extends Plugin {
     entityIndex!: EntityIndex;
+    readonly revealState = new SessionRevealState();
+    readonly cardSettings = { ...DEFAULT_CARD_SETTINGS };
 
     async onload(): Promise<void> {
         this.entityIndex = new EntityIndex(this.app);
 
         this.registerIndexMaintenanceEvents();
+        registerNoteCardPostProcessor(this, {
+            entityIndex: this.entityIndex,
+            revealState: this.revealState,
+            settings: this.cardSettings,
+        });
 
         const rebuildIndex = (): void => {
             this.entityIndex.rebuild();
