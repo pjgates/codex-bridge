@@ -391,6 +391,7 @@ export class CodexDashboardView extends ItemView {
             onRevealChange: () => {
                 void this.renderDetail(record);
             },
+            suppressPortrait: true,
         };
 
         await renderCard(ui.cardHostEl, record, cardCtx);

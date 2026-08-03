@@ -12,7 +12,6 @@ import { buildEntityRecord, type EntityIndex } from "./entityIndex.js";
 import type { RevealState } from "./revealState.js";
 
 export const CARD_HOST_CLASS = "codex-dashboard-card-host";
-export const DOC_MARKER_ATTR = "data-codex-dashboard-card-injected";
 
 export interface NoteCardPostProcessorOptions {
     entityIndex: EntityIndex;
@@ -38,7 +37,7 @@ export function registerNoteCardPostProcessor(
             return;
         }
 
-        if (preview.hasAttribute(DOC_MARKER_ATTR) || preview.querySelector(`.${CARD_HOST_CLASS}`)) {
+        if (preview.querySelector(`.${CARD_HOST_CLASS}`)) {
             return;
         }
 
@@ -55,22 +54,18 @@ export function registerNoteCardPostProcessor(
             return;
         }
 
-        preview.setAttribute(DOC_MARKER_ATTR, "true");
-
         const host = preview.createDiv({ cls: CARD_HOST_CLASS });
         targetSection.insertAdjacentElement("beforebegin", host);
 
         const record = lookupRecord(options.entityIndex, plugin, ctx.sourcePath);
         if (!record) {
             host.remove();
-            preview.removeAttribute(DOC_MARKER_ATTR);
             return;
         }
 
         const file = plugin.app.vault.getAbstractFileByPath(ctx.sourcePath);
         if (!(file instanceof TFile)) {
             host.remove();
-            preview.removeAttribute(DOC_MARKER_ATTR);
             return;
         }
 
@@ -111,7 +106,6 @@ export function refreshNoteCardPreviews(
         previewEl.querySelectorAll(`.${CARD_HOST_CLASS}`).forEach((host) => {
             host.remove();
         });
-        previewEl.removeAttribute(DOC_MARKER_ATTR);
 
         if (settings.showNoteCards) {
             view.previewMode.rerender(true);

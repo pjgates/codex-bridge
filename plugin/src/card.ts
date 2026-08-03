@@ -19,6 +19,7 @@ export interface CardRenderContext {
     addChild: (child: MarkdownRenderChild) => void;
     removeChild: (child: MarkdownRenderChild) => void;
     onRevealChange?: () => void;
+    suppressPortrait?: boolean;
 }
 
 const CARD_CLASS = "codex-dashboard-card";
@@ -27,6 +28,7 @@ const PORTRAIT_WIKILINK_RE = /^\[\[([^\]|]+?)(?:\|[^\]]*)?\]\]$/;
 interface CardRuntimeState {
     generation: number;
     secretChild: MarkdownRenderChild | null;
+    descChild: MarkdownRenderChild | null;
 }
 
 const cardRuntime = new WeakMap<HTMLElement, CardRuntimeState>();
@@ -34,7 +36,7 @@ const cardRuntime = new WeakMap<HTMLElement, CardRuntimeState>();
 function getCardRuntime(el: HTMLElement): CardRuntimeState {
     let runtime = cardRuntime.get(el);
     if (!runtime) {
-        runtime = { generation: 0, secretChild: null };
+        runtime = { generation: 0, secretChild: null, descChild: null };
         cardRuntime.set(el, runtime);
     }
     return runtime;
@@ -66,6 +68,17 @@ function unloadSecretRenderChild(el: HTMLElement, ctx: CardRenderContext): void 
     runtime.secretChild = null;
 }
 
+function unloadDescRenderChild(el: HTMLElement, ctx: CardRenderContext): void {
+    const runtime = cardRuntime.get(el);
+    if (!runtime?.descChild) {
+        return;
+    }
+
+    runtime.descChild.unload();
+    ctx.removeChild(runtime.descChild);
+    runtime.descChild = null;
+}
+
 export async function renderCard(
     el: HTMLElement,
     record: EntityRecord,
@@ -73,8 +86,12 @@ export async function renderCard(
 ): Promise<void> {
     const generation = bumpCardGeneration(el);
     unloadSecretRenderChild(el, ctx);
+    unloadDescRenderChild(el, ctx);
     el.empty();
     el.addClass(CARD_CLASS);
+    if (ctx.suppressPortrait) {
+        el.addClass(`${CARD_CLASS}--no-portrait`);
+    }
 
     const fileText = await ctx.app.vault.cachedRead(ctx.file);
     if (isCardRenderStale(el, generation)) {
@@ -85,8 +102,10 @@ export async function renderCard(
     const revealed = ctx.revealState.isRevealed(ctx.sourcePath);
     const hasSecret = split.secret !== null;
 
-    const portraitEl = el.createDiv({ cls: `${CARD_CLASS}__portrait` });
-    renderPortrait(portraitEl, record, ctx);
+    if (!ctx.suppressPortrait) {
+        const portraitEl = el.createDiv({ cls: `${CARD_CLASS}__portrait` });
+        renderPortrait(portraitEl, record, ctx);
+    }
 
     const bodyEl = el.createDiv({ cls: `${CARD_CLASS}__body` });
 
@@ -105,7 +124,7 @@ export async function renderCard(
 
     renderChips(bodyEl, record, ctx.settings.excludeTags);
 
-    const descEl = bodyEl.createDiv({ cls: `${CARD_CLASS}__desc`, text: split.description });
+    const descEl = bodyEl.createDiv({ cls: `${CARD_CLASS}__desc` });
     descEl.style.setProperty(
         "-webkit-line-clamp",
         String(clampDescriptionLines(ctx.settings.descriptionLines)),
@@ -113,6 +132,15 @@ export async function renderCard(
     descEl.style.setProperty("display", "-webkit-box");
     descEl.style.setProperty("-webkit-box-orient", "vertical");
     descEl.style.setProperty("overflow", "hidden");
+
+    const descChild = new MarkdownRenderChild(descEl);
+    getCardRuntime(el).descChild = descChild;
+    ctx.addChild(descChild);
+    await MarkdownRenderer.renderMarkdown(split.description, descEl, ctx.sourcePath, descChild);
+    if (isCardRenderStale(el, generation)) {
+        unloadDescRenderChild(el, ctx);
+        return;
+    }
 
     if (hasSecret) {
         const footerEl = bodyEl.createDiv({ cls: `${CARD_CLASS}__footer` });

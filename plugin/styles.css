@@ -77,6 +77,10 @@
 		0 0 24px -8px color-mix(in oklch, var(--text-accent) 30%, transparent);
 }
 
+.codex-dashboard-card--no-portrait {
+	grid-template-columns: 1fr;
+}
+
 .codex-dashboard-card__portrait {
 	width: 118px;
 	height: 142px;
