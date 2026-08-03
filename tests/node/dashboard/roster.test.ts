@@ -51,6 +51,17 @@ const records: EntityRecord[] = [
     },
 ];
 
+const nullDepthRecord: EntityRecord = {
+    path: "codex/the-forge/entities/mystery.md",
+    name: "Mystery",
+    aliases: [],
+    depth: null,
+    onstage: false,
+    status: null,
+    campaigns: [{ key: "the-forge", label: "The Forge" }],
+    tags: ["NPC"],
+};
+
 describe("filterRoster", () => {
     it("filters by campaign key", () => {
         expect(filterRoster(records, { campaignKey: "the-forge" }).map((r) => r.name)).toEqual([
@@ -72,6 +83,23 @@ describe("filterRoster", () => {
         ).toEqual(["Wren Kadau", "Valor"]);
     });
 
+    it("keeps null-depth records when no depth filter is applied", () => {
+        expect(filterRoster([...records, nullDepthRecord], { campaignKey: "the-forge" }).map((r) => r.name)).toEqual([
+            "Randall",
+            "Wren Kadau",
+            "Valor",
+            "Mystery",
+        ]);
+    });
+
+    it("excludes null-depth records when a depth filter is active", () => {
+        expect(
+            filterRoster([...records, nullDepthRecord], { campaignKey: "the-forge", depths: [3] }).map(
+                (r) => r.name,
+            ),
+        ).toEqual(["Wren Kadau", "Valor"]);
+    });
+
     it("matches case-insensitive substrings against name and aliases", () => {
         expect(filterRoster(records, { query: "wren" }).map((r) => r.name)).toEqual([
             "Wren Kadau",
@@ -90,6 +118,16 @@ describe("sortRoster", () => {
             [3, "Wren Kadau"],
             [2, "Randall"],
             [1, "Constable Wren"],
+        ]);
+    });
+
+    it("sorts null-depth records after every numeric depth", () => {
+        expect(sortRoster([...records, nullDepthRecord]).map((r) => [r.depth, r.name])).toEqual([
+            [3, "Valor"],
+            [3, "Wren Kadau"],
+            [2, "Randall"],
+            [1, "Constable Wren"],
+            [null, "Mystery"],
         ]);
     });
 });

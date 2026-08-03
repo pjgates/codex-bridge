@@ -1,166 +1,109 @@
-# Task 3 Report: Module id `codex-foundry` + legacy flags read fallback
+# Task 3 Report: Entity index
 
 ## Status
 
 **DONE_WITH_CONCERNS**
 
-Concern: `module.json` GitHub/release URLs still reference the `sf2e-forge-custom` repository and zip artifact names (repo rename is out of scope for Task 3; Task 5 covers README/CHANGELOG). The strict acceptance grep gate for `src/` / `tests/` / `sync/` passes; including `module.json` in the brief's grep command surfaces those URLs.
+Concern: Step 2 dev check (scratch Character create/edit/rename/delete in Obsidian) is pending manual verification — cannot run Obsidian interactively in this session.
 
 ## Commit
 
-- **SHA:** `2ccc8de`
-- **Subject:** `feat!: module id sf2e-forge-custom → codex-foundry; legacy flags read fallback`
+- **SHA:** `d82c5839a9ada58e63e4996d591e56a1585f698c`
+- **Subject:** `feat(plugin): add entity index with metadata cache lifecycle`
 
 ## Summary
 
-Renamed module id from `sf2e-forge-custom` to `codex-foundry` across `src/`, `tests/`, and `sync/`, added `LEGACY_MODULE_ID` read fallback in `moduleFlags`, flipped `module.json` metadata, and renamed module-specific API types from `Sf2eForgeCustom*` to `CodexFoundry*`. All 382 tests pass via `npm run verify`.
+Implemented `EntityIndex` in `plugin/src/entityIndex.ts` and wired lifecycle in `plugin/src/main.ts`:
 
----
+- **Initial build:** waits for metadata cache readiness via `metadataCache.on("resolved")` with `workspace.onLayoutReady` fallback; guarded to run once.
+- **Maintenance:** `metadataCache.on("changed")`, `vault.on("rename")`, `vault.on("delete")` — all via `this.registerEvent`.
+- **API:** `records()`, `campaigns()` (unique `{key, label}` sorted by label), `onChanged()` subscription, `destroy()` on unload.
+- **Mapping:** `buildEntityRecord(path, cache)` produces `EntityRecord` for `type: Character` only; uses `parseCampaigns`, `getAllTags` (#-stripped, deduped), portrait wikilink strip, defaults (`depth` 1, `status` "active", `onstage` only when `true`); skips non-integer depth; no body reads.
 
-## TDD Evidence
+## Files changed
 
-### RED #1 — `moduleFlags` not exported
+| Path | Change |
+|------|--------|
+| `plugin/src/entityIndex.ts` | Created |
+| `plugin/src/main.ts` | Modified — owns index lifecycle |
 
-Command: `npx vitest run src/sync/import.test.ts`
-
-```
- FAIL  src/sync/import.test.ts > legacy module flags > reads sync identity from the legacy sf2e-forge-custom flag key
-TypeError: (0 , __vite_ssr_import_1__.moduleFlags) is not a function
-
- FAIL  src/sync/import.test.ts > legacy module flags > prefers codex-foundry flags when both keys are present
-TypeError: (0 , __vite_ssr_import_1__.moduleFlags) is not a function
-
- Test Files  1 failed (1)
-      Tests  2 failed | 12 passed (14)
-```
-
-### RED #2 — fallback wired; journal shell expectations still on old key
-
-Command: `npx vitest run src/sync/import.test.ts` (after Step 2: `LEGACY_MODULE_ID`, exported `moduleFlags`, `MODULE_ID = "codex-foundry"`)
-
-```
- FAIL  src/sync/import.test.ts > journal shell folder placement > create payload uses Entities/JournalEntry folder; adopt update omits folder
-AssertionError: expected { 'codex-foundry': { …(2) } } to deeply equal { 'sf2e-forge-custom': { …(2) } }
-
-     ✓ reads sync identity from the legacy sf2e-forge-custom flag key
-     ✓ prefers codex-foundry flags when both keys are present
-
- Test Files  1 failed (1)
-      Tests  1 failed | 13 passed (14)
-```
-
-Note: With `MODULE_ID` already `"codex-foundry"` in Step 2, the prefers-new test passes (not fails). The remaining red signal before bulk rename is the journal-shell flag-key assertions.
-
-### GREEN — full suite after Steps 3–5
+## Verification
 
 Command: `npm run verify`
 
 ```
- Test Files  19 passed (19)
-      Tests  382 passed (382)
-✓ built in 438ms
+Test Files  22 passed (22)
+     Tests  411 passed (411)
+typecheck:runtime — PASS
+typecheck:scripts — PASS
+typecheck:plugin — PASS
+lint — PASS
+build — PASS
+plugin:build — PASS
 ```
 
-(`src/sync/import.test.ts`: 14 tests including both legacy fallback tests.)
+## Self-review
 
----
+| Area | Finding |
+|------|---------|
+| Completeness | Brief interfaces implemented; events registered via `registerEvent`; unload calls `destroy()`. |
+| Quality | Change emissions deduped when record data unchanged; `buildEntityRecord` exported for future tests/consumers. |
+| Discipline | Single commit scope; no Obsidian imports in `core/`; bodies not read. |
+| Testing | No mocked-App tests (per plan Decision 5); full verify green. |
 
-## Grep gate
+## Pending manual dev-check (Step 2)
 
-### `src/` `tests/` `sync/` (acceptance scope)
+In Obsidian with plugin enabled:
 
-Command: `rg -n 'sf2e-forge-custom' src/ tests/ sync/`
+1. Create a scratch `type: Character` note → `plugin.entityIndex.records()` includes it (DevTools console).
+2. Edit frontmatter (e.g. `onstage`, `depth`) → index updates without reload.
+3. Rename the note → `records()` reflects new path, old path gone.
+4. Delete the note → entry removed from index.
+
+Suggested console snippet: `app.plugins.plugins['codex-dashboard'].entityIndex.records()`
+
+## Concerns
+
+- Manual dev-check not executed in this session (blocked on Obsidian UI).
+- Invalid `depth` frontmatter excludes the note from the index (fail-safe; matches sync converter strictness without throwing).
+
+
+## Fix wave 1
+
+**Commit:** `830e4d32c9d5ba4e4a734dcb5c5493cff2f9a050`
+
+Controller adjudication: nullable `depth`/`status` — invalid or missing depth no longer excludes notes; no fabricated defaults.
+
+### Changes
+
+- `EntityRecord.depth`: `number | null` — missing, empty, or non-integer frontmatter → `null`, note stays indexed
+- `EntityRecord.status`: `string | null` — missing/empty frontmatter → `null` (no `"active"` default)
+- `sortRoster`: depth-desc, null depths sort last, then name
+- `filterRoster`: null-depth records match only when `depths` filter is empty/undefined
+
+### Test evidence
+
+Command: `npm test -- tests/node/dashboard/roster`
 
 ```
-src/constants.ts:8:export const LEGACY_MODULE_ID = "sf2e-forge-custom";
-src/sync/import.test.ts:189:    it("reads sync identity from the legacy sf2e-forge-custom flag key", () => {
-src/sync/import.test.ts:192:                "sf2e-forge-custom": { syncId: "fs-abc123", syncKind: "entity-journal", importedHash: "h1" },
-src/sync/import.test.ts:202:                "sf2e-forge-custom": { syncId: "old-id" },
+ Test Files  1 passed (1)
+      Tests  8 passed (8)
 ```
 
-`src/sync/import.ts` uses `LEGACY_MODULE_ID` (no literal string) — import + fallback semantics as specified.
+New cases:
+- `keeps null-depth records when no depth filter is applied`
+- `excludes null-depth records when a depth filter is active`
+- `sorts null-depth records after every numeric depth`
 
-### Brief command (includes `module.json`)
-
-Command: `rg -n 'sf2e-forge-custom' src/ tests/ sync/ module.json`
+Command: `npm run verify`
 
 ```
-module.json:43:    "url": "https://github.com/pjgates/sf2e-forge-custom",
-module.json:44:    "manifest": "https://github.com/pjgates/sf2e-forge-custom/releases/latest/download/module.json",
-module.json:45:    "download": "https://github.com/pjgates/sf2e-forge-custom/releases/download/v0.3.0/sf2e-forge-custom.zip",
-module.json:46:    "bugs": "https://github.com/pjgates/sf2e-forge-custom/issues",
-module.json:47:    "changelog": "https://github.com/pjgates/sf2e-forge-custom/releases"
-(+ src/constants.ts and src/sync/import.test.ts lines above)
+ Test Files  22 passed (22)
+      Tests  414 passed (414)
+ typecheck:runtime — PASS
+ typecheck:scripts — PASS
+ typecheck:plugin — PASS
+ lint — PASS
+ build — PASS
+ plugin:build — PASS
 ```
-
----
-
-## `module.json`
-
-| Field | Value |
-|-------|-------|
-| `id` | `codex-foundry` |
-| `title` | `Codex Foundry` |
-| `version` | `1.0.0` |
-| `system` | `["sf2e"]` |
-| `relationships.systems[0].id` | `sf2e` (unchanged) |
-
----
-
-## Identifier renames (Step 5)
-
-### Renamed (module-specific)
-
-| Old | New | Files |
-|-----|-----|-------|
-| `Sf2eForgeCustomApiErrorCode` | `CodexFoundryApiErrorCode` | `src/api.ts`, `src/types/fvtt-augments.d.ts` |
-| `Sf2eForgeCustomApiError` | `CodexFoundryApiError` | same |
-| `Sf2eForgeCustomApiFailure` | `CodexFoundryApiFailure` | same |
-| `Sf2eForgeCustomApiResult` | `CodexFoundryApiResult` | same |
-| `Sf2eForgeCustomCreatedMessageResult` | `CodexFoundryCreatedMessageResult` | same |
-| `Sf2eForgeCustomApi` | `CodexFoundryApi` | same |
-| `Sf2eResolvedUuidDocumentName` | `CodexFoundryResolvedUuidDocumentName` | `src/types/fvtt-augments.d.ts`, `src/api.ts` |
-| `Sf2eResolvedUuidDocument` | `CodexFoundryResolvedUuidDocument` | same |
-| `Sf2eGameModule` | `CodexFoundryGameModule` | `src/types/fvtt-augments.d.ts` |
-
-Also bulk-renamed string `sf2e-forge-custom` → `codex-foundry` across `src/`, `tests/`, `sync/` (lang keys, flag paths, settings keys, templates, tests), then restored intentional legacy literals per brief.
-
-### Deliberately left (sf2e *system* / ruleset)
-
-- `Sf2eGame`, `Sf2eGameNamespace` — `game.pf2e` / SF2e namespace accessors
-- `Sf2eActor`, `Sf2eActorSystemData`, `Sf2eActorSheet`, `Sf2eActorExtensions`
-- `Sf2eTokenDocument`, `Sf2eUserTargetToken`, `Sf2eActiveToken`
-- `Sf2eItem`, `Sf2eStatistic`, `Sf2eCheckModifierInstance`, `Sf2eModifier`, `Sf2eRawCheckRollContext`
-- `Sf2eRollCallback`, `Sf2eRollDieTerm`, `Sf2eRerollResource`, `Sf2eRerollHookOptions`
-- `Sf2eFoundryGlobal`
-- `"sf2e"` in `module.json` `system` and `relationships`
-- `src/rulesets/sf2e/**` path and all SF2e ruleset implementation code
-- `forge-sync` strings (Task 4)
-
----
-
-## Key implementation
-
-**`src/constants.ts`**
-
-```ts
-export const MODULE_ID = "codex-foundry";
-export const LEGACY_MODULE_ID = "sf2e-forge-custom";
-```
-
-**`src/sync/import.ts` — `moduleFlags`**
-
-```ts
-export function moduleFlags(doc: { flags: Record<string, unknown> }): SyncModuleFlags {
-    // ponytail: legacy-key read fallback keeps pre-rename docs managed; removal = one-time flag-migration script if cleanup is ever wanted
-    return ((doc.flags[MODULE_ID] ?? doc.flags[LEGACY_MODULE_ID]) ?? {}) as SyncModuleFlags;
-}
-```
-
----
-
-## Non-goals respected
-
-- No `forge-sync` renames
-- No layout moves
-- No README/CHANGELOG edits

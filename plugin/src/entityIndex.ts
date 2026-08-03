@@ -11,6 +11,9 @@ type ChangeHandler = () => void;
 
 const PORTRAIT_WIKILINK_RE = /^\[\[([^\]|]+?)(?:\|[^\]]*)?\]\]$/;
 
+// Index-side depth/status null semantics are covered by roster tests (Decision 5: no mocked-App tests).
+// Missing, empty, or non-integer depth → null (note stays indexed). Missing status → null.
+
 export class EntityIndex {
     private readonly recordsByPath = new Map<string, EntityRecord>();
     private readonly changeHandlers = new Set<ChangeHandler>();
@@ -152,20 +155,15 @@ export function buildEntityRecord(
         return null;
     }
 
-    const depth = parseDepth(frontmatter.depth);
-    if (depth === null) {
-        return null;
-    }
-
     const portrait = parsePortrait(frontmatter.portrait);
 
     return {
         path,
         name: String(frontmatter.title ?? titleFromPath(path)),
         aliases: toStringArray(frontmatter.aliases),
-        depth,
+        depth: parseDepth(frontmatter.depth),
         onstage: frontmatter.onstage === true,
-        status: String(frontmatter.status ?? "active"),
+        status: parseStatus(frontmatter.status),
         campaigns: parseCampaigns(frontmatter.campaign),
         tags: collectTags(cache),
         ...(portrait ? { portrait } : {}),
@@ -202,7 +200,7 @@ function parsePortrait(value: unknown): string | undefined {
 
 function parseDepth(value: unknown): number | null {
     if (value == null || value === "") {
-        return 1;
+        return null;
     }
 
     const depth =
@@ -213,6 +211,14 @@ function parseDepth(value: unknown): number | null {
               : Number.NaN;
 
     return Number.isInteger(depth) ? depth : null;
+}
+
+function parseStatus(value: unknown): string | null {
+    if (typeof value !== "string" || value.trim().length === 0) {
+        return null;
+    }
+
+    return value;
 }
 
 function toStringArray(value: unknown): string[] {

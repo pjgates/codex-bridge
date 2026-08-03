@@ -4,9 +4,9 @@ export interface EntityRecord {
     path: string;
     name: string;
     aliases: string[];
-    depth: number;
+    depth: number | null;
     onstage: boolean;
-    status: string;
+    status: string | null;
     campaigns: CampaignRef[];
     tags: string[];
     portrait?: string;
@@ -31,8 +31,10 @@ export function filterRoster(records: EntityRecord[], filter: RosterFilter = {})
             return false;
         }
 
-        if (filter.depths && filter.depths.length > 0 && !filter.depths.includes(record.depth)) {
-            return false;
+        if (filter.depths && filter.depths.length > 0) {
+            if (record.depth === null || !filter.depths.includes(record.depth)) {
+                return false;
+            }
         }
 
         if (!query) return true;
@@ -44,7 +46,22 @@ export function filterRoster(records: EntityRecord[], filter: RosterFilter = {})
 
 export function sortRoster(records: EntityRecord[]): EntityRecord[] {
     return [...records].sort((left, right) => {
-        if (right.depth !== left.depth) return right.depth - left.depth;
+        if (left.depth === null && right.depth === null) {
+            return left.name.localeCompare(right.name, undefined, { sensitivity: "base" });
+        }
+
+        if (left.depth === null) {
+            return 1;
+        }
+
+        if (right.depth === null) {
+            return -1;
+        }
+
+        if (right.depth !== left.depth) {
+            return right.depth - left.depth;
+        }
+
         return left.name.localeCompare(right.name, undefined, { sensitivity: "base" });
     });
 }
