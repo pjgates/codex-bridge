@@ -32,30 +32,43 @@ export function registerNoteCardPostProcessor(
             return;
         }
 
-        const preview = element.closest(".markdown-preview-view") as HTMLElement | null;
+        // Post-processors receive .el-* render chunks inside one
+        // .markdown-preview-section sizer — gate on contains, not identity.
+        const section = element.closest(".markdown-preview-section") as HTMLElement | null;
+        if (!section) {
+            return;
+        }
+        const preview = section.closest(".markdown-preview-view") as HTMLElement | null;
         if (!preview) {
             return;
         }
-
         if (preview.querySelector(`.${CARD_HOST_CLASS}`)) {
             return;
         }
 
-        const firstH1 = preview.querySelector("h1");
-        const targetSection =
-            firstH1?.closest(".markdown-preview-section") ??
-            preview.querySelector(".markdown-preview-section");
-        if (!targetSection || element !== targetSection) {
-            return;
-        }
+        const hasH1InSource =
+            plugin.app.metadataCache.getCache(ctx.sourcePath)?.headings?.some((h) => h.level === 1) ??
+            false;
+        const firstH1 = section.querySelector("h1");
 
-        const sectionInfo = ctx.getSectionInfo(element);
-        if (sectionInfo && firstH1 === null && sectionInfo.lineStart > 0) {
-            return;
+        let host: HTMLElement;
+        if (hasH1InSource) {
+            // Wait for the chunk that actually contains the H1 (guarantees it exists in DOM).
+            if (!firstH1 || !element.contains(firstH1)) {
+                return;
+            }
+            host = preview.createDiv({ cls: CARD_HOST_CLASS });
+            firstH1.insertAdjacentElement("beforebegin", host);
+        } else {
+            // Genuinely H1-less note (cache, not DOM timing): anchor after the frontmatter chunk.
+            const anchor = section.querySelector(".el-pre") ?? section.querySelector(".mod-header");
+            host = preview.createDiv({ cls: CARD_HOST_CLASS });
+            if (anchor) {
+                anchor.insertAdjacentElement("afterend", host);
+            } else {
+                section.insertAdjacentElement("afterbegin", host);
+            }
         }
-
-        const host = preview.createDiv({ cls: CARD_HOST_CLASS });
-        targetSection.insertAdjacentElement("beforebegin", host);
 
         const record = lookupRecord(options.entityIndex, plugin, ctx.sourcePath);
         if (!record) {
