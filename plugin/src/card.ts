@@ -125,13 +125,7 @@ export async function renderCard(
     renderChips(bodyEl, record, ctx.settings.excludeTags);
 
     const descEl = bodyEl.createDiv({ cls: `${CARD_CLASS}__desc` });
-    descEl.style.setProperty(
-        "-webkit-line-clamp",
-        String(clampDescriptionLines(ctx.settings.descriptionLines)),
-    );
-    descEl.style.setProperty("display", "-webkit-box");
-    descEl.style.setProperty("-webkit-box-orient", "vertical");
-    descEl.style.setProperty("overflow", "hidden");
+    const descLineClamp = String(clampDescriptionLines(ctx.settings.descriptionLines));
 
     const descChild = new MarkdownRenderChild(descEl);
     getCardRuntime(el).descChild = descChild;
@@ -141,6 +135,15 @@ export async function renderCard(
         unloadDescRenderChild(el, ctx);
         return;
     }
+
+    // MarkdownRenderer wraps the description in a block <p>; line-clamp must
+    // target that paragraph (not just the container) to take effect.
+    const descParagraph = descEl.querySelector(":scope > p");
+    const clampTarget = descParagraph instanceof HTMLElement ? descParagraph : descEl;
+    clampTarget.style.setProperty("-webkit-line-clamp", descLineClamp);
+    clampTarget.style.setProperty("display", "-webkit-box");
+    clampTarget.style.setProperty("-webkit-box-orient", "vertical");
+    clampTarget.style.setProperty("overflow", "hidden");
 
     if (hasSecret) {
         const footerEl = bodyEl.createDiv({ cls: `${CARD_CLASS}__footer` });
