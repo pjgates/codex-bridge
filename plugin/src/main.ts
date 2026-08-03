@@ -3,6 +3,11 @@ import { DEFAULT_CARD_SETTINGS } from "./defaults.js";
 import { EntityIndex } from "./entityIndex.js";
 import { registerNoteCardPostProcessor } from "./noteCardPostProcessor.js";
 import { SessionRevealState } from "./revealState.js";
+import {
+    activateCodexDashboard,
+    CodexDashboardView,
+    VIEW_TYPE_CODEX_DASHBOARD,
+} from "./sidebarView.js";
 
 export default class CodexDashboardPlugin extends Plugin {
     entityIndex!: EntityIndex;
@@ -26,6 +31,23 @@ export default class CodexDashboardPlugin extends Plugin {
         this.registerEvent(this.app.metadataCache.on("resolved", rebuildIndex));
         // onLayoutReady returns void (not EventRef), so it stays outside registerEvent.
         this.app.workspace.onLayoutReady(rebuildIndex);
+
+        this.registerView(
+            VIEW_TYPE_CODEX_DASHBOARD,
+            (leaf) => new CodexDashboardView(leaf, this),
+        );
+
+        this.addRibbonIcon("users", "Open Codex Dashboard", () => {
+            void activateCodexDashboard(this);
+        });
+
+        this.addCommand({
+            id: "open-codex-dashboard",
+            name: "Open Codex Dashboard",
+            callback: () => {
+                void activateCodexDashboard(this);
+            },
+        });
 
         console.info("codex-dashboard: loaded");
     }
