@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { hashCreatureImportData, journalAdoptUpdateData, journalShellCreateData, JOURNAL_SHELL_FOLDER, moduleFlags, peopleActorCreateData, peopleActorUpdateData, rewriteLinkPlaceholders } from "./import.js";
-import type { SyncEntity } from "./payload-types.js";
+import { hashCreatureImportData, creatureArtFields, journalAdoptUpdateData, journalShellCreateData, JOURNAL_SHELL_FOLDER, moduleFlags, peopleActorCreateData, peopleActorUpdateData, rewriteLinkPlaceholders } from "./import.js";
+import type { SyncCreature, SyncEntity } from "./payload-types.js";
 
 describe("rewriteLinkPlaceholders", () => {
     it("rewrites known sync ids to journal UUID links", () => {
@@ -182,6 +182,30 @@ describe("journal shell folder placement", () => {
             },
         });
         expect(adopt).not.toHaveProperty("folder");
+    });
+});
+
+describe("creatureArtFields", () => {
+    const manta: SyncCreature = {
+        syncId: "fs-manta001",
+        slug: "manta",
+        name: "Manta",
+        statblock: {} as SyncCreature["statblock"],
+        portrait: "art/fs-manta001.webp",
+        contentHash: "h-m1",
+    };
+
+    it("drives both actor img and prototype token texture from the portrait", () => {
+        // Reimport path relies on this: core's default-artwork fill only runs at creation,
+        // so an existing creature actor's token texture only updates if we write it.
+        expect(creatureArtFields(manta)).toEqual({
+            img: "codex-sync/art/fs-manta001.webp",
+            prototypeToken: { texture: { src: "codex-sync/art/fs-manta001.webp" } },
+        });
+    });
+
+    it("returns no art fields when the creature has no portrait, never clobbering existing token art", () => {
+        expect(creatureArtFields({ ...manta, portrait: null })).toEqual({});
     });
 });
 

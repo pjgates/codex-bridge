@@ -223,6 +223,15 @@ function creaturePortrait(creature: SyncCreature): string | undefined {
     return creature.portrait ? `codex-sync/${creature.portrait}` : undefined;
 }
 
+/** Vault-owned art for creature actors. portrait drives img AND prototypeToken.texture.src: core's
+ * default-artwork fill only runs at creation, so reimport must rewrite the texture explicitly or
+ * existing tokens keep their original (default-icon) texture. Absent portrait → {}: never clobbers. */
+export function creatureArtFields(creature: SyncCreature): Record<string, unknown> {
+    const portrait = creaturePortrait(creature);
+    if (!portrait) return {};
+    return { img: portrait, prototypeToken: { texture: { src: portrait } } };
+}
+
 function getManagedDocument(docType: ManagedDocType, id: string): ForgeDocument | undefined {
     return docType === "JournalEntry" ? game.journal!.get(id) : game.actors!.get(id);
 }
@@ -250,12 +259,11 @@ async function writeCreatureBaseline(actor: Actor.Implementation, syncId: string
 
 async function createCreatureActor(creature: SyncCreature): Promise<Actor.Implementation> {
     const translated = buildTranslatedCreature(creature);
-    const portrait = creaturePortrait(creature);
     const translatedFlags = translated.flags as Record<string, Record<string, unknown>> | undefined;
     const builderModuleFlags = translatedFlags?.[MODULE_ID] ?? {};
     const actor = await getDocumentClass("Actor").create({
         ...translated,
-        ...(portrait ? { img: portrait } : {}),
+        ...creatureArtFields(creature),
         folder: await getOrCreateFolder("Bestiary", "Actor"),
         ownership: { default: NONE },
         flags: {
@@ -273,10 +281,9 @@ async function createCreatureActor(creature: SyncCreature): Promise<Actor.Implem
 
 async function reimportCreatureActor(actor: Actor.Implementation, creature: SyncCreature): Promise<void> {
     const translated = buildTranslatedCreature(creature);
-    const portrait = creaturePortrait(creature);
     await actor.update({
         name: translated.name,
-        ...(portrait ? { img: portrait } : {}),
+        ...creatureArtFields(creature),
         system: translated.system,
     } as Actor.UpdateData);
     const itemIds = actor.items.map((item) => item.id);

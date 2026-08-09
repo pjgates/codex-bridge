@@ -5,12 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## Unreleased
+## 1.0.2
 
 ### Changed
 
 - **Vault bestiary format:** creature statblocks moved from YAML frontmatter to ` ```statblock ` body fences, declared by a `creatures: [id, …]` frontmatter array. A file can now hold several creatures (e.g. `praetorians.md`); each fence carries its own `id`, `syncId`, `published`, and `portrait`. Push mints missing syncIds into the fence. Old frontmatter statblocks fail the build with a migration error naming the file.
 - **Statblock Importer:** pasting a multi-creature file offers a creature picker; public notes now exclude the statblock fences.
+
+### Fixed
+
+- **Vault Sync:** creature portraits now drive the prototype token texture, not just the actor image. Foundry only applies default artwork at creation, so previously synced creature actors kept their old (default-icon) token texture on reimport; reimport now rewrites `prototypeToken.texture.src` from the vault portrait. Creatures without a portrait are untouched — GM-set token art is never clobbered.
 
 ## 1.0.1
 

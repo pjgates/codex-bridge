@@ -1,48 +1,48 @@
 {
-    "id": "codex-foundry",
-    "title": "Codex Foundry",
-    "description": "Codex bridge for Foundry VTT: vault content sync plus ruleset houserules (currently Starfinder Second Edition).",
-    "version": "1.0.1",
-    "authors": [
-        {
-            "name": "peterg"
+  "id": "codex-foundry",
+  "title": "Codex Foundry",
+  "description": "Codex bridge for Foundry VTT: vault content sync plus ruleset houserules (currently Starfinder Second Edition).",
+  "version": "1.0.2",
+  "authors": [
+    {
+      "name": "peterg"
+    }
+  ],
+  "compatibility": {
+    "minimum": "14",
+    "verified": "14",
+    "maximum": "14"
+  },
+  "relationships": {
+    "systems": [
+      {
+        "id": "sf2e",
+        "type": "system",
+        "compatibility": {
+          "minimum": "0.0.4"
         }
-    ],
-    "compatibility": {
-        "minimum": "14",
-        "verified": "14",
-        "maximum": "14"
-    },
-    "relationships": {
-        "systems": [
-            {
-                "id": "sf2e",
-                "type": "system",
-                "compatibility": {
-                    "minimum": "0.0.4"
-                }
-            }
-        ]
-    },
-    "system": [
-        "sf2e"
-    ],
-    "esmodules": [
-        "dist/module.js"
-    ],
-    "styles": [
-        "dist/module.css"
-    ],
-    "languages": [
-        {
-            "lang": "en",
-            "name": "English",
-            "path": "dist/lang/en.json"
-        }
-    ],
-    "url": "https://github.com/pjgates/codex-bridge",
-    "manifest": "https://github.com/pjgates/codex-bridge/releases/latest/download/module.json",
-    "download": "https://github.com/pjgates/codex-bridge/releases/download/v1.0.1/codex-foundry.zip",
-    "bugs": "https://github.com/pjgates/codex-bridge/issues",
-    "changelog": "https://github.com/pjgates/codex-bridge/releases"
+      }
+    ]
+  },
+  "system": [
+    "sf2e"
+  ],
+  "esmodules": [
+    "dist/module.js"
+  ],
+  "styles": [
+    "dist/module.css"
+  ],
+  "languages": [
+    {
+      "lang": "en",
+      "name": "English",
+      "path": "dist/lang/en.json"
+    }
+  ],
+  "url": "https://github.com/pjgates/codex-bridge",
+  "manifest": "https://github.com/pjgates/codex-bridge/releases/latest/download/module.json",
+  "download": "https://github.com/pjgates/codex-bridge/releases/download/v1.0.1/codex-foundry.zip",
+  "bugs": "https://github.com/pjgates/codex-bridge/issues",
+  "changelog": "https://github.com/pjgates/codex-bridge/releases"
 }
