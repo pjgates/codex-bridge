@@ -64,7 +64,7 @@ export class CodexDashboardView extends ItemView {
     }
 
     getIcon(): string {
-        return "users";
+        return "sword";
     }
 
     async onOpen(): Promise<void> {

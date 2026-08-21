@@ -718,3 +718,10 @@
 		transition: none;
 	}
 }
+
+/* ── Ribbon / view icon: gold sword rotated 135° clockwise ─────────────── */
+
+.side-dock-ribbon-action[aria-label="Open Codex Dashboard"] .svg-icon,
+.workspace-tab-header[data-type="codex-dashboard"] .workspace-tab-header-inner-icon .svg-icon {
+	transform: rotate(135deg);
+}

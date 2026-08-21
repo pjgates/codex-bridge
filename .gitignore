@@ -21,3 +21,4 @@ Thumbs.db
 .env.local
 codex-sync.config.json
 sync-out/
+.superpowers/

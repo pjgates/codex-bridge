@@ -49,7 +49,7 @@ export default class CodexDashboardPlugin extends Plugin {
 
         this.addSettingTab(new CodexDashboardSettingTab(this.app, this));
 
-        this.addRibbonIcon("users", "Open Codex Dashboard", () => {
+        this.addRibbonIcon("sword", "Open Codex Dashboard", () => {
             void activateCodexDashboard(this);
         });
 
