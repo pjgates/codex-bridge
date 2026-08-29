@@ -223,13 +223,24 @@ function creaturePortrait(creature: SyncCreature): string | undefined {
     return creature.portrait ? `codex-sync/${creature.portrait}` : undefined;
 }
 
-/** Vault-owned art for creature actors. portrait drives img AND prototypeToken.texture.src: core's
- * default-artwork fill only runs at creation, so reimport must rewrite the texture explicitly or
- * existing tokens keep their original (default-icon) texture. Absent portrait → {}: never clobbers. */
+/** Vault-owned creature art: portraits drive the actor and base token texture; optional
+ * transparent subjects drive the dynamic ring without replacing existing portrait art. */
 export function creatureArtFields(creature: SyncCreature): Record<string, unknown> {
     const portrait = creaturePortrait(creature);
-    if (!portrait) return {};
-    return { img: portrait, prototypeToken: { texture: { src: portrait } } };
+    const subject = creature.subject;
+    if (!portrait && !subject) return {};
+    return {
+        ...(portrait ? { img: portrait } : {}),
+        prototypeToken: {
+            ...(portrait ? { texture: { src: portrait } } : {}),
+            ...(subject ? {
+                ring: {
+                    enabled: true,
+                    subject: { texture: `codex-sync/${subject}`, scale: 1 },
+                },
+            } : {}),
+        },
+    };
 }
 
 function getManagedDocument(docType: ManagedDocType, id: string): ForgeDocument | undefined {

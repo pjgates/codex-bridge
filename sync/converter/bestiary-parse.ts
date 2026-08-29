@@ -11,6 +11,8 @@ export interface ParsedVaultCreature extends ParsedCreature {
     syncId?: string;
     /** Bare art filename from the fence `portrait` field, if present. */
     portrait?: string;
+    /** Bare transparent token art filename from the fence `subject` field, if present. */
+    subject?: string;
     /** Fence-body character offsets in the raw file, for syncId write-back. */
     span: { start: number; end: number };
 }
@@ -34,6 +36,7 @@ export function parseCreature(
         slug: creature.id,
         syncId: creature.syncId,
         portrait: creature.portrait,
+        subject: creature.subject,
         span: creature.span,
         statblock: normaliseStatblock(creature.data, filename),
     }));

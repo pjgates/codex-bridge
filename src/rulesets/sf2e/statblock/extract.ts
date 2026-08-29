@@ -4,7 +4,7 @@
  *
  * A creature file declares its statblocks in frontmatter — `creatures: [id, …]`
  * — and provides one ```statblock fence per id in the body. Identity fields
- * (`id`, `syncId`, `portrait`) live inside the fence; everything else is a
+ * (`id`, `syncId`, `portrait`, `subject`) live inside the fence; everything else is a
  * Pathfinder 2e Creature Layout field passed through to normaliseStatblock.
  */
 import { load } from "js-yaml";
@@ -16,7 +16,9 @@ export interface ExtractedCreature {
     syncId?: string;
     /** Bare art filename from the fence `portrait` field, if present. */
     portrait?: string;
-    /** Normaliser input: every fence field except id/syncId/portrait. */
+    /** Bare transparent token art filename from the fence `subject` field, if present. */
+    subject?: string;
+    /** Normaliser input: every fence field except id/syncId/portrait/subject. */
     data: Record<string, unknown>;
     /** Fence-body character offsets in the raw file, for syncId write-back. */
     span: { start: number; end: number };
@@ -96,15 +98,19 @@ export function extractStatblocks(filename: string, raw: string): ExtractedStatb
             throw new Error(`${filename}: statblock block "${trimmedId}": not declared in the frontmatter creatures array`);
         }
 
-        const { id: _id, syncId, portrait, ...data } = record;
+        const { id: _id, syncId, portrait, subject, ...data } = record;
         if (syncId !== undefined && typeof syncId !== "string") throw new Error(`${filename}: ${trimmedId}: syncId: expected a string`);
         if (portrait !== undefined && typeof portrait !== "string") {
             throw new Error(`${filename}: ${trimmedId}: portrait: expected a string`);
+        }
+        if (subject !== undefined && typeof subject !== "string") {
+            throw new Error(`${filename}: ${trimmedId}: subject: expected a string`);
         }
         byId.set(trimmedId, {
             id: trimmedId,
             syncId: syncId as string | undefined,
             portrait: portrait === undefined ? undefined : stripWikilink(portrait as string),
+            subject: subject === undefined ? undefined : stripWikilink(subject as string),
             data,
             span: { start, end: start + yaml.length },
         });

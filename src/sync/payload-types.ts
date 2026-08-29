@@ -25,6 +25,8 @@ export interface SyncCreature {
     name: string;
     statblock: CreatureStatblock;
     portrait: string | null;
+    /** Optional transparent token subject; omitted by legacy creature payloads. */
+    subject?: string | null;
     contentHash: string;
 }
 

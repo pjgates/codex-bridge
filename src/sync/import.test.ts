@@ -204,8 +204,39 @@ describe("creatureArtFields", () => {
         });
     });
 
+    it("uses separate staged subject art for the dynamic ring without replacing the portrait", () => {
+        expect(creatureArtFields({
+            ...manta,
+            subject: "art/fs-manta001-subject.png",
+        })).toEqual({
+            img: "codex-sync/art/fs-manta001.webp",
+            prototypeToken: {
+                texture: { src: "codex-sync/art/fs-manta001.webp" },
+                ring: {
+                    enabled: true,
+                    subject: { texture: "codex-sync/art/fs-manta001-subject.png", scale: 1 },
+                },
+            },
+        });
+    });
+
     it("returns no art fields when the creature has no portrait, never clobbering existing token art", () => {
         expect(creatureArtFields({ ...manta, portrait: null })).toEqual({});
+    });
+
+    it("adds subject art without clobbering existing creature art when no portrait is present", () => {
+        expect(creatureArtFields({
+            ...manta,
+            portrait: null,
+            subject: "art/fs-manta001-subject.png",
+        })).toEqual({
+            prototypeToken: {
+                ring: {
+                    enabled: true,
+                    subject: { texture: "codex-sync/art/fs-manta001-subject.png", scale: 1 },
+                },
+            },
+        });
     });
 });
 

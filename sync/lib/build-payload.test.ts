@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -157,6 +158,53 @@ Secret XYZ\n%%Secret%%\nGM only
 
         expect(result.payload.creatures[0]?.name).toBe("Dust Manta");
         expect(result.payload.creatures[0]?.statblock.level).toBe(3);
+    });
+
+    it("stages creature subject art separately from its portrait and includes it in the content hash", async () => {
+        const creatureSource = DUST_MANTA.replace(
+            "id: dust-manta\n",
+            "id: dust-manta\nsyncId: fs-manta001\nportrait: randall-20260726.webp\nsubject: \"[[hero-subject.png]]\"\n",
+        );
+        await writeFile(path.join(vault, "codex/the-forge/bestiary/dust-manta.md"), creatureSource);
+
+        const result = await buildPayload({ vaultPath: vault, campaign: "the-forge" });
+        const creature = result.payload.creatures[0]!;
+
+        expect(creature.portrait).toBe("art/fs-manta001.webp");
+        expect(creature.subject).toBe("art/fs-manta001-subject.png");
+        expect(result.artFiles.get(path.join(vault, "codex/assets/hero-subject.png")))
+            .toBe("art/fs-manta001-subject.png");
+        expect(creature.contentHash).toBe(
+            createHash("sha256")
+                .update(JSON.stringify([creature.statblock, creature.portrait, creature.subject]))
+                .digest("hex")
+                .slice(0, 16),
+        );
+    });
+
+    it("preserves the legacy content hash for creatures without subject art", async () => {
+        await writeFile(path.join(vault, "codex/the-forge/bestiary/dust-manta.md"), DUST_MANTA);
+
+        const result = await buildPayload({ vaultPath: vault, campaign: "the-forge" });
+        const creature = result.payload.creatures[0]!;
+
+        expect(creature.contentHash).toBe(
+            createHash("sha256")
+                .update(JSON.stringify([creature.statblock, creature.portrait]))
+                .digest("hex")
+                .slice(0, 16),
+        );
+    });
+
+    it("hard-fails when a referenced creature subject asset is missing", async () => {
+        const creatureSource = DUST_MANTA.replace(
+            "id: dust-manta\n",
+            "id: dust-manta\nsubject: missing-creature-subject.png\n",
+        );
+        await writeFile(path.join(vault, "codex/the-forge/bestiary/dust-manta.md"), creatureSource);
+
+        await expect(buildPayload({ vaultPath: vault, campaign: "the-forge" }))
+            .rejects.toThrow(/missing-creature-subject\.png/);
     });
 
     it("mints a missing creature syncId into the statblock fence, not the frontmatter", async () => {

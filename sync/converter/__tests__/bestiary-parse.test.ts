@@ -225,11 +225,17 @@ type: Character
         expect(() => parseCreature("old.md", raw)).toThrow("old.md: statblock: old frontmatter format");
     });
 
-    it("surfaces fence syncId and portrait for the payload builder", () => {
-        const raw = creatureFile(`syncId: fs-abc12345\nportrait: "[[rat.webp]]"\nname: Rat\nlevel: 1\nac: 10\nhp: 10\n${REQUIRED_MECHANICS}`);
+    it("surfaces fence syncId, portrait, and subject for the payload builder", () => {
+        const raw = creatureFile(`syncId: fs-abc12345\nportrait: "[[rat.webp]]"\nsubject: "[[rat-subject.png]]"\nname: Rat\nlevel: 1\nac: 10\nhp: 10\n${REQUIRED_MECHANICS}`);
         const result = parseOne("rat.md", raw);
         expect(result.syncId).toBe("fs-abc12345");
         expect(result.portrait).toBe("rat.webp");
+        expect(result.subject).toBe("rat-subject.png");
+    });
+
+    it("rejects non-string creature subjects", () => {
+        const raw = creatureFile(`subject: 42\nname: Rat\nlevel: 1\nac: 10\nhp: 10\n${REQUIRED_MECHANICS}`);
+        expect(() => parseCreature("rat.md", raw)).toThrow("rat.md: test-creature: subject: expected a string");
     });
 
     it("applies defaults for missing optional fields", () => {

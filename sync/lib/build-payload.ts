@@ -224,13 +224,17 @@ export async function buildPayload(options: BuildPayloadOptions): Promise<BuildR
         for (const creature of parsed) {
             const syncId = await ensureSyncId(filePath, creature.syncId);
             const portrait = await stageArt(creature.portrait, syncId, filePath);
+            const subject = await stageSubjectArt(creature.subject, syncId, filePath);
             creatures.push({
                 syncId,
                 slug: creature.slug,
                 name: creature.statblock.name,
                 statblock: creature.statblock,
                 portrait,
-                contentHash: hash(JSON.stringify([creature.statblock, portrait])),
+                subject,
+                contentHash: hash(JSON.stringify(subject
+                    ? [creature.statblock, portrait, subject]
+                    : [creature.statblock, portrait])),
             });
         }
     }
