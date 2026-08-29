@@ -219,7 +219,11 @@ describe("buildImportActorData", () => {
         const filaments = actions.find((item) => item.name === "Extraction Filaments")!;
         const filamentsDescription = (filaments.system as { description: { value: string } }).description.value;
         expect(filamentsDescription).toContain("<strong>Failure</strong>");
-        expect(filamentsDescription).toContain("@UUID[Compendium.sf2e.conditions.Item.Drained]");
+        expect(filamentsDescription).toContain("@UUID[Compendium.sf2e.conditions.Item.4D2KBtexWXa6oUMR]{Drained 1}");
+        const veil = actions.find((item) => item.name === "Dust Veil")!;
+        const veilDescription = (veil.system as { description: { value: string } }).description.value;
+        expect(veilDescription).toContain("@UUID[Compendium.sf2e.conditions.Item.TkIyaNPgTZFBCCuh]{dazzled} for 1 round");
+        expect(veilDescription).toContain("@UUID[Compendium.sf2e.conditions.Item.XgEqL1kFApUbl5Z2]{blinded} for 1 round");
     });
 });
 

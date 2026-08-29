@@ -49,6 +49,7 @@ const VALUED_CONDITIONS = [
     "doomed",
     "wounded",
     "dying",
+    "glitching",
 ] as const;
 
 /**
@@ -75,39 +76,48 @@ const VALUELESS_CONDITIONS = [
     "dazzled",
     "fatigued",
     "encumbered",
+    "suppressed",
+    "untethered",
 ] as const;
 
-/** Map condition text → Compendium item name (PascalCase). */
-const CONDITION_ITEM_MAP: Record<string, string> = {
-    "off-guard": "Off-Guard",
-    blinded: "Blinded",
-    deafened: "Deafened",
-    paralyzed: "Paralyzed",
-    petrified: "Petrified",
-    immobilized: "Immobilized",
-    grabbed: "Grabbed",
-    restrained: "Restrained",
-    fascinated: "Fascinated",
-    fleeing: "Fleeing",
-    unconscious: "Unconscious",
-    invisible: "Invisible",
-    quickened: "Quickened",
-    prone: "Prone",
-    dazzled: "Dazzled",
-    fatigued: "Fatigued",
-    encumbered: "Encumbered",
-    frightened: "Frightened",
-    sickened: "Sickened",
-    stunned: "Stunned",
-    slowed: "Slowed",
-    clumsy: "Clumsy",
-    enfeebled: "Enfeebled",
-    drained: "Drained",
-    stupefied: "Stupefied",
-    doomed: "Doomed",
-    wounded: "Wounded",
-    dying: "Dying",
-};
+/**
+ * SF2e document IDs from packs/pf2e/conditions (shared) and packs/sf2e/conditions
+ * in foundryvtt/pf2e, pinned to 99eae5d9d3ab13aa7a80632475a191215db3b730.
+ * Name-based UUIDs are resolved during the system's pack build, not at runtime.
+ */
+const CONDITION_ITEM_IDS = {
+    "off-guard": "AJh5ex99aV6VTggg",
+    blinded: "XgEqL1kFApUbl5Z2",
+    deafened: "9PR9y0bi4JPKnHPR",
+    paralyzed: "6uEgoh53GbXuHpTF",
+    petrified: "dTwPJuKgBQCMxixg",
+    immobilized: "eIcWbB5o3pP6OIMe",
+    grabbed: "kWc1fhmv9LBiTuei",
+    restrained: "VcDeM8A5oI6VqhbM",
+    fascinated: "AdPVz7rbaVSRxHFg",
+    fleeing: "sDPxOjQ9kx2RZE8D",
+    unconscious: "fBnFDH2MTzgFijKf",
+    invisible: "zJxUflt9np0q4yML",
+    quickened: "nlCjDvLMf2EkV2dl",
+    prone: "j91X7x0XSomq8d60",
+    dazzled: "TkIyaNPgTZFBCCuh",
+    fatigued: "HL2l2VRSaQHu9lUw",
+    encumbered: "D5mg6Tc7Jzrj6ro7",
+    frightened: "TBSHQspnbcqxsmjL",
+    sickened: "fesd1n5eVhpCSS18",
+    stunned: "dfCMdR4wnpbYNTix",
+    slowed: "xYTAsEpcJE1Ccni3",
+    clumsy: "i3OJZU2nk64Df3xm",
+    enfeebled: "MIRkyAjyBeXivMa7",
+    drained: "4D2KBtexWXa6oUMR",
+    stupefied: "e1XGnhKNSQIm5IXg",
+    doomed: "3uh1r86TzbQvosxv",
+    wounded: "Yl48xTdMh3aeQYL2",
+    dying: "yZRUzMqrMmfLu0V1",
+    glitching: "6A2QDy8wRGCVQsSd",
+    suppressed: "enA7BxAjBb7ns1iF",
+    untethered: "z1ucw4CLwLqHoAp3",
+} as const;
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -182,35 +192,40 @@ export function enrichTemplates(text: string): string {
 }
 
 /**
- * Condition names → `@UUID[Compendium.sf2e.conditions.Item.X]{display}`
+ * Condition names → `@UUID[Compendium.sf2e.conditions.Item.<id>]{display}`
  *
  * Handles both valued conditions ("frightened 1") and select valueless
  * conditions ("off-guard", "blinded", …).
  */
 export function enrichConditions(text: string): string {
-    let result = text;
+    // Captured UUID links occupy odd segments; only enrich the prose between them.
+    const segments = text.split(/(@UUID\[[^\]]+\](?:\{[^}]*\})?)/g);
+    for (let index = 0; index < segments.length; index += 2) {
+        let result = segments[index];
 
-    // Valued conditions: "frightened 1", "sickened 2", etc.
-    for (const cond of VALUED_CONDITIONS) {
-        const itemName = CONDITION_ITEM_MAP[cond];
-        const re = new RegExp(`\\b(${cond})\\s+(\\d+)\\b`, "gi");
-        result = result.replace(re, (_match, name: string, value: string) => {
-            return `@UUID[Compendium.${SYSTEM_ID}.conditions.Item.${itemName}]{${capitalise(name)} ${value}}`;
-        });
+        // Valued conditions: "frightened 1", "sickened 2", etc.
+        for (const cond of VALUED_CONDITIONS) {
+            const itemId = CONDITION_ITEM_IDS[cond];
+            const re = new RegExp(`\\b(${cond})\\s+(\\d+)\\b`, "gi");
+            result = result.replace(re, (_match, name: string, value: string) => {
+                return `@UUID[Compendium.${SYSTEM_ID}.conditions.Item.${itemId}]{${capitalise(name)} ${value}}`;
+            });
+        }
+
+        // Valueless conditions: "off-guard", "blinded", etc.
+        for (const cond of VALUELESS_CONDITIONS) {
+            const itemId = CONDITION_ITEM_IDS[cond];
+            // Escape hyphens for regex
+            const escaped = cond.replace(/-/g, "\\-");
+            const re = new RegExp(`\\b${escaped}\\b`, "gi");
+            result = result.replace(re, (match) => {
+                return `@UUID[Compendium.${SYSTEM_ID}.conditions.Item.${itemId}]{${match}}`;
+            });
+        }
+        segments[index] = result;
     }
 
-    // Valueless conditions: "off-guard", "blinded", etc.
-    for (const cond of VALUELESS_CONDITIONS) {
-        const itemName = CONDITION_ITEM_MAP[cond];
-        // Escape hyphens for regex
-        const escaped = cond.replace(/-/g, "\\-");
-        const re = new RegExp(`\\b${escaped}\\b`, "gi");
-        result = result.replace(re, (match) => {
-            return `@UUID[Compendium.${SYSTEM_ID}.conditions.Item.${itemName}]{${match}}`;
-        });
-    }
-
-    return result;
+    return segments.join("");
 }
 
 // ---------------------------------------------------------------------------

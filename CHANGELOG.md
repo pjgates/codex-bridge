@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## Unreleased
+
+### Fixed
+
+- **SF2e creature imports:** condition links now use compendium document IDs instead of names, fixing Dazzled, Blinded, and other linked conditions in abilities. This applies to new imports and explicit reimports; existing actors are not automatically updated.
+- **SF2e conditions:** ability descriptions now recognize Glitching with a numeric value, Suppressed, and Untethered. Existing explicit condition links are preserved.
+
 ## 1.0.2
 
 ### Changed
