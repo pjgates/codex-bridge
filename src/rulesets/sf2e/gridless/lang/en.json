@@ -4,6 +4,15 @@
             "gridlessCombat": {
                 "name": "Gridless Combat",
                 "hint": "Enable continuous combat geometry, automatic cover, area targeting, and movement overlays on gridless PF2e and SF2e scenes. Includes flanking and attack-distance guides. Requires reload."
+            },
+            "movementPreview": {
+                "name": "Movement Preview",
+                "hint": "Remaining-movement overlay style on gridless scenes. Off hides the overlay; Simple circle draws the remaining distance as a plain circle (routed path costs included, terrain ignored); Reachable ring outlines the approximate reachable area. Applies to the next preview.",
+                "choices": {
+                    "off": "Off",
+                    "circle": "Simple circle",
+                    "ring": "Reachable ring"
+                }
             }
         },
         "gridless": {

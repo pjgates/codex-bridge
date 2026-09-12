@@ -47,7 +47,7 @@ An optional setting for PF2e and SF2e gridless scenes. Gridded scenes keep their
 - All five blocked rays prevent the attack or save. Native Take Cover effects provide greater cover without stacking circumstance bonuses.
 - Native area shapes remain continuous. Area placement selects visible targets inside the shape with at least one clear wall ray.
 - Area saves use the placed shape as their origin. If an item has multiple areas, select the relevant area before the save.
-- The remaining-Stride ring appears only for one selected token during movement or while the **Preview Movement Ring** shortcut is held.
+- The remaining-Stride outline appears only for one selected token during movement or while the **Preview Movement Ring** shortcut is held.
 - Selecting multiple tokens hides movement rings, including held previews.
 - The shortcut is unassigned by default. Assign it under **Configure Controls → Codex Foundry → Preview Movement Ring**.
 - Ready attacks add colored distance overlays: filled melee-reach circles and outline-only ranged circles. They use the same movement/hold-preview visibility.
@@ -58,7 +58,18 @@ An optional setting for PF2e and SF2e gridless scenes. Gridded scenes keep their
 - Drag previews include the planned path. Canceling a drag restores the recorded budget, and the next turn resets movement history.
 - This is a movement-only indicator. Attacks and other non-movement actions do not consume its budget.
 - Outside the token's turn, only the current drag preview consumes the displayed allowance.
-- Ring outlines remain straight-line previews. They do not predict walls or future terrain costs.
+- The outline shows an approximate reachable area around walls and through terrain. It uses native movement costs, not a hidden square grid.
+- The overlay has three modes under **Movement Preview**: the reachable-area ring (default), a simple circle of the remaining distance (routed path costs included, terrain ignored), or off.
+- During dragging, the last completed outline stays at its calculated position until the latest replacement is ready.
+- Automatic routing preserves placed waypoints and searches for cheaper routes around walls and difficult terrain.
+- Clearance uses the occupied rectangle. Exactly fitting doorways permit passage.
+- Small creatures use 2.5-foot passages normally. Medium creatures use them as difficult terrain.
+- Large, Huge, and Gargantuan creatures can use 5-, 10-, and 15-foot passages, respectively, as difficult terrain.
+- Only the cramped portion costs extra. This penalty does not stack with other difficult terrain.
+- Tighter gaps require Squeeze and remain outside automatic combat routing.
+- Terrain uses Region behaviors that modify movement costs, labeled **Difficult Terrain** in PF2e/SF2e.
+- Prepared abilities that ignore all difficult or greater difficult terrain also affect gridless movement costs.
+- Routing stays on the current elevation and level. Explicit vertical transitions, teleportation, and unconstrained movement retain native behavior.
 - Movement budgets require native history recording. PF2e Toolbelt's per-user **Better Movement → No History Record** option must be off.
 
 Automatic cover is this module's geometric approximation, not native PF2e/SF2e automation. Region outlines do not clip to walls.
@@ -94,6 +105,7 @@ Found under **Module Settings > Codex Foundry**. All settings are world-scoped (
 | **Enable Target Helper** | Adds per-target rows to chat cards. Requires reload. | On |
 | **Heroic Rerolls** | Raises Hero Point d20 rerolls below 10 to 10. Requires reload. | Off |
 | **Gridless Combat** | Continuous geometry, automatic cover, area targeting, flanking guides, and remaining-movement rings. Requires reload. | Off |
+| **Movement Preview** | Gridless remaining-movement overlay: **Reachable ring**, **Simple circle** (remaining distance; routed costs included, terrain ignored), or **Off**. Requires Gridless Combat. | Reachable ring |
 | **Players Roll All Dice** | Enables the PRAD variant. Requires Target Helper to be on. | Off |
 | **Strict DC Mode (Exact Probabilities)** | Uses DC = 12 + modifier instead of 11 + modifier under PRAD, exactly preserving original probabilities. | Off |
 | **Statblock Importer** | Adds an Import Statblock button to the Actors sidebar (GM only). | On |

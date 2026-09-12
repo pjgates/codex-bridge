@@ -11,12 +11,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - **Gridless Combat:** optional PF2e/SF2e support with continuous distance and reach, native flanking, center-based automatic cover, and wall-aware area targeting.
 - **Gridless guides:** center-filled flanking sectors and a turn-based remaining-movement ring with native action glyphs. Rings appear only for one selected token during movement or hold-to-preview.
+- **Movement preview options:** the remaining-movement overlay renders as the reachable-area ring (default), a plain circle of the remaining distance that still includes routed path costs, or nothing at all.
 - **Attack distances:** ready melee attacks show translucent reach circles. Ranged attacks show outline-only range rings. Equal distances share labeled circles.
+- **Gridless routing:** automatic terrain-weighted routes and reachable-movement outlines account for token clearance without snapping movement to squares.
+- **Cramped passages:** Small creatures use 2.5-foot passages normally. Medium and larger creatures can use smaller passages at difficult-terrain cost. Tighter gaps require Squeeze.
 - **Pathfinder compatibility:** the module manifest now permits PF2e worlds.
 
 ### Fixed
 
+- **Cave routing:** destination searches use A* and skip distant wall geometry. Route corners remain clear after native pixel rounding.
+- **Movement preview:** continuous dragging no longer cancels every outline calculation. The previous outline stays in place until its replacement is ready.
 - **Gridless movement:** spent distance now carries forward when the active combatant inherits its scene from the encounter.
+- **Gridless terrain:** prepared abilities that ignore all difficult or greater difficult terrain now affect native gridless movement costs.
 - **SF2e creature imports:** condition links now use compendium document IDs instead of names, fixing Dazzled, Blinded, and other linked conditions in abilities. This applies to new imports and explicit reimports; existing actors are not automatically updated.
 - **SF2e conditions:** ability descriptions now recognize Glitching with a numeric value, Suppressed, and Untethered. Existing explicit condition links are preserved.
 

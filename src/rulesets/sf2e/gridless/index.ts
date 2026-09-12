@@ -3,6 +3,7 @@ import { activateCover } from "./cover.js";
 import { activateAreaTargeting } from "./areas.js";
 import { activateMovementRings } from "./movement.js";
 import { activateFlankingGuide } from "./flanking.js";
+import { activateGridlessRouting } from "./routing.js";
 
 export { registerGridlessSetting } from "./settings.js";
 export { registerMovementPreviewKeybind } from "./movement.js";
@@ -12,6 +13,7 @@ export function activateGridlessCombat(): void {
     activateTokenGeometry();
     activateCover();
     activateAreaTargeting();
+    activateGridlessRouting();
     activateMovementRings();
     activateFlankingGuide();
 }
