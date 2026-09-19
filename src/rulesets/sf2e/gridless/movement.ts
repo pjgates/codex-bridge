@@ -25,11 +25,20 @@ function iconGlyph(iconClass: string, fallback: string): string {
     return glyph;
 }
 
-/** The climb rim borrows the Climb movement action's icon; the squeeze rim uses compress. */
-function frontierGlyph(reason: FrontierReason): string {
-    if (reason === "squeeze") return iconGlyph("fa-solid fa-compress", "\uf066");
-    const climb = (CONFIG.Token.movement.actions as Record<string, { icon?: string }>).climb;
-    return iconGlyph(climb?.icon ?? "fa-solid fa-person-through-window", "\ue5a9");
+/**
+ * The climb rim borrows the Climb movement action's own marker: its image when it has one, as the
+ * token HUD shows, otherwise its font icon. The squeeze rim uses compress.
+ */
+function frontierIcon(reason: FrontierReason, size: number): PIXI.Text | PIXI.Sprite {
+    const climb = (CONFIG.Token.movement.actions as Record<string, { icon?: string; img?: string }>).climb;
+    if (reason === "climb" && climb?.img) {
+        const sprite = PIXI.Sprite.from(climb.img);
+        sprite.width = sprite.height = size;
+        return sprite;
+    }
+    const glyph = reason === "squeeze" ? iconGlyph("fa-solid fa-compress", "\uf066")
+        : iconGlyph(climb?.icon ?? "fa-solid fa-person-through-window", "\ue5a9");
+    return new PIXI.Text(glyph, { fontFamily: "Font Awesome 7 Pro", fontWeight: "900", fontSize: size, fill: 0xffffff, stroke: 0x000000, strokeThickness: 4 });
 }
 const FRONTIER_COLOR = 0xff4d4d;
 
@@ -88,7 +97,7 @@ export function activateMovementRings(): void {
     let fogMask: PIXI.Sprite | null = null;
     const previews = new WeakMap<Token.Implementation, MovementPreview>();
     const rings = new Map<Token.Implementation, {
-        graphics: PIXI.Graphics; frontierGraphics: PIXI.Graphics; frontierIcons: PIXI.Text[]; debugGraphics: PIXI.Graphics; debugLegend: PIXI.Text;
+        graphics: PIXI.Graphics; frontierGraphics: PIXI.Graphics; frontierIcons: (PIXI.Text | PIXI.Sprite)[]; debugGraphics: PIXI.Graphics; debugLegend: PIXI.Text;
         attackGraphics: PIXI.Graphics; attackLabels: PIXI.Text[];
         attackActor: AttackActor | null; attackSource: readonly PreparedAttack[] | undefined;
         attackRanges: (AttackRange & { color: number })[]; tokenHeight: number;
@@ -113,7 +122,7 @@ export function activateMovementRings(): void {
         rings.delete(token);
     }
 
-    function clearFrontier(ring: { frontierGraphics: PIXI.Graphics; frontierIcons: PIXI.Text[] }): void {
+    function clearFrontier(ring: { frontierGraphics: PIXI.Graphics; frontierIcons: (PIXI.Text | PIXI.Sprite)[] }): void {
         ring.frontierGraphics.clear();
         for (const icon of ring.frontierIcons) { ring.frontierGraphics.removeChild(icon); icon.destroy(); }
         ring.frontierIcons = [];
@@ -253,9 +262,7 @@ export function activateMovementRings(): void {
                                     current.frontierGraphics.lineStyle(1 / drawZoom, FRONTIER_COLOR, 0.6).beginFill(FRONTIER_COLOR, 0.3)
                                         .drawPolygon(offsets.map((value, i) => value + (i % 2 ? point.y : point.x))).endFill();
                                 }
-                                const icon = current.frontierGraphics.addChild(new PIXI.Text(frontierGlyph(rim.reason), {
-                                    fontFamily: "Font Awesome 7 Pro", fontWeight: "900", fontSize: 18, fill: 0xffffff, stroke: 0x000000, strokeThickness: 4,
-                                }));
+                                const icon = current.frontierGraphics.addChild(frontierIcon(rim.reason, 18));
                                 icon.anchor.set(0.5, 0.5);
                                 icon.position.set(rim.centre.x, rim.centre.y);
                                 icon.scale.set(1 / drawZoom);

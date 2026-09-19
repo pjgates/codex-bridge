@@ -70,6 +70,12 @@ function setupMovementCanvas() {
         anchor = { set() {} };
         constructor(public text: string, public style: { fontFamily?: string }) { super(); }
     }
+    class Sprite extends Container {
+        anchor = { set() {} };
+        width = 0; height = 0;
+        src = "";
+        static from(src: string) { const sprite = new Sprite(); sprite.src = src; return sprite; }
+    }
     const reaches = new Map<AttackItem, number>();
     const scene = { regions: [], levels: new Map([["floor", { edges: new Map() }]]),
         dimensions: { size: 100, distance: 5, distancePixels: 20, rect: { x: -1000, y: -1000, width: 2000, height: 2000 } } };
@@ -108,7 +114,7 @@ function setupMovementCanvas() {
     const combat = { started: true, combatant };
     const bindings = new Map<string, PreviewBinding>();
     const interfaceLayer = new Container();
-    vi.stubGlobal("PIXI", { Container, Graphics, Text, Color });
+    vi.stubGlobal("PIXI", { Container, Graphics, Text, Sprite, Color });
     vi.stubGlobal("ClipperLib", {
         PolyType: { ptSubject: 0 }, ClipType: { ctUnion: 1 }, PolyFillType: { pftNonZero: 1 },
         Clipper: class {
@@ -163,7 +169,8 @@ function setupMovementCanvas() {
         debugHexes: () => visibleGraphics().flatMap(graphic => graphic.paintedPolygons).filter(p => p.alpha > 0 && p.points.length === 12),
         frontier: () => {
             const layer = visibleGraphics().find(graphic => (graphic as Graphics & { name?: string }).name === "codex-movement-frontier");
-            return { cells: layer?.paintedPolygons ?? [], icons: (layer?.children ?? []).filter((child): child is Text => child instanceof Text).map(icon => icon.text) };
+            return { cells: layer?.paintedPolygons ?? [],
+                icons: (layer?.children ?? []).map(child => child instanceof Text ? child.text : child instanceof Sprite ? child.src : "?") };
         },
         setSetting: (key: string, value: unknown) => { settingValues[key] = value; registeredSettings.get(key)?.onChange?.(value); },
         budgetPosition: () => visibleGraphics().find(isBudget)?.position,
@@ -430,4 +437,10 @@ it("paints a red rim with a climb icon along a ledge the token cannot walk up", 
     binding.onUp();
     await radii();
     expect(frontier().cells).toEqual([]);
+    // With the Climb action carrying an image, as Foundry's default does, the rim shows that image.
+    (CONFIG.Token.movement.actions as Record<string, { img?: string; walls?: string }>).climb = { img: "icons/svg/ladder.svg", walls: "move" };
+    binding.onDown();
+    await radii();
+    expect(frontier().icons).toEqual(["icons/svg/ladder.svg"]);
+    binding.onUp();
 });

@@ -13,4 +13,8 @@
     .codex-climb-refused {
         color: #ff6b6b;
     }
+
+    .img.codex-climb-refused {
+        filter: sepia(1) saturate(6) hue-rotate(-30deg);
+    }
 }

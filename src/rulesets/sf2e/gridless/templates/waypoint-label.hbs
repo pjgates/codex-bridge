@@ -33,7 +33,11 @@
         <i class="icon fa-solid fa-compress codex-squeezed" inert></i>
     {{/if}}
     {{#if climbRefused}}
-        <i class="icon {{climbIcon}} codex-climb-refused" inert></i>
+        {{#if climbImg}}
+            <div class="img codex-climb-refused" style="background-image: url({{climbImg}})"></div>
+        {{else}}
+            <i class="icon {{climbIcon}} codex-climb-refused" inert></i>
+        {{/if}}
     {{/if}}
     {{#if actionCost}}
     <span class="action-glyph">
