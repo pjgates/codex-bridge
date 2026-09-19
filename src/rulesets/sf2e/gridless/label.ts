@@ -22,6 +22,7 @@ interface LabelContext {
     actionCost?: { actions: number; overage: boolean };
     remaining?: string;
     climbRefused?: boolean;
+    climbIcon?: string;
     squeezed?: boolean;
 }
 interface LabelState { codexSqueezed?: Set<RulerWaypoint>; codexFloors?: { elevations: number[]; refusedFrom: number | null; chain: RulerWaypoint[] } | null }
@@ -82,6 +83,7 @@ export function decorateWaypointLabel(ruler: RulerLike, waypoint: RulerWaypoint,
             if (elevation !== previous) context.elevation.delta = signed(round(elevation - previous, 2));
             if (floors.refusedFrom !== null && index >= floors.refusedFrom) {
                 context.climbRefused = true;
+                context.climbIcon = (CONFIG.Token.movement.actions as Record<string, { icon?: string }>).climb?.icon ?? "fa-solid fa-person-through-window";
                 context.cssClass = `${context.cssClass} unreachable`.trim();
             }
         }

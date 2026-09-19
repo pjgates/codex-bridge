@@ -7,8 +7,30 @@ import { dragPaths, getMovementArea, isKnownMovementPoint, measureProposedMoveme
 import { TERRAIN_COLORS, type DebugTerrain } from "./debug.js";
 import type { FrontierReason } from "./hexfield.js";
 
-/** Font Awesome 7 Pro solid glyphs Foundry already loads: person-hiking and compress. */
-const FRONTIER_ICONS: Record<FrontierReason, string> = { climb: "\uf6ec", squeeze: "\uf066" };
+/** Font Awesome solid glyph for an icon class, read from the loaded stylesheet so it always matches the ruler's own icons. */
+const glyphCache = new Map<string, string>();
+function iconGlyph(iconClass: string, fallback: string): string {
+    const known = glyphCache.get(iconClass);
+    if (known) return known;
+    let glyph = fallback;
+    if (typeof document !== "undefined" && typeof getComputedStyle === "function") {
+        const probe = document.createElement("i");
+        probe.className = iconClass;
+        document.body.appendChild(probe);
+        const content = getComputedStyle(probe, "::before").content.match(/"(.)"/u);
+        probe.remove();
+        if (content) glyph = content[1];
+    }
+    glyphCache.set(iconClass, glyph);
+    return glyph;
+}
+
+/** The climb rim borrows the Climb movement action's icon; the squeeze rim uses compress. */
+function frontierGlyph(reason: FrontierReason): string {
+    if (reason === "squeeze") return iconGlyph("fa-solid fa-compress", "\uf066");
+    const climb = (CONFIG.Token.movement.actions as Record<string, { icon?: string }>).climb;
+    return iconGlyph(climb?.icon ?? "fa-solid fa-person-through-window", "\ue5a9");
+}
 const FRONTIER_COLOR = 0xff4d4d;
 
 type Waypoint = TokenDocument.MeasuredMovementWaypoint;
@@ -231,7 +253,7 @@ export function activateMovementRings(): void {
                                     current.frontierGraphics.lineStyle(1 / drawZoom, FRONTIER_COLOR, 0.6).beginFill(FRONTIER_COLOR, 0.3)
                                         .drawPolygon(offsets.map((value, i) => value + (i % 2 ? point.y : point.x))).endFill();
                                 }
-                                const icon = current.frontierGraphics.addChild(new PIXI.Text(FRONTIER_ICONS[rim.reason], {
+                                const icon = current.frontierGraphics.addChild(new PIXI.Text(frontierGlyph(rim.reason), {
                                     fontFamily: "Font Awesome 7 Pro", fontWeight: "900", fontSize: 18, fill: 0xffffff, stroke: 0x000000, strokeThickness: 4,
                                 }));
                                 icon.anchor.set(0.5, 0.5);

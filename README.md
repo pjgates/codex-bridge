@@ -99,7 +99,7 @@ Scenes imported by the Map Workshop Importer carry `setElevation` floor regions.
 
 With the reachable ring on in hex lattice mode, cells just beyond the ring that the token could enter only by other means are filled red, one icon per stretch:
 
-- A **hiker** marks a ledge more than one 2.5-foot step up. Switch to Climb or Fly to take it. Tokens already on a climbing action never see these.
+- The **Climb action's icon** marks a ledge more than one 2.5-foot step up. Switch to Climb or Fly to take it. Tokens already on a climbing action never see these.
 - A **compress arrow** marks a gap too tight for the token's cramped footprint but wide enough for a Squeeze, half the cramped width. Routes do go through, at triple cost, and the rim stays red until the token enters it. It appears only where the gap leads to ground the token cannot otherwise reach, so ordinary walls stay unmarked.
 
 ### Ruler label

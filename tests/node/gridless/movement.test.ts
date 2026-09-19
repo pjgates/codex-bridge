@@ -426,7 +426,7 @@ it("paints a red rim with a climb icon along a ledge the token cannot walk up", 
     expect(cells.length).toBeGreaterThan(20);
     expect(cells.every(cell => cell.fill === 0xff4d4d && cell.alpha > 0)).toBe(true);
     expect(cells.every(cell => cell.points[0] > 280)).toBe(true);
-    expect(icons).toEqual(["\uf6ec"]);
+    expect(icons).toEqual(["\ue5a9"]);
     binding.onUp();
     await radii();
     expect(frontier().cells).toEqual([]);

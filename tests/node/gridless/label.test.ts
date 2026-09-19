@@ -32,7 +32,7 @@ function setup(options: { gridless?: boolean; floors?: boolean; enforceClimb?: b
             getMovementOrigin: (p: { x: number; y: number }) => ({ x: p.x + 50, y: p.y + 50 }) },
         measureMovementPath: () => ({ cost: history }),
     };
-    vi.stubGlobal("CONFIG", { Token: { rulerClass: Ruler } });
+    vi.stubGlobal("CONFIG", { Token: { rulerClass: Ruler, movement: { actions: { climb: { icon: "fa-solid fa-person-through-window" } } } } });
     vi.stubGlobal("CONST", { REGION_MOVEMENT_SEGMENTS: { ENTER: 1, MOVE: 0, EXIT: -1 } });
     vi.stubGlobal("game", { system: { id: "pf2e" }, combat: { started: true, combatant: { token: token.document } },
         settings: { get: (_ns: string, key: string) => key === "enforceClimb" ? enforceClimb : true },
@@ -97,6 +97,7 @@ describe("merged ruler label", () => {
         expect(onStep!.climbRefused).toBeUndefined();
         expect(pastLedge!.climbRefused).toBe(true);
         expect(pastLedge!.cssClass).toContain("unreachable");
+        expect(pastLedge!.climbIcon).toBe("fa-solid fa-person-through-window");
         expect(pastLedge!.elevation!.total).toBe("+2.5");
         vi.unstubAllGlobals();
         const relaxed = setup({ floors: true, enforceClimb: false });
