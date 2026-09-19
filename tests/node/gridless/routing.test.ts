@@ -319,18 +319,16 @@ it("halves difficult-terrain reach and restores it for a creature that ignores t
     expect(await reach()).toBeLessThanOrEqual(710);
 });
 
-it("routes a hex path around a solid wall and lands on the destination's cell centre", async () => {
+it("routes a hex path around a solid wall and finishes exactly where the user asked", async () => {
     const { token } = setup({ lattice: "hex" });
     token.actor.size = "sm";
     const path = await token.findMovementPath([{ x: 250, y: 450 }, { x: 650, y: 450 }]).promise;
     expect(path.length).toBeGreaterThan(2);
     expect(path.length).toBeLessThanOrEqual(12);
     expect(path.some(point => point.y < 350 || point.y > 650)).toBe(true);
-    const last = path.at(-1)!;
-    // The endpoint lands on the destination's cell centre, not the exact cursor position.
-    const snapped = Math.hypot(last.x - 650, last.y - 450);
-    expect(snapped).toBeGreaterThan(1);
-    expect(snapped).toBeLessThanOrEqual(10);
+    // Foundry flags any requested position the found path misses as unreachable, so the last
+    // leg leaves the lattice and ends on the exact request when it fits.
+    expect(path.at(-1)).toMatchObject({ x: 650, y: 450 });
 });
 
 it("stops a hex route at an unreachable destination instead of crossing the wall", async () => {
@@ -341,15 +339,11 @@ it("stops a hex route at an unreachable destination instead of crossing the wall
     expect(path.at(-1)!.x).toBeLessThan(480);
 });
 
-it("keeps a clear hex drag on the native straight line, snapped to the destination cell", async () => {
+it("keeps a clear hex drag on the native straight line to the exact destination", async () => {
     const { token } = setup({ lattice: "hex" });
     const path = await token.findMovementPath([{ x: 150, y: 150 }, { x: 650, y: 150 }]).promise;
     expect(path).toHaveLength(2);
-    // The endpoint is the destination's cell centre, not the raw cursor position.
-    const centre = hexCentre(hexAt({ x: 700, y: 200 }, 10), 10);
-    const last = path.at(-1)!;
-    expect(Math.hypot(last.x - (centre.x - 50), last.y - (centre.y - 50))).toBeLessThan(0.5);
-    expect(last.x === 650 && last.y === 150).toBe(false);
+    expect(path.at(-1)).toMatchObject({ x: 650, y: 150 });
 });
 
 

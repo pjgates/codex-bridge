@@ -32,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Fixed
 
 - **Dense wall scenes:** the wall-clearance build no longer compares every wall against every other one. A 4,000-wall level built in 35 seconds and froze the tab; it now takes a fraction of a second.
+- **Two labels on every hex drag:** hex routes ended on the destination's cell centre, a few pixels from the request, so Foundry appended the request as an unreachable waypoint with a second label. Routes now finish on the exact request whenever the last leg fits.
 - **Long movement budgets on the hex lattice:** the reachable flood threw for budgets of 80 ft or more on large scenes.
 - **Floor treads at other heights:** floor entries are now traced along the path geometrically. Foundry's region segmentiser only reports a region whose elevation band contains the token, and map-workshop exports put `setElevation` on zero-height bands, so a token at one height never saw the next tread.
 - **Concave regions on the hex lattice:** difficult-terrain and floor regions were rasterised with a convex-only containment test, so any concave region, which is most hand-drawn or cave-shaped ones, applied no cost or height at all. Regions now use even-odd containment.

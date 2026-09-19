@@ -3,7 +3,7 @@ import { buildClearance, clearSegment, obstructedFraction, rayClearance, type Cl
 import { navigationPath, reachablePolygons, searchNavigation, type NavigationMap } from "./navigation.js";
 import { isGridlessActive, movementLatticeMode } from "./settings.js";
 import { activateGridlessTerrainCosts } from "./terrain.js";
-import { hexAt, hexCentre } from "./hex.js";
+import { hexAt } from "./hex.js";
 import { blockedFrontier, buildHexField, floodReachable, hexContours, hexPull, hexRoute, modeArrays, type FrontierRim, type HexClearanceMode, type HexField, type HexRegion } from "./hexfield.js";
 import { snapshotMovementDebug, type MovementDebugData, type MovementDebugRegion } from "./debug.js";
 import { CLIMB_ACTIONS } from "./elevation.js";
@@ -313,27 +313,17 @@ function activatePassageCosts(): void {
     };
 }
 
-/** Snap the destination only when the final native legs still clear the full footprint. */
+/** Keep a clear native drag only when its legs also clear the lattice's full footprint. */
 function hexSnapEnd(token: NativeToken, path: Waypoint[], options: PathOptions): Waypoint[] | null {
-    const last = path.at(-1)!, previous = path.at(-2);
-    const action = CONFIG.Token.movement.actions[last.action];
-    let snapped = path;
-    if (action?.walls && !action.teleport && previous?.level === last.level && previous.elevation === last.elevation) {
-        const destination = token.document.getCenterPoint(last);
-        const size = token.scene.dimensions.size / 10;
-        const centre = hexCentre(hexAt(destination, size), size);
-        const pivot = token.document.getCenterPoint({ ...last, x: 0, y: 0 });
-        snapped = [...path.slice(0, -1), { ...last, x: centre.x - pivot.x, y: centre.y - pivot.y }];
-    }
-    for (let i = 1; i < snapped.length; i++) {
-        const from = snapped[i - 1], to = snapped[i], action = CONFIG.Token.movement.actions[to.action];
+    for (let i = 1; i < path.length; i++) {
+        const from = path[i - 1], to = path[i], action = CONFIG.Token.movement.actions[to.action];
         if (!action?.walls || action.teleport || from.level !== to.level || from.elevation !== to.elevation) continue;
         const { field } = movementHexField(token, to, options);
         const a = token.document.getCenterPoint({ ...from, width: to.width, height: to.height, shape: to.shape });
         const b = token.document.getCenterPoint(to);
         if (!clearSegment(field.fullSpace, b, b) || !clearSegment(field.fullSpace, a, b)) return null;
     }
-    return snapped;
+    return path;
 }
 
 
@@ -381,6 +371,9 @@ function hexPathJob(token: NativeToken, points: Waypoint[], options: PathOptions
             const path = hexPull(field, route, mode);
             const { space } = modeArrays(field, mode);
             if (!clearSegment(space, origin, path[0])) break;
+            // Finish exactly where the user asked when that last leg fits. Foundry matches the found
+            // path against the request by exact position and labels any mismatch as unreachable.
+            if (clearSegment(space, destination, destination) && clearSegment(space, path[path.length - 1], destination)) path[path.length - 1] = destination;
             const pivot = token.document.getCenterPoint({ ...to, x: 0, y: 0 });
             for (const point of path) {
                 routed.push({ ...to, x: point.x - pivot.x, y: point.y - pivot.y,
