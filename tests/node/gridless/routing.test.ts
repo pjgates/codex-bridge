@@ -1,17 +1,18 @@
 import { afterEach, expect, it, vi } from "vitest";
 import { activateGridlessRouting, getMovementArea, measureProposedMovement } from "../../../src/rulesets/sf2e/gridless/routing.js";
 import { buildClearance, clearSegment } from "../../../src/rulesets/sf2e/gridless/clearance.js";
+import { hexAt, hexCentre } from "../../../src/rulesets/sf2e/gridless/hex.js";
 
 afterEach(() => vi.unstubAllGlobals());
 
-function setup() {
+function setup(options: { lattice?: "continuous" | "hex" } = {}) {
     const callbacks: Record<string, () => void> = {};
     const edge = { a: { x: 500, y: 300 }, b: { x: 500, y: 700 }, move: 1, direction: 0, type: "wall" };
     let geometryReads = 0;
     const edges = new Map([["wall", edge]]);
     const level = { id: "floor", get edges() { geometryReads++; return edges; } };
     const scene = { id: "scene", regions: [], levels: new Map([["floor", level]]),
-        dimensions: { size: 100, distancePixels: 20, rect: { x: 0, y: 0, width: 1000, height: 1000 } } };
+        dimensions: { size: 100, distancePixels: 20, distance: 5, rect: { x: 0, y: 0, width: 1000, height: 1000 } } };
     type Waypoint = { x: number; y: number; elevation: number; width: number; height: number; depth: number; shape: number; level: string; action: string; cost?: number; intermediate?: boolean; terrain?: { difficulty: number } | null; checkpoint?: boolean };
     type Exemption = { environment: string; feature: string };
     class TerrainData {
@@ -51,7 +52,9 @@ function setup() {
     }
     let enabled = true;
     vi.stubGlobal("CONFIG", { Token: { objectClass: Token, movement: { TerrainData, actions: { walk: { walls: "move" }, blink: { walls: null, teleport: true } } } } });
-    vi.stubGlobal("game", { system: { id: "pf2e" }, settings: { get: () => enabled }, user: { isGM: true } });
+    vi.stubGlobal("game", { system: { id: "pf2e" }, settings: {
+        get: (_namespace: string, key: string) => key === "movementLattice" ? options.lattice ?? "continuous" : enabled,
+    }, user: { isGM: true } });
     vi.stubGlobal("canvas", { ready: true, scene, grid: { isGridless: true }, dimensions: scene.dimensions,
         visibility: { tokenVision: false }, tokens: { controlled: [] } });
     vi.stubGlobal("Hooks", { on: (name: string, callback: () => void) => { callbacks[name] = callback; } });
@@ -252,4 +255,218 @@ it("stops a compressed footprint crossing even when its centre misses the wall",
     const [path, constrained] = token.constrainMovementPath(points, { preview: false });
     expect(constrained).toBe(true);
     expect(path.at(-1)!.x).toBeLessThanOrEqual(425);
+});
+
+function difficult(token: { scene: { regions: unknown[] } }, from: number, difficulty = 2): void {
+    token.scene.regions = [{
+        hidden: false,
+        polygons: [{ points: [from, 0, 1000, 0, 1000, 1000, from, 1000] }],
+        includedInLevel: () => true,
+        behaviors: [{ disabled: false, system: { _getTerrainEffects: () => [{ name: "difficulty", difficulty }] } }],
+    }];
+}
+
+it("stops the hex ring at a wall for a token with no cramped allowance", async () => {
+    const { token, edge, callbacks } = setup({ lattice: "hex" });
+    token.actor.size = "sm";
+    const outline = async () => {
+        // 12 feet keeps the wall's end out of reach, so only the band itself decides the outline.
+        const area = await getMovementArea(token as unknown as Token.Implementation, { x: 300, y: 500 }, 12).promise;
+        expect(area!.length).toBeGreaterThan(0);
+        const xs = area!.flatMap(polygon => polygon.filter((_value, index) => index % 2 === 0));
+        return { min: Math.min(...xs), max: Math.max(...xs) };
+    };
+    const closed = await outline();
+    expect(closed.max).toBeLessThan(490);
+    expect(closed.min).toBeLessThan(250);
+    edge.move = 0;
+    callbacks.updateWall();
+    const opened = await outline();
+    expect(opened.max).toBeGreaterThan(520);
+});
+
+it("charges the cramped allowance where a medium token passes a wall band", async () => {
+    const { token, edge, callbacks } = setup({ lattice: "hex" });
+    const reach = async () => {
+        const area = await getMovementArea(token as unknown as Token.Implementation, { x: 300, y: 500 }, 20).promise;
+        return Math.max(...area!.flatMap(polygon => polygon.filter((_value, index) => index % 2 === 0)));
+    };
+    const closed = await reach();
+    edge.move = 0;
+    callbacks.updateWall();
+    const opened = await reach();
+    // Hex keeps continuous semantics: a Medium token's cramped footprint passes beside the
+    // wall at difficult cost, so the closed door costs distance instead of blocking outright.
+    expect(opened).toBeGreaterThan(600);
+    expect(closed).toBeLessThan(opened - 50);
+});
+
+it("halves difficult-terrain reach and restores it for a creature that ignores the terrain", async () => {
+    const { token, edge, callbacks } = setup({ lattice: "hex" });
+    edge.move = 0;
+    difficult(token, 0);
+    callbacks.updateRegion();
+    const reach = async () => {
+        const area = await getMovementArea(token as unknown as Token.Implementation, { x: 300, y: 500 }, 20).promise;
+        return Math.max(...area!.flatMap(polygon => polygon.filter((_value, index) => index % 2 === 0)));
+    };
+    // Twenty feet of budget allows ten feet (200 pixels) of difficult-terrain travel.
+    expect(await reach()).toBeGreaterThanOrEqual(490);
+    expect(await reach()).toBeLessThanOrEqual(510);
+    token.actor.system.movement.terrain.difficult.ignored.push({ environment: "all", feature: "all" });
+    callbacks.updateActor();
+    expect(await reach()).toBeGreaterThanOrEqual(690);
+    expect(await reach()).toBeLessThanOrEqual(710);
+});
+
+it("routes a hex path around a solid wall and lands on the destination's cell centre", async () => {
+    const { token } = setup({ lattice: "hex" });
+    token.actor.size = "sm";
+    const path = await token.findMovementPath([{ x: 250, y: 450 }, { x: 650, y: 450 }]).promise;
+    expect(path.length).toBeGreaterThan(2);
+    expect(path.length).toBeLessThanOrEqual(12);
+    expect(path.some(point => point.y < 350 || point.y > 650)).toBe(true);
+    const last = path.at(-1)!;
+    // The endpoint lands on the destination's cell centre, not the exact cursor position.
+    const snapped = Math.hypot(last.x - 650, last.y - 450);
+    expect(snapped).toBeGreaterThan(1);
+    expect(snapped).toBeLessThanOrEqual(10);
+});
+
+it("stops a hex route at an unreachable destination instead of crossing the wall", async () => {
+    const { token } = setup({ lattice: "hex" });
+    token.actor.size = "sm";
+    token.scene.levels.get("floor")!.edges.set("sealed", { a: { x: 500, y: 0 }, b: { x: 500, y: 1000 }, move: 1, direction: 0, type: "wall" });
+    const path = await token.findMovementPath([{ x: 250, y: 450 }, { x: 650, y: 450 }]).promise;
+    expect(path.at(-1)!.x).toBeLessThan(480);
+});
+
+it("keeps a clear hex drag on the native straight line, snapped to the destination cell", async () => {
+    const { token } = setup({ lattice: "hex" });
+    const path = await token.findMovementPath([{ x: 150, y: 150 }, { x: 650, y: 150 }]).promise;
+    expect(path).toHaveLength(2);
+    // The endpoint is the destination's cell centre, not the raw cursor position.
+    const centre = hexCentre(hexAt({ x: 700, y: 200 }, 10), 10);
+    const last = path.at(-1)!;
+    expect(Math.hypot(last.x - (centre.x - 50), last.y - (centre.y - 50))).toBeLessThan(0.5);
+    expect(last.x === 650 && last.y === 150).toBe(false);
+});
+
+
+it("keeps full-footprint clearance even when cramped movement has no cost penalty", async () => {
+    const { token, edge, TerrainData } = setup({ lattice: "hex" });
+    TerrainData.getMovementCostFunction = () => (_from, _to, distance) => distance;
+    // The line clears the reduced footprint at the wall tip, but not the full token.
+    const path = await token.findMovementPath([{ x: 250, y: 680 }, { x: 650, y: 680 }]).promise;
+    const full = buildClearance([edge], token.scene.dimensions.rect, 100, 100, 0);
+    const centres = path.map(point => token.document.getCenterPoint(point));
+    expect(centres.slice(1).every((point, i) => clearSegment(full, centres[i], point))).toBe(true);
+    expect(path.at(-1)!.x).toBeCloseTo(650, 0);
+});
+
+it("uses the cramped-passage fallback only when a full route cannot fit", async () => {
+    const { token, callbacks } = setup({ lattice: "hex" });
+    gap(token, 60, callbacks);
+    const path = await token.findMovementPath([{ x: 250, y: 450 }, { x: 650, y: 450 }]).promise;
+    expect(Math.abs(path.at(-1)!.x - 650)).toBeLessThanOrEqual(10);
+    const centres = path.map(point => token.document.getCenterPoint(point));
+    const walls = [...token.scene.levels.get("floor")!.edges.values()];
+    const cramped = buildClearance(walls, token.scene.dimensions.rect, 50, 50, -5);
+    const full = buildClearance(walls, token.scene.dimensions.rect, 100, 100, 0);
+    expect(centres.slice(1).every((point, i) => clearSegment(cramped, centres[i], point))).toBe(true);
+    expect(centres.slice(1).some((point, i) => !clearSegment(full, centres[i], point))).toBe(true);
+    expect(measureProposedMovement(token as unknown as Token.Implementation, path)).toBeGreaterThan(20);
+});
+
+it("checks walking clearance before a native teleport without moving its destination", async () => {
+    const { token, edge, TerrainData } = setup({ lattice: "hex" });
+    TerrainData.getMovementCostFunction = () => (_from, _to, distance) => distance;
+    const path = await token.findMovementPath([
+        { x: 250, y: 680 }, { x: 650, y: 680 }, { x: 803, y: 807, action: "blink" },
+    ]).promise;
+    const full = buildClearance([edge], token.scene.dimensions.rect, 100, 100, 0);
+    expect(path.at(-1)).toMatchObject({ x: 803, y: 807, action: "blink" });
+    expect(path.slice(1).every((point, i) => point.action === "blink" ||
+        clearSegment(full, token.document.getCenterPoint(path[i]), token.document.getCenterPoint(point)))).toBe(true);
+});
+
+it("keeps full hex clearance after native whole-pixel waypoint rounding", async () => {
+    const { token, callbacks } = setup({ lattice: "hex" });
+    token.actor.size = "sm";
+    Object.assign(token.scene.dimensions, { size: 79, distancePixels: 15.8 });
+    Object.assign(token.scene.dimensions.rect, { width: 2160, height: 2963 });
+    const walls = [
+        { a: { x: 1292, y: 1184 }, b: { x: 1330, y: 1216 }, move: 20, type: "wall", direction: 0 },
+        { a: { x: 1330, y: 1216 }, b: { x: 1332, y: 1180 }, move: 20, type: "wall", direction: 0 },
+    ];
+    const edges = token.scene.levels.get("floor")!.edges;
+    edges.clear(); walls.forEach((wall, i) => edges.set(String(i), wall)); callbacks.updateWall();
+    const path = await token.findMovementPath([{ x: 994, y: 1282 }, { x: 1503, y: 1110 }]).promise;
+    expect(Math.hypot(path.at(-1)!.x - 1503, path.at(-1)!.y - 1110)).toBeLessThan(8);
+    const centres = path.map(point => ({ x: Math.round(point.x) + 39.5, y: Math.round(point.y) + 39.5 }));
+    const full = buildClearance(walls, token.scene.dimensions.rect, 39.5, 39.5, 0);
+    expect(centres.slice(1).every((point, i) => clearSegment(full, centres[i], point))).toBe(true);
+});
+
+it("snapshots only reachable known debug cells and keeps terrain separate from token cost", async () => {
+    const { token, callbacks } = setup({ lattice: "hex" });
+    difficult(token, 300);
+    const region = token.scene.regions[0];
+    Object.assign(region, {
+        testPoint: (point: { x: number; elevation: number }) => point.x >= 300 && point.elevation === 0,
+        behaviors: [
+            { type: "environment", disabled: false, system: { mode: "add", environmentTypes: new Set(["aquatic"]), _getTerrainEffects: () => [] } },
+            { disabled: false, system: { _getTerrainEffects: () => [{ difficulty: 2 }] } },
+        ],
+    });
+    vi.stubGlobal("game", { ...game, user: { isGM: false } });
+    Object.assign(canvas!, { visibility: { tokenVision: true, testVisibility: (p: { x: number }) => p.x < 340 },
+        fog: { isPointExplored: (p: { x: number }) => p.x < 340 } });
+    const area = getMovementArea(token as unknown as Token.Implementation, { x: 300, y: 500 }, 5, undefined, true);
+    await area.promise;
+    expect(area.debug).toBeDefined();
+    const cells = area.debug!.cells;
+    expect(cells.some(cell => cell.terrain === "aquatic" && cell.multiplier === 2)).toBe(true);
+    expect(cells.some(cell => cell.terrain === "none" && cell.multiplier === 1)).toBe(true);
+    expect(cells.every(cell => hexCentre(cell, area.debug!.size).x < 340)).toBe(true);
+    expect(cells.every(cell => cell.cost <= 5)).toBe(true);
+    const saved = structuredClone(cells);
+    token.actor.system.movement.terrain.difficult.ignored.push({ environment: "all", feature: "all" });
+    callbacks.updateActor();
+    const changed = getMovementArea(token as unknown as Token.Implementation, { x: 300, y: 500 }, 10, undefined, true);
+    await changed.promise;
+    expect(changed.debug!.cells.some(cell => cell.terrain === "aquatic" && cell.multiplier === 1)).toBe(true);
+    expect(area.debug!.cells).toEqual(saved);
+});
+
+it("honours scene environment inheritance and region remove/override precedence", async () => {
+    const { token, callbacks } = setup({ lattice: "hex" });
+    Object.assign(token.scene, { flags: { pf2e: { environmentTypes: ["underground"] } } });
+    difficult(token, 0);
+    const environment = (mode: string, type: string) => ({ type: "environment", disabled: false,
+        system: { mode, environmentTypes: new Set([type]), _getTerrainEffects: () => [] } });
+    const behaviors = [environment("add", "aquatic"), environment("remove", "aquatic"), environment("add", "aquatic")];
+    Object.assign(token.scene.regions[0], { testPoint: () => true, behaviors });
+    const types = async () => {
+        const area = getMovementArea(token as unknown as Token.Implementation, { x: 300, y: 500 }, 1, undefined, true);
+        await area.promise;
+        return [...new Set(area.debug!.cells.map(cell => cell.terrain))];
+    };
+    expect(await types()).toEqual(["underground"]);
+    behaviors.push(environment("override", "forest"), environment("add", "aquatic"));
+    callbacks.updateRegionBehavior();
+    expect(await types()).toEqual(["aquatic"]);
+});
+
+it("squeezes a hex route through a gap below the cramped footprint at triple cost", async () => {
+    const { token, callbacks } = setup({ lattice: "hex" });
+    const waypoints = [{ x: 250, y: 450 }, { x: 650, y: 450 }];
+    gap(token, 40, callbacks);
+    const path = await token.findMovementPath(waypoints).promise;
+    expect(path.at(-1)?.x).toBe(650);
+    // Twenty feet of travel: the 100 px wall band is cramped for the full footprint, and its
+    // middle 50 px also for the cramped footprint, so 2.5 ft cost double and 2.5 ft cost triple.
+    expect(measureProposedMovement(token as unknown as Token.Implementation, path)).toBeCloseTo(27.5, 0);
+    gap(token, 8, callbacks);
+    expect((await token.findMovementPath(waypoints).promise).at(-1)?.x).toBe(250);
 });

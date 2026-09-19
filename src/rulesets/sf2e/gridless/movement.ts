@@ -1,8 +1,15 @@
 import { MODULE_ID } from "../../../constants.js";
-import { isGridlessActive, movementPreviewMode } from "./settings.js";
+import { isGridlessActive, movementDebugEnabled, movementLatticeMode, movementPreviewMode, type MovementPreviewMode } from "./settings.js";
 import type { Point } from "./geometry.js";
+import { hexCentre, hexCorners } from "./hex.js";
 import { getAttackRanges, type AttackActor, type AttackRange, type PreparedAttack } from "./reach.js";
 import { dragPaths, getMovementArea, isKnownMovementPoint, measureProposedMovement, mergeMovementArea, type MovementAreaJob } from "./routing.js";
+import { TERRAIN_COLORS, type DebugTerrain } from "./debug.js";
+import type { FrontierReason } from "./hexfield.js";
+
+/** Font Awesome 7 Pro solid glyphs Foundry already loads: person-hiking and compress. */
+const FRONTIER_ICONS: Record<FrontierReason, string> = { climb: "\uf6ec", squeeze: "\uf066" };
+const FRONTIER_COLOR = 0xff4d4d;
 
 type Waypoint = TokenDocument.MeasuredMovementWaypoint;
 interface RulerData {
@@ -11,7 +18,7 @@ interface RulerData {
     plannedMovement: Record<string, { history: Waypoint[]; foundPath: Waypoint[] }>;
 }
 interface MovementRuler {
-    token: Token.Implementation;
+    token: Token.Implementation & { readonly isDragged: boolean };
     refresh(data: RulerData): void;
     clear(): void;
 }
@@ -49,23 +56,23 @@ export function movementBudget(speed: number, cost: number): { actions: number; 
     return { actions, remaining: actions * speed - cost };
 }
 
+export function ownTurn(token: Token.Implementation): boolean {
+    const combat = game.combat;
+    return !!combat?.started && combat.combatant?.token === token.document;
+}
+
 export function activateMovementRings(): void {
     let container: PIXI.Container | null = null;
     let fogMask: PIXI.Sprite | null = null;
     const previews = new WeakMap<Token.Implementation, MovementPreview>();
     const rings = new Map<Token.Implementation, {
-        graphics: PIXI.Graphics; label: PIXI.Text; glyph: PIXI.Text;
+        graphics: PIXI.Graphics; frontierGraphics: PIXI.Graphics; frontierIcons: PIXI.Text[]; debugGraphics: PIXI.Graphics; debugLegend: PIXI.Text;
         attackGraphics: PIXI.Graphics; attackLabels: PIXI.Text[];
         attackActor: AttackActor | null; attackSource: readonly PreparedAttack[] | undefined;
         attackRanges: (AttackRange & { color: number })[]; tokenHeight: number;
-        scale: number; zoom: number; area?: MovementAreaJob;
+        scale: number; zoom: number; previewMode?: MovementPreviewMode; area?: MovementAreaJob;
         areaPending?: boolean; queuedArea?: () => void;
     }>();
-
-    function ownTurn(token: Token.Implementation): boolean {
-        const combat = game.combat;
-        return !!combat?.started && combat.combatant?.token === token.document;
-    }
 
     function remove(token: Token.Implementation): void {
         const ring = rings.get(token);
@@ -74,10 +81,20 @@ export function activateMovementRings(): void {
         ring.area?.cancel();
         container!.removeChild(ring.attackGraphics);
         ring.attackGraphics.destroy({ children: true });
+        container!.removeChild(ring.debugGraphics);
+        ring.debugGraphics.destroy({ children: true });
         container!.removeChild(ring.graphics);
         ring.graphics.destroy({ children: true });
+        container!.removeChild(ring.frontierGraphics);
+        ring.frontierGraphics.destroy({ children: true });
         if (fogMask) fogMask.renderable = false;
         rings.delete(token);
+    }
+
+    function clearFrontier(ring: { frontierGraphics: PIXI.Graphics; frontierIcons: PIXI.Text[] }): void {
+        ring.frontierGraphics.clear();
+        for (const icon of ring.frontierIcons) { ring.frontierGraphics.removeChild(icon); icon.destroy(); }
+        ring.frontierIcons = [];
     }
 
     function maskMovement(graphics: PIXI.Graphics): void {
@@ -106,16 +123,19 @@ export function activateMovementRings(): void {
         const preview = previews.get(token);
         // This Foundry 14 getter is absent from fvtt-types.
         const nativeToken = token as Token.Implementation & { readonly movementAnimationPromise: Promise<void> | null };
-        if (!movementPreviewHeld && !preview && !nativeToken.movementAnimationPromise) return remove(token);
+        const activePreview = movementPreviewHeld || !!preview || !!nativeToken.movementAnimationPromise;
+        const debug = movementDebugEnabled() && movementLatticeMode() === "hex";
+        if (!activePreview && !debug) return remove(token);
         // Prepared land Speed includes effects and conditions. Native history resets at turn start.
         const system = token.actor?.system as { movement?: { speeds?: { land?: { value: number } } } } | undefined;
         const speed = system?.movement?.speeds?.land?.value ?? 0;
         const cost = preview?.cost ?? (ownTurn(token) ? token.measureMovementPath(token.document.movementHistory).cost : 0);
         // An unreachable path has no movement budget, but weapon reach can still be previewed.
         const budget = speed > 0 && Number.isFinite(cost) ? movementBudget(speed, cost) : null;
-        const actions = budget?.actions ?? 0, remaining = budget?.remaining ?? 0;
+        const remaining = budget?.remaining ?? 0;
         const previewMode = movementPreviewMode();
         const showMovement = !!budget && previewMode !== "off";
+        const showDebug = !!budget && debug;
         let ring = rings.get(token);
         // Prepared system strikes and weapon-specific reach are not modeled by fvtt-types.
         const attackActor = token.actor as unknown as AttackActor | null;
@@ -132,12 +152,17 @@ export function activateMovementRings(): void {
         }
         if (!ring) {
             const attackGraphics = container.addChild(new PIXI.Graphics());
+            const debugGraphics = container.addChild(new PIXI.Graphics());
+            const debugLegend = debugGraphics.addChild(new PIXI.Text("", { fontSize: 12, fill: 0xffffff,
+                stroke: 0x000000, strokeThickness: 4, align: "center", wordWrap: true, wordWrapWidth: 480 }));
+            debugLegend.anchor.set(0.5, 0);
+            // The action glyph and remaining budget live on the native ruler label; this draws only the outline.
             const graphics = container.addChild(new PIXI.Graphics());
-            const label = graphics.addChild(new PIXI.Text("", { fontSize: 16, fill: 0xffffff, stroke: 0x000000, strokeThickness: 4 }));
-            const glyph = graphics.addChild(new PIXI.Text("", { fontFamily: "Pathfinder2eActions", fontSize: 22,
-                fill: 0xffffff, stroke: 0x000000, strokeThickness: 3 }));
-            label.anchor.set(0, 0.5); glyph.anchor.set(1, 0.5);
-            ring = { graphics, label, glyph, attackGraphics, attackLabels: [], attackActor, attackSource, attackRanges,
+            graphics.name = "codex-movement-budget";
+            // Red cells and icons for ledges and gaps the token could pass only by climbing or squeezing.
+            const frontierGraphics = container.addChild(new PIXI.Graphics());
+            frontierGraphics.name = "codex-movement-frontier";
+            ring = { graphics, frontierGraphics, frontierIcons: [], attackGraphics, debugGraphics, debugLegend, attackLabels: [], attackActor, attackSource, attackRanges,
                 tokenHeight: 0, scale: 0, zoom: 0 };
             rings.set(token, ring);
         }
@@ -148,41 +173,34 @@ export function activateMovementRings(): void {
         ring.attackGraphics.position.set(attackCenter.x, attackCenter.y);
         maskMovement(ring.graphics);
         ring.graphics.visible = showMovement;
-        ring.attackGraphics.visible = attackRanges.length > 0;
+        ring.attackGraphics.visible = activePreview && attackRanges.length > 0;
+        ring.debugGraphics.visible = showDebug;
+        if (!showDebug) { ring.debugGraphics.clear(); ring.debugLegend.text = ""; }
         const scale = canvas!.dimensions!.distancePixels;
         const zoom = canvas!.stage!.scale.x;
-        const projectionChanged = ring.scale !== scale || ring.zoom !== zoom;
+        const projectionChanged = ring.scale !== scale || ring.zoom !== zoom || ring.previewMode !== previewMode;
         const attacksLayoutChanged = attacksChanged || projectionChanged || ring.tokenHeight !== token.h;
         ring.attackActor = attackActor; ring.attackSource = attackSource; ring.attackRanges = attackRanges; ring.tokenHeight = token.h;
-        if (!showMovement) {
+        const needsArea = showDebug || (showMovement && previewMode === "ring");
+        if (!needsArea) {
             ring.area?.cancel();
             ring.area = undefined;
             ring.areaPending = false;
             ring.queuedArea = undefined;
-            ring.graphics.clear();
-        } else if (previewMode === "circle") {
-            // Simple mode: the routed path cost is already spent, but terrain never shapes the outline.
-            ring.area?.cancel();
-            ring.area = undefined;
-            ring.areaPending = false;
-            ring.queuedArea = undefined;
+        }
+        ring.frontierGraphics.visible = showMovement && previewMode === "ring";
+        if (!showMovement) { ring.graphics.clear(); clearFrontier(ring); }
+        else if (previewMode === "circle") {
             const radius = remaining * scale;
             ring.graphics.position.set(center.x, center.y);
             ring.graphics.clear().lineStyle(2 / zoom, 0x77ccff, 0.7).drawCircle(0, 0, radius);
-            ring.glyph.text = String(Math.min(3, actions));
-            ring.label.text = (actions > 3 ? "… " : "") + game.i18n!.format("codex-foundry.gridless.movementRemaining", {
-                distance: String(Math.round(remaining * 10) / 10), units: canvas!.grid!.units,
-            });
-            ring.glyph.position.set(-5 / zoom, -radius);
-            ring.label.position.set(5 / zoom, -radius);
-            ring.glyph.scale.set(1 / zoom);
-            ring.label.scale.set(1 / zoom);
-        } else {
+        }
+        if (needsArea) {
             const current = ring;
             // Keep only the newest request, but let the active calculation finish.
-            // Completed polygons remain anchored to their own scene position.
+            // Debug cells and the outline share one immutable snapshot of the same flood.
             current.queuedArea = () => {
-                const area = getMovementArea(token, center, remaining, preview?.waypoint);
+                const area = getMovementArea(token, center, remaining, preview?.waypoint, showDebug);
                 if (current.area === area && !projectionChanged) return;
                 current.area = area;
                 current.areaPending = true;
@@ -190,23 +208,61 @@ export function activateMovementRings(): void {
                     if (rings.get(token) !== current || current.area !== area) return;
                     if (polygons) {
                         const drawZoom = canvas!.stage!.scale.x;
-                        current.graphics.position.set(center.x, center.y);
-                        current.graphics.clear().lineStyle(2 / drawZoom, 0x77ccff, 0.7);
+                        const drawRing = showMovement && previewMode === "ring";
+                        if (drawRing) {
+                            current.graphics.position.set(center.x, center.y);
+                            current.graphics.clear().lineStyle(2 / drawZoom, 0x77ccff, 0.7);
+                        }
                         let top = center.y;
                         for (const polygon of mergeMovementArea(polygons)) {
-                            current.graphics.drawPolygon(polygon.map((value, index) => value - (index % 2 ? center.y : center.x)));
+                            if (drawRing) current.graphics.drawPolygon(polygon.map((value, index) => value - (index % 2 ? center.y : center.x)));
                             for (let i = 1; i < polygon.length; i += 2) {
                                 if (polygon[i] < top && isKnownMovementPoint({ x: polygon[i - 1], y: polygon[i] })) top = polygon[i];
                             }
                         }
-                        current.glyph.text = String(Math.min(3, actions));
-                        current.label.text = (actions > 3 ? "… " : "") + game.i18n!.format("codex-foundry.gridless.movementRemaining", {
-                            distance: String(Math.round(remaining * 10) / 10), units: canvas!.grid!.units,
-                        });
-                        current.glyph.position.set(-5 / drawZoom, top - center.y);
-                        current.label.position.set(5 / drawZoom, top - center.y);
-                        current.glyph.scale.set(1 / drawZoom);
-                        current.label.scale.set(1 / drawZoom);
+                        clearFrontier(current);
+                        if (drawRing && area.frontier?.rims.length) {
+                            maskMovement(current.frontierGraphics);
+                            const { size, rims } = area.frontier;
+                            const offsets = hexCorners({ q: 0, r: 0 }, size).flatMap(point => [point.x, point.y]);
+                            for (const rim of rims) {
+                                for (const cell of rim.cells) {
+                                    const point = hexCentre(cell, size);
+                                    current.frontierGraphics.lineStyle(1 / drawZoom, FRONTIER_COLOR, 0.6).beginFill(FRONTIER_COLOR, 0.3)
+                                        .drawPolygon(offsets.map((value, i) => value + (i % 2 ? point.y : point.x))).endFill();
+                                }
+                                const icon = current.frontierGraphics.addChild(new PIXI.Text(FRONTIER_ICONS[rim.reason], {
+                                    fontFamily: "Font Awesome 7 Pro", fontWeight: "900", fontSize: 18, fill: 0xffffff, stroke: 0x000000, strokeThickness: 4,
+                                }));
+                                icon.anchor.set(0.5, 0.5);
+                                icon.position.set(rim.centre.x, rim.centre.y);
+                                icon.scale.set(1 / drawZoom);
+                                current.frontierIcons.push(icon);
+                            }
+                        }
+                        if (showDebug && movementDebugEnabled()) {
+                            maskMovement(current.debugGraphics);
+                            current.debugGraphics.clear();
+                            current.debugLegend.text = "";
+                            if (area.debug?.cells.length) {
+                                const { size, cells } = area.debug;
+                                const offsets = hexCorners({ q: 0, r: 0 }, size).flatMap(point => [point.x, point.y]);
+                                const terrains = new Set<DebugTerrain>();
+                                for (const cell of cells) {
+                                    const point = hexCentre(cell, size);
+                                    const stroke = cell.multiplier >= 3 ? 0xff6666 : cell.multiplier > 1 ? 0xffbf47 : 0xffffff;
+                                    current.debugGraphics.lineStyle(1 / drawZoom, stroke, 0.4)
+                                        .beginFill(TERRAIN_COLORS[cell.terrain], 0.12)
+                                        .drawPolygon(offsets.map((value, i) => value + (i % 2 ? point.y : point.x))).endFill();
+                                    terrains.add(cell.terrain);
+                                }
+                                const labels = Array.from(terrains, terrain => game.i18n!.localize(`codex-foundry.gridless.debugTerrain.${terrain}`));
+                                current.debugLegend.text = game.i18n!.localize("codex-foundry.gridless.debugCostLegend") + "\n"
+                                    + game.i18n!.format("codex-foundry.gridless.debugTerrainLegend", { terrains: labels.join(" · ") });
+                                current.debugLegend.position.set(center.x, top + 24 / drawZoom);
+                                current.debugLegend.scale.set(1 / drawZoom);
+                            }
+                        }
                     }
                     current.areaPending = false;
                     const next = current.queuedArea;
@@ -221,6 +277,7 @@ export function activateMovementRings(): void {
             }
         }
         ring.scale = scale; ring.zoom = zoom;
+        ring.previewMode = previewMode;
         if (!attacksLayoutChanged) return;
         ring.attackGraphics.clear();
         while (ring.attackLabels.length > attackRanges.length) {
@@ -260,13 +317,17 @@ export function activateMovementRings(): void {
         const routed = plan?.foundPath?.length ? plan.foundPath : undefined;
         // Follow the live drag path: the ruler's pending waypoints, or the request captured
         // before routing resolves. The routed plan refines the spent distance once it lands.
-        const live = data.pendingWaypoints.length ? data.pendingWaypoints : dragPaths.get(this.token);
+        const live = data.pendingWaypoints.length ? data.pendingWaypoints : this.token.isDragged ? dragPaths.get(this.token) : undefined;
         const end = live?.at(-1) ?? routed?.at(-1);
         if (end) {
             const history = ownTurn(this.token) ? this.token.measureMovementPath(plan?.history ?? data.passedWaypoints).cost : 0;
             previews.set(this.token, { cost: history + measureProposedMovement(this.token, routed ?? live!),
                 center: this.token.document.getCenterPoint(end), waypoint: end });
-        } else previews.delete(this.token);
+        } else {
+            // Foundry ends movement with an idle refresh; clear() is only ruler teardown.
+            previews.delete(this.token);
+            dragPaths.delete(this.token);
+        }
         refresh(this.token);
     };
     prototype.clear = function (): void {

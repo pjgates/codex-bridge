@@ -13,9 +13,42 @@
                     "circle": "Simple circle",
                     "ring": "Reachable ring"
                 }
+            },
+            "movementDebug": {
+                "name": "Movement Debug",
+                "hint": "Show reachable cells for one selected token on the hex lattice. Terrain colours fill cells at low opacity. Outlines show this token's cost: white normal, amber higher, red triple or more. Aquatic requires an Environment region tag. Local to this client."
+            },
+            "enforceClimb": {
+                "name": "Refuse climbs on foot",
+                "hint": "On scenes with map-workshop floor regions, a walking-type move onto a floor more than one 2.5 ft step higher is refused and the token stops at the ledge; Climb, Fly, Blink or Displace are needed. When disabled, tokens still take each floor's height but any rise is walkable."
+            },
+            "movementLattice": {
+                "name": "Movement Lattice",
+                "hint": "Choose continuous geometry or a fixed hex lattice at one tenth of a square. Normal hex routes use the full token footprint. A separate cramped-passage fallback runs only when no full-footprint route exists. Applies to the next preview.",
+                "choices": {
+                    "continuous": "Continuous geometry",
+                    "hex": "6-inch hex lattice"
+                }
             }
         },
+        "floors": {
+            "climbRefused": "{name} cannot walk up {rise} ft (more than one {step} ft step). Use Climb or Fly."
+        },
         "gridless": {
+            "debugCostLegend": "Cost per CELL — White: normal · Amber: higher · Red: ×3+",
+            "debugTerrainLegend": "Terrain fill — {terrains}",
+            "debugTerrain": {
+                "none": "Untagged (white)",
+                "aquatic": "Aquatic (blue)",
+                "arctic": "Arctic (ice blue)",
+                "desert": "Desert (sand)",
+                "forest": "Forest (green)",
+                "mountain": "Mountain (grey)",
+                "plains": "Plains (lime)",
+                "swamp": "Swamp (teal)",
+                "underground": "Underground (purple)",
+                "urban": "Urban (stone)"
+            },
             "movementRemaining": "{distance} {units} left",
             "previewMovementName": "Preview Movement Ring",
             "previewMovementHint": "Hold to preview remaining movement and ready attack distances for exactly one selected token on a gridless scene.",

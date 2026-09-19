@@ -1,8 +1,14 @@
 import type { Bounds, Point } from "./geometry.js";
 import { buildClearance, clearSegment, obstructedFraction, rayClearance, type Clearance, type NavigationWall } from "./clearance.js";
 import { navigationPath, reachablePolygons, searchNavigation, type NavigationMap } from "./navigation.js";
-import { isGridlessActive } from "./settings.js";
+import { isGridlessActive, movementLatticeMode } from "./settings.js";
 import { activateGridlessTerrainCosts } from "./terrain.js";
+import { hexAt, hexCentre } from "./hex.js";
+import { blockedFrontier, buildHexField, floodReachable, hexContours, hexPull, hexRoute, modeArrays, type FrontierRim, type HexClearanceMode, type HexField, type HexRegion } from "./hexfield.js";
+import { snapshotMovementDebug, type MovementDebugData, type MovementDebugRegion } from "./debug.js";
+import { CLIMB_ACTIONS } from "./elevation.js";
+import { climbsEnforced, SET_ELEVATION_TYPE } from "./floors.js";
+import type { HexFloor } from "./hexfield.js";
 
 // Foundry 14's terrain/level additions are not yet represented by fvtt-types.
 interface Waypoint extends Point {
@@ -21,16 +27,17 @@ interface NativeEdge {
     a: Point; b: Point; type: string; direction: number; move: number;
     orientPoint(point: Point): number;
 }
-interface NativeRegion {
-    hidden: boolean;
+interface NativeRegion extends MovementDebugRegion {
     polygons: { points: number[] }[];
-    includedInLevel(level: string): boolean;
-    behaviors: { disabled: boolean; system: { _getTerrainEffects(token: unknown, segment: unknown, options: unknown): unknown[] } }[];
+    behaviors: (MovementDebugRegion["behaviors"][number] & {
+        system: { _getTerrainEffects(token: unknown, segment: unknown, options: unknown): unknown[] };
+    })[];
 }
 interface NativeToken {
     actor: { system: object; size?: string } | null;
     scene: { regions: Iterable<NativeRegion>; levels: Map<string, { edges: Map<string, NativeEdge> }>;
-        dimensions: { size: number; distancePixels: number; rect: Bounds } };
+        dimensions: { size: number; distance: number; distancePixels: number; rect: Bounds };
+        flags?: Record<string, { environmentTypes?: string[] }> };
     document: { _source: Omit<Waypoint, "action">; movementAction: string; getCenterPoint(point: Partial<Waypoint>): Point };
     createTerrainMovementPath(points: Partial<Waypoint>[], options?: object): Waypoint[];
     measureMovementPath(points: unknown[], options?: object): { cost: number };
@@ -38,11 +45,14 @@ interface NativeToken {
     findMovementPath(points: Partial<Waypoint>[], options?: PathOptions): Job<Waypoint[]>;
 }
 
-export type MovementAreaJob = Job<number[][]>;
+export interface MovementFrontier { size: number; rims: FrontierRim[] }
+export type MovementAreaJob = Job<number[][]> & { debug?: MovementDebugData; frontier?: MovementFrontier };
 let revision = 0;
 let maps = new WeakMap<NativeToken, { key: string; actor: object | undefined; map: NavigationMap; base: Waypoint; pivot: Point }>();
-let areas = new WeakMap<NativeToken, { key: string; map: NavigationMap; job: MovementAreaJob }>();
-let clearances = new WeakMap<NativeToken, { key: string; actor: object | undefined; solid: Clearance; clearance: Clearance }>();
+let areas = new WeakMap<NativeToken, { key: string; map: object; job: MovementAreaJob }>();
+let hexFields = new WeakMap<NativeToken, { key: string; actor: object | undefined; field: HexField }>();
+let clearances = new WeakMap<NativeToken, { key: string; actor: object | undefined; solid: Clearance; clearance: Clearance;
+    walls: NavigationWall[]; full: Point; cramped: Point }>();
 /** Last path a token's ruler asked to find, captured before routing resolves. */
 export const dragPaths = new WeakMap<object, Partial<TokenDocument.MeasuredMovementWaypoint>[]>();
 
@@ -81,9 +91,15 @@ function movementClearance(token: NativeToken, base: Waypoint, preview = false) 
     const solid = buildClearance(walls, token.scene.dimensions.rect, full.x, full.y, 0);
     const clearance = full.x === cramped.x && full.y === cramped.y ? solid
         : buildClearance(walls, token.scene.dimensions.rect, cramped.x, cramped.y, 0);
-    const entry = { key, actor: token.actor?.system, solid, clearance };
+    const entry = { key, actor: token.actor?.system, solid, clearance, walls, full, cramped };
     clearances.set(token, entry);
     return entry;
+}
+
+/** Full standing footprint for position guides; no search, budget, or cramped fallback. */
+export function getMovementFootprint(token: Token.Implementation): Clearance {
+    const native = token as unknown as NativeToken;
+    return movementClearance(native, { ...native.document._source, action: native.document.movementAction }, true).solid;
 }
 
 function movementMap(token: NativeToken, base: Waypoint, options: PathOptions = {}) {
@@ -172,6 +188,91 @@ function movementMap(token: NativeToken, base: Waypoint, options: PathOptions = 
     return entry;
 }
 
+/** Scene regions that raise movement cost, with the difficulty their effects apply. */
+function terrainRegions(token: NativeToken, base: Waypoint, preview: boolean): HexRegion[] {
+    const { width, height, depth, shape, level, action } = base;
+    const segment = { width, height, depth, shape, level, action, preview };
+    const regions: HexRegion[] = [];
+    for (const region of token.scene.regions) {
+        if (region.hidden || !region.includedInLevel(level)) continue;
+        let difficulty = 0;
+        for (const behavior of region.behaviors) {
+            if (behavior.disabled) continue;
+            for (const effect of behavior.system._getTerrainEffects(token.document, segment, { preview })) {
+                if (!effect || typeof effect !== "object" || !("difficulty" in effect)) continue;
+                const value = (effect as { difficulty?: unknown }).difficulty;
+                if (typeof value === "number") difficulty = Math.max(difficulty, Math.min(3, Math.round(value)));
+            }
+        }
+        if (difficulty >= 2) regions.push({ difficulty, polygons: region.polygons.map(polygon => polygon.points) });
+    }
+    return regions;
+}
+
+/** Map-workshop floor regions on the token's level, as lattice floor heights. */
+function floorHeights(token: NativeToken, level: string): HexFloor[] {
+    const floors: HexFloor[] = [];
+    for (const region of token.scene.regions) {
+        if (region.hidden || !region.includedInLevel(level)) continue;
+        const behavior = region.behaviors.find(b => !b.disabled && b.type === SET_ELEVATION_TYPE);
+        if (!behavior) continue;
+        const floor = (behavior.system as { elevation?: number }).elevation ?? 0;
+        floors.push({ floor, polygons: region.polygons.map(polygon => polygon.points) });
+    }
+    return floors;
+}
+
+/** Measure each terrain rate without relying on finding a clear sample inside a scene region. */
+function terrainStepCosts(token: NativeToken, base: Waypoint, preview: boolean): number[] {
+    const { size, distance } = token.scene.dimensions;
+    const step = distance * 10;
+    const costs = [step, step, 2 * step, 3 * step];
+    const from: Waypoint = { x: 0, y: 0, width: base.width, height: base.height, elevation: base.elevation,
+        depth: base.depth, shape: base.shape, level: base.level, action: base.action, terrain: null };
+    for (const difficulty of [2, 3]) {
+        // Measure a full scene unit, then divide into ten CELLs to avoid subpixel rounding.
+        const measured = token.measureMovementPath([from, { ...from, x: size, terrain: { difficulty } }], { preview }).cost;
+        if (Number.isFinite(measured)) costs[difficulty] = Math.max(step, Math.round(measured * 10));
+    }
+    return costs;
+}
+
+/** The per-token lattice field, cached on the same key as the continuous clearance. */
+function movementHexField(token: NativeToken, base: Waypoint, options: PathOptions) {
+    const { key: clearanceKey, walls, full, cramped } = movementClearance(token, base, !!options.preview);
+    const climb = CLIMB_ACTIONS.has(base.action) || !climbsEnforced();
+    const key = `${clearanceKey}:${climb}`;
+    const prior = hexFields.get(token);
+    if (prior?.key === key && prior.actor === token.actor?.system) return prior;
+    const { rect, size, distance } = token.scene.dimensions;
+    const restricted = !!options.preview && !game.user!.isGM && canvas!.visibility.tokenVision;
+    const regions = terrainRegions(token, base, !!options.preview);
+    const field = buildHexField({
+        walls, bounds: rect, size: size / 10, step: distance * 10,
+        full: { width: full.x, height: full.y }, cramped: { width: cramped.x, height: cramped.y },
+        stepCosts: terrainStepCosts(token, base, !!options.preview),
+        regions,
+        floors: floorHeights(token, base.level),
+        climb,
+        // A Squeeze fits half the cramped footprint; Small and Tiny creatures have no cramped footprint to halve.
+        squeeze: full.x !== cramped.x || full.y !== cramped.y ? { width: cramped.x / 2, height: cramped.y / 2 } : undefined,
+        known: restricted ? isKnownMovementPoint : undefined,
+    });
+    const entry = { key, actor: token.actor?.system, field };
+    hexFields.set(token, entry);
+    return entry;
+}
+
+/** Does this leg force the token's cramped footprint through walls, i.e. a Squeeze? */
+export function isSqueezedLeg(token: Token.Implementation, from: Waypoint, to: Waypoint): boolean {
+    const native = token as unknown as NativeToken;
+    const { solid, clearance } = movementClearance(native, to, true);
+    if (solid === clearance) return false;
+    const a = native.document.getCenterPoint({ ...from, width: to.width, height: to.height, shape: to.shape });
+    const b = native.document.getCenterPoint(to);
+    return obstructedFraction(clearance, a, b) > 0;
+}
+
 /** Record and preview the same native terrain costs, including cramped passages. */
 export function measureProposedMovement(token: Token.Implementation, points: Partial<Waypoint>[]): number {
     const native = token as unknown as NativeToken;
@@ -198,15 +299,111 @@ function activatePassageCosts(): void {
             if (solid === clearance) return measured;
             const a = token.document.getCenterPoint({ ...segment, x: from.j, y: from.i });
             const b = token.document.getCenterPoint({ ...segment, x: to.j, y: to.i });
-            const fraction = obstructedFraction(solid, a, b);
-            if (!fraction) return measured;
+            const crampedFraction = obstructedFraction(solid, a, b);
+            if (!crampedFraction) return measured;
+            // Where even the cramped footprint overlaps walls the token is squeezing: greater difficult terrain.
+            const squeezedFraction = obstructedFraction(clearance, a, b);
             const cramped = cost(from, to, distance, { ...segment, terrain: { difficulty: 2 } });
-            return measured + Math.max(0, cramped - measured) * fraction;
+            let total = measured + Math.max(0, cramped - measured) * (crampedFraction - squeezedFraction);
+            if (squeezedFraction > 0) {
+                const greater = cost(from, to, distance, { ...segment, terrain: { difficulty: 3 } });
+                total += Math.max(0, greater - measured) * squeezedFraction;
+            }
+            return total;
         };
     };
 }
 
-export function getMovementArea(token: Token.Implementation, center: Point, budget: number, preview?: Partial<Waypoint>): MovementAreaJob {
+/** Snap the destination only when the final native legs still clear the full footprint. */
+function hexSnapEnd(token: NativeToken, path: Waypoint[], options: PathOptions): Waypoint[] | null {
+    const last = path.at(-1)!, previous = path.at(-2);
+    const action = CONFIG.Token.movement.actions[last.action];
+    let snapped = path;
+    if (action?.walls && !action.teleport && previous?.level === last.level && previous.elevation === last.elevation) {
+        const destination = token.document.getCenterPoint(last);
+        const size = token.scene.dimensions.size / 10;
+        const centre = hexCentre(hexAt(destination, size), size);
+        const pivot = token.document.getCenterPoint({ ...last, x: 0, y: 0 });
+        snapped = [...path.slice(0, -1), { ...last, x: centre.x - pivot.x, y: centre.y - pivot.y }];
+    }
+    for (let i = 1; i < snapped.length; i++) {
+        const from = snapped[i - 1], to = snapped[i], action = CONFIG.Token.movement.actions[to.action];
+        if (!action?.walls || action.teleport || from.level !== to.level || from.elevation !== to.elevation) continue;
+        const { field } = movementHexField(token, to, options);
+        const a = token.document.getCenterPoint({ ...from, width: to.width, height: to.height, shape: to.shape });
+        const b = token.document.getCenterPoint(to);
+        if (!clearSegment(field.fullSpace, b, b) || !clearSegment(field.fullSpace, a, b)) return null;
+    }
+    return snapped;
+}
+
+
+/** Route through the lattice: the cells the token steps through, pulled to corner waypoints. */
+function hexPathJob(token: NativeToken, points: Waypoint[], options: PathOptions, original: NativeToken["findMovementPath"],
+    direct: boolean): Job<Waypoint[]> {
+    let cancelled = false;
+    let nativeJob: Job<Waypoint[]> | undefined;
+    const job: Job<Waypoint[]> = { cancel: () => { cancelled = true; nativeJob?.cancel(); }, promise: Promise.resolve(null) };
+    job.promise = (async () => {
+        // A clear drag keeps the native straight line; the lattice is only needed to navigate.
+        if (direct) {
+            nativeJob = original.call(token, points, options);
+            const straight = await nativeJob.promise;
+            if (cancelled || !straight?.length) return cancelled ? null : straight;
+            const snapped = hexSnapEnd(token, straight, options);
+            if (snapped) return snapped;
+        }
+        const routed = [points[0]];
+        const actions = CONFIG.Token.movement.actions as unknown as Record<string, { walls: string | null; teleport?: boolean }>;
+        for (let i = 1; i < points.length; i++) {
+            if (cancelled) return null;
+            const from = routed.at(-1)!, to = points[i];
+            // Native movement remains authoritative for explicit vertical/level transitions and teleportation.
+            if (from.level !== to.level || from.elevation !== to.elevation || !actions[to.action]?.walls || actions[to.action].teleport) {
+                routed.push(to);
+                continue;
+            }
+            const { field } = movementHexField(token, { ...to, level: from.level }, options);
+            const origin = token.document.getCenterPoint({ ...from, width: to.width, height: to.height, shape: to.shape });
+            const destination = token.document.getCenterPoint(to);
+            const start = hexAt(origin, field.size), goal = hexAt(destination, field.size);
+            let mode: HexClearanceMode = "full";
+            let route = hexRoute(field, start, goal, mode);
+            if (!route && field.canCramp) {
+                mode = "cramped";
+                route = hexRoute(field, start, goal, mode);
+            }
+            // Gaps down to half the cramped footprint are squeezed through as greater difficult terrain.
+            if (!route && field.canSqueeze) {
+                mode = "squeeze";
+                route = hexRoute(field, start, goal, mode);
+            }
+            if (!route) break;
+            const path = hexPull(field, route, mode);
+            const { space } = modeArrays(field, mode);
+            if (!clearSegment(space, origin, path[0])) break;
+            const pivot = token.document.getCenterPoint({ ...to, x: 0, y: 0 });
+            for (const point of path) {
+                routed.push({ ...to, x: point.x - pivot.x, y: point.y - pivot.y,
+                    explicit: false, checkpoint: false, snapped: false });
+            }
+            const last = routed.at(-1)!;
+            last.explicit = to.explicit;
+            last.checkpoint = to.checkpoint;
+        }
+        if (cancelled) return null;
+        nativeJob = original.call(token, routed, options);
+        const result = await nativeJob.promise;
+        return cancelled ? null : result;
+    })().then(result => {
+        if (cancelled) result = null;
+        job.result = result;
+        return result;
+    });
+    return job;
+}
+
+export function getMovementArea(token: Token.Implementation, center: Point, budget: number, preview?: Partial<Waypoint>, debug = false): MovementAreaJob {
     const native = token as unknown as NativeToken;
     const source = native.document._source;
     const input = preview;
@@ -215,10 +412,12 @@ export function getMovementArea(token: Token.Implementation, center: Point, budg
     const base: Waypoint = { x, y, width, height, depth, shape, elevation, level, action: movement };
     const action = CONFIG.Token.movement.actions[base.action];
     if (action.teleport || !action.walls) return { result: [], promise: Promise.resolve([]), cancel() {} };
-    const { map } = movementMap(native, base, { preview: true });
-    const key = `${center.x}:${center.y}:${budget}`;
+    const entry = movementLatticeMode() === "hex"
+        ? movementHexField(native, base, { preview: true })
+        : movementMap(native, base, { preview: true });
+    const key = `${center.x}:${center.y}:${budget}:${debug}`;
     const prior = areas.get(native);
-    if (prior?.map === map && prior.key === key) return prior.job;
+    if (prior?.map === entry && prior.key === key) return prior.job;
     prior?.job.cancel();
     let cancelled = false;
     const epoch = revision;
@@ -227,14 +426,25 @@ export function getMovementArea(token: Token.Implementation, center: Point, budg
         cancelled = true;
         if (areas.get(native)?.job === job) areas.delete(native);
     }, promise: Promise.resolve(null) };
+    const continuous = "map" in entry ? entry.map : undefined;
+    const field = "field" in entry ? entry.field : undefined;
     job.promise = (async () => {
-        const search = await searchNavigation(map, center, { budget, cancelled: isCancelled });
+        if (field) {
+            const reached = floodReachable(field, hexAt(center, field.size), Math.round(budget * 100));
+            if (!reached || isCancelled()) return isCancelled() ? null : [];
+            job.frontier = { size: field.size, rims: blockedFrontier(field) };
+            if (debug) job.debug = snapshotMovementDebug(field, native.scene.regions, base.level, base.elevation,
+                native.scene.flags?.[game.system!.id]?.environmentTypes ?? []);
+            return hexContours(field);
+        }
+        if (!continuous) return null;
+        const search = await searchNavigation(continuous, center, { budget, cancelled: isCancelled });
         if (!search || isCancelled()) return null;
-        const polygons = await reachablePolygons(map, search, budget, isCancelled);
+        const polygons = await reachablePolygons(continuous, search, budget, isCancelled);
         if (isCancelled()) return null;
         return polygons;
     })().then(result => { job.result = result; return result; });
-    areas.set(native, { key, map, job });
+    areas.set(native, { key, map: entry, job });
     return job;
 }
 
@@ -258,12 +468,14 @@ export function mergeMovementArea(polygons: number[][]): number[][] {
 export function activateGridlessRouting(): void {
     activateGridlessTerrainCosts();
     activatePassageCosts();
-    maps = new WeakMap(); areas = new WeakMap(); clearances = new WeakMap(); revision++;
+    maps = new WeakMap(); areas = new WeakMap(); clearances = new WeakMap(); hexFields = new WeakMap(); revision++;
     const prototype = CONFIG.Token.objectClass.prototype as unknown as NativeToken;
     const originalConstraint = prototype.constrainMovementPath;
     prototype.constrainMovementPath = function (points, options = {}) {
         const [path, constrained] = originalConstraint.call(this, points, options);
-        if (!isGridlessActive() || options.preview || options.ignoreWalls) return [path, constrained];
+        // Hex paths use the footprint selected by their search. Do not re-clamp a passage
+        // fallback with a different footprint after routing.
+        if (!isGridlessActive() || movementLatticeMode() === "hex" || options.preview || options.ignoreWalls) return [path, constrained];
         for (let i = 1; i < path.length; i++) {
             const from = path[i - 1], to = path[i];
             const action = CONFIG.Token.movement.actions[to.action];
@@ -309,6 +521,7 @@ export function activateGridlessRouting(): void {
             const cost = map.cost(a, b);
             return Number.isFinite(cost) && cost <= lower + 1e-8;
         });
+        if (movementLatticeMode() === "hex") return hexPathJob(this, nativePoints, options, original, direct);
         if (direct) return original.call(this, points, options);
         let cancelled = false;
         const isCancelled = () => cancelled;
@@ -352,5 +565,5 @@ export function activateGridlessRouting(): void {
         Hooks.on(hook, invalidate);
     }
     Hooks.on("visibilityRefresh", () => { if (!game.user!.isGM && canvas!.visibility.tokenVision) invalidate(); });
-    Hooks.on("canvasTearDown", () => { maps = new WeakMap(); areas = new WeakMap(); clearances = new WeakMap(); revision++; });
+    Hooks.on("canvasTearDown", () => { maps = new WeakMap(); areas = new WeakMap(); clearances = new WeakMap(); hexFields = new WeakMap(); revision++; });
 }

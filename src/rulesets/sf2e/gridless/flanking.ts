@@ -1,6 +1,10 @@
+import { MODULE_ID } from "../../../constants.js";
 import type { Point } from "./geometry.js";
-import { isGridlessActive } from "./settings.js";
+import { isGridlessActive, movementLatticeMode } from "./settings.js";
 import type { SystemToken } from "./tokens.js";
+import { hexCentre, hexCorners, hexRange } from "./hex.js";
+import { clearSegment } from "./clearance.js";
+import { getMovementFootprint, isKnownMovementPoint } from "./routing.js";
 
 /** Directional wedges: the outer arc uses native flanking checks, not every filled interior point. */
 export function sampleFlankingSectors(
@@ -35,7 +39,7 @@ export function sampleFlankingSectors(
     return sectors;
 }
 
-export function getFlankingSectors(attacker: SystemToken, target: SystemToken): number[][] {
+export function getFlankingPolygons(attacker: SystemToken, target: SystemToken): number[][] {
     if (attacker === target || !attacker.actor?.isOfType("creature") || !target.actor?.isOfType("creature")) return [];
     const allies: Pick<SystemToken, "id" | "actor" | "document" | "mechanicalBounds" | "canFlank" | "isAdjacentTo">[] = [];
     for (const token of attacker.layer.placeables) {
@@ -70,6 +74,23 @@ export function getFlankingSectors(attacker: SystemToken, target: SystemToken): 
     };
     const range = reach * canvas!.dimensions!.distancePixels;
     const limit = range + Math.hypot(original.width + target.mechanicalBounds.width, original.height + target.mechanicalBounds.height) / 2;
+    if (movementLatticeMode() === "hex") {
+        const size = canvas!.grid!.size / 10;
+        const range = hexRange({ x: target.center.x - limit, y: target.center.y - limit, width: 2 * limit, height: 2 * limit }, size);
+        const footprint = getMovementFootprint(attacker);
+        const offsets = hexCorners({ q: 0, r: 0 }, size).flatMap(point => [point.x, point.y]);
+        const cells: number[][] = [];
+        for (let q = range.qMin; q <= range.qMax; q++) {
+            for (let r = range.rMin; r <= range.rMax; r++) {
+                const point = hexCentre({ q, r }, size);
+                if (!isKnownMovementPoint(point)) continue;
+                moveView(point.x, point.y);
+                if (!attacker.isFlanking.call(view, target, { reach }) || !clearSegment(footprint, point, point)) continue;
+                cells.push(offsets.map((value, index) => value + (index % 2 ? point.y : point.x)));
+            }
+        }
+        return cells;
+    }
     return sampleFlankingSectors(target.center, limit,
         (x, y) => { moveView(x, y); return view.distanceTo(target, { reach }) <= reach; },
         (x, y) => { moveView(x, y); return attacker.isFlanking.call(view, target, { reach }); });
@@ -86,24 +107,26 @@ export function activateFlankingGuide(): void {
         const attacker = canvas!.tokens!.controlled[0] as SystemToken;
         const target = [...game.user!.targets][0] as SystemToken;
         if (!target.isVisible) return;
-        const sectors = getFlankingSectors(attacker, target);
-        if (!sectors.length) return;
+        const polygons = getFlankingPolygons(attacker, target);
+        if (!polygons.length) return;
         if (!graphics) {
             graphics = canvas!.interface!.addChild(new PIXI.Graphics());
             graphics.zIndex = 1;
             graphics.eventMode = "none";
         }
-        graphics.beginFill(0xff4444, 0.45);
-        for (const sector of sectors) graphics.drawPolygon(sector);
+        const hex = movementLatticeMode() === "hex";
+        graphics.lineStyle(hex ? 1 / canvas!.stage!.scale.x : 0, 0xff4444, 0.45).beginFill(0xff4444, hex ? 0.12 : 0.45);
+        for (const polygon of polygons) graphics.drawPolygon(polygon);
         graphics.endFill();
     };
     const request = (): void => { if (!frame) frame = requestAnimationFrame(refresh); };
     for (const hook of ["controlToken", "updateToken", "createToken", "deleteToken", "updateActor", "createItem", "updateItem", "deleteItem",
-        "createWall", "updateWall", "deleteWall", "canvasReady", "updateScene"] as const) Hooks.on(hook, request);
+        "createWall", "updateWall", "deleteWall", "canvasReady", "updateScene", "visibilityRefresh", "canvasPan"] as const) Hooks.on(hook, request);
     Hooks.on("targetToken", (user) => { if (user === game.user) request(); });
+    Hooks.on("updateSetting", setting => { if (setting.key === `${MODULE_ID}.movementLattice`) request(); });
     // Foundry 14 supplies flags; fvtt-types still declares the older one-argument hook.
     Hooks.on("refreshToken", (_token: Token.Implementation, flags: Record<string, boolean> = {}) => {
-        if (flags.refreshVisibility || flags.refreshSize || flags.refreshElevation) request();
+        if (flags.refreshVisibility || flags.refreshPosition || flags.refreshSize || flags.refreshElevation) request();
     });
     Hooks.on("canvasTearDown", () => {
         cancelAnimationFrame(frame); frame = 0;

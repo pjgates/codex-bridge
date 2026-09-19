@@ -10,15 +10,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Added
 
 - **Gridless Combat:** optional PF2e/SF2e support with continuous distance and reach, native flanking, center-based automatic cover, and wall-aware area targeting.
-- **Gridless guides:** center-filled flanking sectors and a turn-based remaining-movement ring with native action glyphs. Rings appear only for one selected token during movement or hold-to-preview.
+- **Gridless guides:** a flanking position guide and a turn-based remaining-movement ring with native action glyphs. Movement rings appear during movement or hold-to-preview.
 - **Movement preview options:** the remaining-movement overlay renders as the reachable-area ring (default), a plain circle of the remaining distance that still includes routed path costs, or nothing at all.
 - **Attack distances:** ready melee attacks show translucent reach circles. Ranged attacks show outline-only range rings. Equal distances share labeled circles.
 - **Gridless routing:** automatic terrain-weighted routes and reachable-movement outlines account for token clearance without snapping movement to squares.
+- **Movement lattice:** a new **Movement Lattice** setting adds a fixed hex lattice at one tenth of a square. Normal routes use the token's full footprint. A separate cramped-passage fallback runs only when no full-footprint route exists. Continuous geometry remains the default.
 - **Cramped passages:** Small creatures use 2.5-foot passages normally. Medium and larger creatures can use smaller passages at difficult-terrain cost. Tighter gaps require Squeeze.
 - **Pathfinder compatibility:** the module manifest now permits PF2e worlds.
+- **Movement Debug:** an optional client-only overlay fills reachable hex cells at low opacity. Terrain tags select fill colors. White, amber, and red outlines show movement cost.
+- **Hex flanking guide:** low-opacity red cells mark native flank-eligible positions on the shared lattice, with normal token-footprint wall clearance. Continuous mode retains directional wedges.
+- **Floors:** map-workshop `setElevation` floor regions now move tokens between floor heights from Codex Foundry, including the drop-time path rewrite, the **Refuse climbs on foot** setting, and floor snapping for dropped tokens. The importer module keeps only the region behavior type.
+- **Floor-aware preview:** in hex lattice mode the drag label shows the planned floor height at each waypoint and flags waypoints past a refused ledge. The reachable ring and automatic routes stop at ledges the movement action cannot climb.
+- **Blocked frontier:** in hex lattice mode the reachable ring now shows red cells with a hiker icon along ledges the current action cannot climb and a compress icon at gaps that need a Squeeze, taking the token's movement action and size into account.
+- **Squeezing:** on the hex lattice, gaps between half and the full cramped footprint are now routed as greater difficult terrain. The squeezed stretch costs triple in movement measurement and the ruler label shows a compress icon on that leg.
+
+### Changed
+
+- **One ruler label:** the remaining-movement text and action glyph moved from a separate overlay label into the native ruler waypoint label, alongside distance, surcharge, and elevation. The reachable ring is now outline only.
+- Normal movement no longer draws a hex-cell trail. The native ruler line and movement outline remain available.
 
 ### Fixed
 
+- **Dense wall scenes:** the wall-clearance build no longer compares every wall against every other one. A 4,000-wall level built in 35 seconds and froze the tab; it now takes a fraction of a second.
+- **Long movement budgets on the hex lattice:** the reachable flood threw for budgets of 80 ft or more on large scenes.
+- **Floor treads at other heights:** floor entries are now traced along the path geometrically. Foundry's region segmentiser only reports a region whose elevation band contains the token, and map-workshop exports put `setElevation` on zero-height bands, so a token at one height never saw the next tread.
+- **Concave regions on the hex lattice:** difficult-terrain and floor regions were rasterised with a convex-only containment test, so any concave region, which is most hand-drawn or cave-shaped ones, applied no cost or height at all. Regions now use even-odd containment.
+- **Difficult terrain on the hex lattice:** movement costs now apply throughout each region, not just at entry. Search and reachable outlines use native terrain rates and terrain-ignore abilities. Straightening no longer discards cheaper terrain detours.
+- **Movement preview cleanup:** normal movement previews clear when movement finishes or a drag is cancelled. Hold-to-preview remains available.
+- **Hex corner clearance:** removed corner displacement and the four-foot routing preference that produced sharp zigzags. Search and straightening now check complete segments against the selected footprint.
 - **Cave routing:** destination searches use A* and skip distant wall geometry. Route corners remain clear after native pixel rounding.
 - **Movement preview:** continuous dragging no longer cancels every outline calculation. The previous outline stays in place until its replacement is ready.
 - **Gridless movement:** spent distance now carries forward when the active combatant inherits its scene from the encounter.

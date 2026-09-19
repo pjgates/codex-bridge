@@ -74,6 +74,7 @@ export default defineConfig({
                 { src: "src/rulesets/sf2e/prad/templates/**/*", dest: "templates/prad" },
                 { src: "src/rulesets/sf2e/target-helper/templates/**/*", dest: "templates/target-helper" },
                 { src: "src/sync/templates/**/*", dest: "templates/sync" },
+                { src: "src/rulesets/sf2e/gridless/templates/**/*", dest: "templates/gridless" },
                 { src: "module.json", dest: "." },
             ],
         }),

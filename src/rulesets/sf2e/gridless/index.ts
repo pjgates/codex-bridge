@@ -4,6 +4,7 @@ import { activateAreaTargeting } from "./areas.js";
 import { activateMovementRings } from "./movement.js";
 import { activateFlankingGuide } from "./flanking.js";
 import { activateGridlessRouting } from "./routing.js";
+import { activateMovementLabel } from "./label.js";
 
 export { registerGridlessSetting } from "./settings.js";
 export { registerMovementPreviewKeybind } from "./movement.js";
@@ -16,5 +17,6 @@ export function activateGridlessCombat(): void {
     activateAreaTargeting();
     activateGridlessRouting();
     activateMovementRings();
+    activateMovementLabel();
     activateFlankingGuide();
 }

@@ -37,8 +37,10 @@ An optional setting for PF2e and SF2e gridless scenes. Gridded scenes keep their
 
 - Distances use continuous Euclidean geometry without rounding. Large tokens retain PF2e occupied-space reach.
 - Native flanking rules remain active. A wall that blocks all five target rays also blocks flanking.
-- With one controlled creature and one target, red wedges extend from the target center to the valid flanking arc.
-- The outer arc uses native flanking checks. The interior fill indicates direction only.
+- With one controlled creature and one target, hex mode shows low-opacity red cells on the shared 6-inch lattice.
+- Each marked cell center passes native flanking and reach checks, plus the attacker's normal standing-footprint wall clearance. Unknown cell centers remain unmarked.
+- Flanking cells show all eligible positions, regardless of remaining movement. Movement Debug is not required.
+- Continuous mode retains red directional wedges. Their outer arc uses native flanking checks, while the interior fill indicates direction only.
 - An eligible ally must already be within reach. The guide preserves native flanking feats and excludes wall-blocked positions.
 - Automatic cover samples the target center and four corners from the attacker center. Movement-blocking walls provide the obstruction.
 - A creature across the center line provides lesser cover (+1 AC).
@@ -61,15 +63,48 @@ An optional setting for PF2e and SF2e gridless scenes. Gridded scenes keep their
 - The outline shows an approximate reachable area around walls and through terrain. It uses native movement costs, not a hidden square grid.
 - The overlay has three modes under **Movement Preview**: the reachable-area ring (default), a simple circle of the remaining distance (routed path costs included, terrain ignored), or off.
 - During dragging, the last completed outline stays at its calculated position until the latest replacement is ready.
+- Moves are computed by continuous geometry by default. **Movement Lattice** can instead run them on a fixed 6-inch hex lattice a tenth of a square wide — the same cells for every token.
+- On the lattice, the reachable ring comes from a typed-array flood instead of thousands of native measurements: a 25-foot ring floods in about 2 ms and a 75-foot ring in about 3 ms (44 000 cells), with its outline tracing in another 5–10 ms. Continuous mode makes roughly 2 500 native path measurements per drag update.
+- Normal hex routes keep the token's full footprint clear along every segment. Straightening removes redundant waypoints without moving corners.
+- If no full-footprint route exists, routing tries the smaller cramped-passage footprint. Straightening retains the footprint selected by that search.
+- Normal movement keeps the native ruler line and movement outline without a hex-cell trail.
+- **Movement Debug** is a client-only setting, off by default. On the hex lattice, it fills reachable cells for one selected token at 12% opacity.
+- Debug outlines show cost per CELL: white for normal, amber for higher, red for triple or more. A legend explains the colors.
+- Debug fills use explicit Environment tags, including blue for Aquatic. Aquatic takes visual priority over broader tags such as Underground.
+- Debug cells respect fog and the remaining movement budget. They stay visible while the token is selected and clear on deselection or disable.
+- The cramped fallback and approximate ring retain a half-cell tolerance. Normal hex routes use the full footprint without shrinking it.
+- Every other gridless rule is shared: distance, cover, flanking, areas, terrain, fog, elevation, and movement budgets.
 - Automatic routing preserves placed waypoints and searches for cheaper routes around walls and difficult terrain.
-- Clearance uses the occupied rectangle. Exactly fitting doorways permit passage.
+- Clearance uses the occupied rectangle. Continuous routing permits exact fits. Hex routing requires usable cell centres within the selected clearance.
 - Small creatures use 2.5-foot passages normally. Medium creatures use them as difficult terrain.
 - Large, Huge, and Gargantuan creatures can use 5-, 10-, and 15-foot passages, respectively, as difficult terrain.
 - Only the cramped portion costs extra. This penalty does not stack with other difficult terrain.
-- Tighter gaps require Squeeze and remain outside automatic combat routing.
+- Gaps down to half the cramped footprint are squeezed through as greater difficult terrain: the squeezed stretch costs triple and the ruler label shows a compress icon. Anything tighter is impassable to automatic routing.
 - Terrain uses Region behaviors that modify movement costs, labeled **Difficult Terrain** in PF2e/SF2e.
 - Prepared abilities that ignore all difficult or greater difficult terrain also affect gridless movement costs.
+- Hex search and reachable outlines charge terrain cost on every CELL step. Straightening preserves cheaper terrain detours using sampled terrain costs.
 - Routing stays on the current elevation and level. Explicit vertical transitions, teleportation, and unconstrained movement retain native behavior.
+
+### Floors (map-workshop caves)
+
+Scenes imported by the Map Workshop Importer carry `setElevation` floor regions. Codex Foundry applies their heights on every such scene, gridless or not:
+
+- Entering a floor inserts its height into the path at the entry point. A rise of one 2.5-foot step or any descent is free.
+- A higher rise on a walking-type action stops the token at the ledge with a warning. Climb, Fly, Blink, and Displace may take any rise.
+- **Refuse climbs on foot** (world setting, on by default) controls the refusal. Turned off, tokens still take each floor's height.
+- Tokens dropped onto the map land at the floor under them.
+- On gridless scenes in hex lattice mode, the drag label previews the planned height at each waypoint, marks waypoints past a refused ledge, and the reachable ring and automatic routes stop at ledges the current movement action cannot climb.
+
+### Why can't I go there?
+
+With the reachable ring on in hex lattice mode, cells just beyond the ring that the token could enter only by other means are filled red, one icon per stretch:
+
+- A **hiker** marks a ledge more than one 2.5-foot step up. Switch to Climb or Fly to take it. Tokens already on a climbing action never see these.
+- A **compress arrow** marks a gap too tight for the token's cramped footprint but wide enough for a Squeeze, half the cramped width. Routes do go through, at triple cost, and the rim stays red until the token enters it. It appears only where the gap leads to ground the token cannot otherwise reach, so ordinary walls stay unmarked. Small and Tiny creatures have no cramped footprint and see no squeeze cells.
+
+### Ruler label
+
+On gridless scenes the native ruler label carries everything in one place: distance, any cramped-passage or terrain surcharge as an added cost, elevation, the action glyph, and the remaining movement for the turn. The module supplies its own waypoint-label template while Gridless Combat is on and draws only the reachable outline itself.
 - Movement budgets require native history recording. PF2e Toolbelt's per-user **Better Movement → No History Record** option must be off.
 
 Automatic cover is this module's geometric approximation, not native PF2e/SF2e automation. Region outlines do not clip to walls.
@@ -106,6 +141,7 @@ Found under **Module Settings > Codex Foundry**. All settings are world-scoped (
 | **Heroic Rerolls** | Raises Hero Point d20 rerolls below 10 to 10. Requires reload. | Off |
 | **Gridless Combat** | Continuous geometry, automatic cover, area targeting, flanking guides, and remaining-movement rings. Requires reload. | Off |
 | **Movement Preview** | Gridless remaining-movement overlay: **Reachable ring**, **Simple circle** (remaining distance; routed costs included, terrain ignored), or **Off**. Requires Gridless Combat. | Reachable ring |
+| **Movement Lattice** | Gridless movement model: **Continuous geometry** (exact) or a **6-inch hex lattice** that floods rings and routes in milliseconds with cell-centre waypoints. Requires Gridless Combat. | Continuous geometry |
 | **Players Roll All Dice** | Enables the PRAD variant. Requires Target Helper to be on. | Off |
 | **Strict DC Mode (Exact Probabilities)** | Uses DC = 12 + modifier instead of 11 + modifier under PRAD, exactly preserving original probabilities. | Off |
 | **Statblock Importer** | Adds an Import Statblock button to the Actors sidebar (GM only). | On |

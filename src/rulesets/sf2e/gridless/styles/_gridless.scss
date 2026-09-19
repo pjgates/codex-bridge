@@ -1,0 +1,16 @@
+// Ruler waypoint label additions on gridless scenes.
+.waypoint-label {
+    .codex-remaining-movement {
+        display: block;
+        font-size: 0.85em;
+        opacity: 0.85;
+    }
+
+    .codex-squeezed {
+        color: #ffbf47;
+    }
+
+    .codex-climb-refused {
+        color: #ff6b6b;
+    }
+}

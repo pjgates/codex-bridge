@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { activateMovementRings, movementBudget, registerMovementPreviewKeybind } from "../../../src/rulesets/sf2e/gridless/movement.js";
 import { dragPaths } from "../../../src/rulesets/sf2e/gridless/routing.js";
 import type { AttackItem, PreparedAttack } from "../../../src/rulesets/sf2e/gridless/reach.js";
+import { registerGridlessSetting } from "../../../src/rulesets/sf2e/gridless/settings.js";
 
 interface PreviewBinding { onDown(): boolean; onUp(): boolean }
 let releasePreview: (() => boolean) | undefined;
@@ -42,6 +43,8 @@ function setupMovementCanvas() {
     class Graphics extends Container {
         circles: { radius: number; fillAlpha: number; color: number }[] = [];
         polygons: number[][] = [];
+        paintedPolygons: { points: number[]; stroke: number; fill: number; alpha: number }[] = [];
+        fillColor = 0;
         fillAlpha = 0;
         color = 0;
         get radii() {
@@ -50,14 +53,18 @@ function setupMovementCanvas() {
                 points.filter((_point, index) => index % 2 === 0).map((x, index) => Math.hypot(x, points[index * 2 + 1])))));
             return radii;
         }
-        clear() { this.circles = []; this.polygons = []; this.fillAlpha = 0; return this; }
+        clear() { this.circles = []; this.polygons = []; this.paintedPolygons = []; this.fillAlpha = 0; return this; }
         lineStyle(_width = 0, color = 0) { this.color = color; return this; }
-        beginFill(_color: number, alpha = 1) { this.fillAlpha = alpha; return this; }
+        beginFill(color: number, alpha = 1) { this.fillColor = color; this.fillAlpha = alpha; return this; }
         endFill() { this.fillAlpha = 0; return this; }
         drawCircle(_x: number, _y: number, radius: number) {
             this.circles.push({ radius, fillAlpha: this.fillAlpha, color: this.color }); return this;
         }
-        drawPolygon(points: number[]) { this.polygons.push(points); return this; }
+        drawPolygon(points: number[]) {
+            this.polygons.push(points);
+            this.paintedPolygons.push({ points, stroke: this.color, fill: this.fillColor, alpha: this.fillAlpha });
+            return this;
+        }
     }
     class Text extends Container {
         anchor = { set() {} };
@@ -65,10 +72,10 @@ function setupMovementCanvas() {
     }
     const reaches = new Map<AttackItem, number>();
     const scene = { regions: [], levels: new Map([["floor", { edges: new Map() }]]),
-        dimensions: { size: 100, distancePixels: 20, rect: { x: -10000, y: -10000, width: 20000, height: 20000 } } };
+        dimensions: { size: 100, distance: 5, distancePixels: 20, rect: { x: -1000, y: -1000, width: 2000, height: 2000 } } };
     const makeToken = (id: string) => {
         const token = {
-            id, controlled: false, center: { x: 100, y: 200 }, w: 100, h: 100, movementAnimationPromise: null as Promise<void> | null,
+            id, controlled: false, isDragged: false, center: { x: 100, y: 200 }, w: 100, h: 100, movementAnimationPromise: null as Promise<void> | null,
             scene,
             actor: {
                 system: { actions: [] as PreparedAttack[], movement: { speeds: { land: { value: 25 } } } },
@@ -80,12 +87,12 @@ function setupMovementCanvas() {
                 movementAction: "walk",
                 getCenterPoint(point: { x: number; y: number }) { return point; },
             },
-            renderFlags: { set: (): void => { callbacks.refreshToken?.(token, {}); } },
+            renderFlags: { set: (_options?: unknown): void => { callbacks.refreshToken?.(token, {}); } },
             createTerrainMovementPath(points: unknown[]) { return points; },
-            measureMovementPath(points: { x: number; y: number; cost?: number }[]) {
+            measureMovementPath(points: { x: number; y: number; cost?: number; terrain?: { difficulty: number } }[]) {
                 return { cost: points.reduce((sum, point, index) => sum + (point.cost
-                    ?? (index ? Math.hypot(point.x - points[index - 1].x, point.y - points[index - 1].y) / 20 : 0)), 0) };
-            },
+                    ?? (index ? Math.hypot(point.x - points[index - 1].x, point.y - points[index - 1].y) / 20 * (point.terrain?.difficulty ?? 1) : 0)), 0) };
+            }
         };
         return token;
     };
@@ -113,29 +120,32 @@ function setupMovementCanvas() {
     });
     vi.stubGlobal("CONFIG", { Token: { rulerClass: Ruler, movement: { actions: { walk: { walls: "move" } } } } });
     vi.stubGlobal("Hooks", { on(name: string, callback: (...args: unknown[]) => void) { callbacks[name] = callback; } });
-    const settingValues: Record<string, unknown> = {};
+    const settingValues: Record<string, unknown> = { gridlessCombat: true };
+    const registeredSettings = new Map<string, { default: unknown; onChange?: (value: unknown) => void }>();
     vi.stubGlobal("game", { user: { id: "user", isGM: true }, combat, system: { id: "pf2e" },
-        settings: { get: (_namespace: string, key: string) => settingValues[key] ?? true },
+        settings: {
+            register: (_namespace: string, key: string, config: { default: unknown }) => registeredSettings.set(key, config),
+            get: (_namespace: string, key: string) => settingValues[key] ?? registeredSettings.get(key)?.default ?? true,
+        },
         keybindings: { register: (_namespace: string, key: string, binding: PreviewBinding) => bindings.set(key, binding) },
         i18n: {
             localize: (key: string) => key.endsWith(".reach") ? "Reach" : "Range",
             format: (_key: string, data: { distance: string; attacks?: string }) => data.attacks ? `${data.attacks}: ${data.distance} ft` : `${data.distance} ft left`,
         } });
-    vi.stubGlobal("canvas", { ready: true, scene: { id: "scene" }, grid: { isGridless: true, units: "ft" },
+    vi.stubGlobal("canvas", { ready: true, scene: { id: "scene" }, grid: { isGridless: true, units: "ft", size: 100 },
         dimensions: { distancePixels: 20 }, stage: { scale: { x: 1 } }, interface: interfaceLayer, tokens: { controlled } });
+    registerGridlessSetting();
     registerMovementPreviewKeybind();
     const binding = bindings.get("previewMovement")!;
     releasePreview = binding.onUp;
     activateMovementRings();
     const visibleGraphics = () => interfaceLayer.children.flatMap(container => container.children).filter((child): child is Graphics => child instanceof Graphics && child.visible);
-    const isBudget = (graphic: Graphics) => graphic.children.some(child => child instanceof Text && child.style.fontFamily === "Pathfinder2eActions");
+    const isBudget = (graphic: Graphics) => (graphic as Graphics & { name?: string }).name === "codex-movement-budget";
     const radii = async () => {
         await vi.runAllTimersAsync();
         return visibleGraphics().filter(isBudget).flatMap(graphic => graphic.radii);
     };
     const attackCircles = () => visibleGraphics().filter(graphic => !isBudget(graphic)).flatMap(graphic => graphic.circles);
-    const glyph = () => visibleGraphics().flatMap(graphic => graphic.children)
-        .find((child): child is Text => child instanceof Text && child.style.fontFamily === "Pathfinder2eActions");
     const select = (next: MovementTokenFixture[]) => {
         for (const previous of [...controlled]) {
             if (next.includes(previous)) continue;
@@ -148,7 +158,14 @@ function setupMovementCanvas() {
             callbacks.controlToken(selected, true);
         }
     };
-    return { token, other, callbacks, combat, combatant, binding, radii, attackCircles, reaches, glyph: () => glyph()?.text,
+    return { token, other, callbacks, combat, combatant, binding, radii, attackCircles, reaches,
+        polygons: () => visibleGraphics().flatMap(graphic => graphic.polygons),
+        debugHexes: () => visibleGraphics().flatMap(graphic => graphic.paintedPolygons).filter(p => p.alpha > 0 && p.points.length === 12),
+        frontier: () => {
+            const layer = visibleGraphics().find(graphic => (graphic as Graphics & { name?: string }).name === "codex-movement-frontier");
+            return { cells: layer?.paintedPolygons ?? [], icons: (layer?.children ?? []).filter((child): child is Text => child instanceof Text).map(icon => icon.text) };
+        },
+        setSetting: (key: string, value: unknown) => { settingValues[key] = value; registeredSettings.get(key)?.onChange?.(value); },
         budgetPosition: () => visibleGraphics().find(isBudget)?.position,
         budgetOutline: () => {
             const graphic = visibleGraphics().find(isBudget);
@@ -157,11 +174,10 @@ function setupMovementCanvas() {
 }
 
 it("retains the movement budget during hold preview, drag cancellation, and turn changes", async () => {
-    const { token, callbacks, combat, combatant, binding, radii, glyph, ruler, select } = setupMovementCanvas();
+    const { token, callbacks, combat, combatant, binding, radii, ruler, select } = setupMovementCanvas();
     expect(await radii()).toEqual([]);
     binding.onDown();
     expect(await radii()).toEqual([expect.closeTo(500, 1)]);
-    expect(glyph()).toBe("1");
     token.document.movementHistory.push({ x: 200, y: 0, cost: 10 });
     token.center = { x: 200, y: 0 };
     callbacks.refreshToken(token, {});
@@ -172,7 +188,6 @@ it("retains the movement budget during hold preview, drag cancellation, and turn
     const planned = { history: token.document.movementHistory, foundPath: [{ x: 520, y: 0, cost: 16 }] };
     ruler.refresh({ passedWaypoints: token.document.movementHistory, pendingWaypoints: [], plannedMovement: { user: planned } });
     expect(await radii()).toEqual([expect.closeTo(480, 1)]);
-    expect(glyph()).toBe("2");
     ruler.refresh({ passedWaypoints: token.document.movementHistory, pendingWaypoints: [], plannedMovement: {} });
     expect(await radii()).toEqual([expect.closeTo(300, 1)]);
     token.document.movementHistory = [];
@@ -223,14 +238,40 @@ it("tracks the dragged waypoint before the routed plan lands", async () => {
     expect(await radii()).toEqual([expect.closeTo(100, 1)]);
 });
 
-it("keeps following the captured drag path when the ruler reports nothing", async () => {
-    const { token, ruler, radii, budgetPosition, settings } = setupMovementCanvas();
+it("clears a finished drag on an idle ruler refresh without requiring ruler.clear", async () => {
+    const { token, ruler, radii, budgetPosition, settings, binding } = setupMovementCanvas();
     settings.movementPreview = "circle";
+    settings.movementLattice = "hex";
+    token.isDragged = true;
     dragPaths.set(token, [{ x: 700, y: 200, cost: 30 }]);
-    ruler.refresh({ passedWaypoints: [], pendingWaypoints: [], plannedMovement: {} });
+    const idle = { passedWaypoints: token.document.movementHistory, pendingWaypoints: [], plannedMovement: {} };
+    ruler.refresh(idle);
     expect(budgetPosition()?.x).toBe(700);
     expect(await radii()).toEqual([expect.closeTo(400, 1)]);
-    ruler.clear();
+    token.isDragged = false;
+    ruler.refresh(idle);
+    expect(await radii()).toEqual([]);
+    binding.onDown();
+    ruler.refresh(idle);
+    expect(budgetPosition()?.x).toBe(100);
+    expect(await radii()).toEqual([expect.closeTo(500, 1)]);
+});
+
+it("keeps pending movement visible after drop and clears it when the animation finishes", async () => {
+    const { token, ruler, radii, budgetPosition, settings } = setupMovementCanvas();
+    settings.movementPreview = "circle";
+    settings.movementLattice = "hex";
+    token.isDragged = true;
+    dragPaths.set(token, [{ x: 300, y: 200, cost: 10 }]);
+    ruler.refresh({ passedWaypoints: [], pendingWaypoints: [], plannedMovement: {} });
+    expect(await radii()).toEqual([expect.closeTo(300, 1)]);
+    token.isDragged = false;
+    token.movementAnimationPromise = Promise.resolve();
+    ruler.refresh({ passedWaypoints: [], pendingWaypoints: [{ x: 500, y: 200, cost: 20 }], plannedMovement: {} });
+    expect(budgetPosition()?.x).toBe(500);
+    expect(await radii()).toEqual([expect.closeTo(100, 1)]);
+    token.movementAnimationPromise = null;
+    ruler.refresh({ passedWaypoints: [{ x: 500, y: 200, cost: 20 }], pendingWaypoints: [], plannedMovement: {} });
     expect(await radii()).toEqual([]);
 });
 
@@ -325,4 +366,68 @@ it("finishes outlines during continuous dragging without moving the previous wal
     expect(completedWhileMoving).toBe(true);
     await radii();
     expect(budgetOutline()?.x).toBe(339);
+});
+
+it("keeps normal hex movement free of cell overlays", async () => {
+    const { token, settings, binding, polygons, radii } = setupMovementCanvas();
+    settings.movementLattice = "hex";
+    binding.onDown();
+    token.renderFlags.set({ refreshRuler: true });
+    await radii();
+    expect(polygons().filter(polygon => polygon.length === 12)).toEqual([]);
+});
+
+it("shows white normal-cost cells and blue aquatic fills only while local debugging is enabled", async () => {
+    const { token, settings, setSetting, debugHexes, radii, select } = setupMovementCanvas();
+    settings.movementLattice = "hex";
+    settings.movementPreview = "off";
+    Object.assign(token.scene, { regions: [{
+        hidden: false, includedInLevel: () => true,
+        testPoint: (point: { x: number; elevation: number }) => point.x >= 200 && point.elevation === 0,
+        polygons: [{ points: [200, -1000, 1000, -1000, 1000, 1000, 200, 1000] }],
+        behaviors: [
+            { type: "environment", disabled: false, system: { mode: "add", environmentTypes: new Set(["aquatic"]), _getTerrainEffects: () => [] } },
+            { disabled: false, system: { _getTerrainEffects: () => [{ difficulty: 2 }] } },
+        ],
+    }] });
+    expect(debugHexes()).toEqual([]);
+    setSetting("movementDebug", true);
+    await radii();
+    const cells = debugHexes();
+    const plain = cells.find(cell => cell.points[0] < 180);
+    const water = cells.find(cell => cell.points[0] > 220);
+    expect(plain?.stroke).toBe(0xffffff);
+    expect(plain?.fill).toBe(0xffffff);
+    expect(water?.fill).toBe(0x3399ff);
+    expect(water?.stroke).toBe(0xffbf47);
+    expect(cells.every(cell => cell.alpha <= 0.15)).toBe(true);
+    setSetting("movementDebug", false);
+    await radii();
+    expect(debugHexes()).toEqual([]);
+    setSetting("movementDebug", true);
+    await radii();
+    select([]);
+    expect(debugHexes()).toEqual([]);
+});
+
+it("paints a red rim with a climb icon along a ledge the token cannot walk up", async () => {
+    const { token, settings, radii, frontier, binding } = setupMovementCanvas();
+    settings.movementLattice = "hex";
+    const floor = (elevation: number, points: number[]) => ({
+        hidden: false, includedInLevel: () => true, testPoint: () => false, polygons: [{ points }],
+        behaviors: [{ type: "map-workshop-importer.setElevation", disabled: false, system: { elevation, _getTerrainEffects: () => [] } }],
+    });
+    Object.assign(token.scene, { regions: [floor(0, [-1000, -1000, 300, -1000, 300, 1000, -1000, 1000]), floor(7.5, [300, -1000, 1000, -1000, 1000, 1000, 300, 1000])] });
+    token.renderFlags.set({ refreshRuler: true });
+    expect(frontier().cells).toEqual([]);
+    binding.onDown();
+    await radii();
+    const { cells, icons } = frontier();
+    expect(cells.length).toBeGreaterThan(20);
+    expect(cells.every(cell => cell.fill === 0xff4d4d && cell.alpha > 0)).toBe(true);
+    expect(cells.every(cell => cell.points[0] > 280)).toBe(true);
+    expect(icons).toEqual(["\uf6ec"]);
+    binding.onUp();
+    await radii();
+    expect(frontier().cells).toEqual([]);
 });
