@@ -22,6 +22,10 @@
                 "name": "Refuse climbs on foot",
                 "hint": "On scenes with map-workshop floor regions, a walking-type move onto a floor more than one 2.5 ft step higher is refused and the token stops at the ledge; Climb, Fly, Blink or Displace are needed. When disabled, tokens still take each floor's height but any rise is walkable."
             },
+            "promptMovementChecks": {
+                "name": "Prompt checks for ledges and gaps",
+                "hint": "When a move climbs or drops more than one 2.5 ft tread, post the system's Climb (Athletics) roll; when it squeezes through a tight gap, post the Squeeze (Acrobatics) roll. The move still happens; the GM reads the result."
+            },
             "movementLattice": {
                 "name": "Movement Lattice",
                 "hint": "Choose continuous geometry or a fixed hex lattice at one tenth of a square. Normal hex routes use the full token footprint. A separate cramped-passage fallback runs only when no full-footprint route exists. Applies to the next preview.",

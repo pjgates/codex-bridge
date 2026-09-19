@@ -8,7 +8,7 @@ import { activateHeroicRerolls, isHeroicRerollsEnabled } from "../rulesets/sf2e/
 import { isPradEnabled, applyDCBaseSetting, registerAttackInterceptHook, registerPradSheetHooks } from "../rulesets/sf2e/prad/index.js";
 import { activateTargetHelper, setPradOvercomeEnabled } from "../rulesets/sf2e/target-helper/index.js";
 import { checkForVaultUpdates } from "../sync/index.js";
-import { activateFloorElevation, activateGridlessCombat } from "../rulesets/sf2e/gridless/index.js";
+import { activateFloorElevation, activateGridlessCombat, activateMovementChecks } from "../rulesets/sf2e/gridless/index.js";
 
 export function onReady(): void {
     const isEnabled = game.settings!.get(MODULE_ID, "enableCustomRules");
@@ -22,6 +22,8 @@ export function onReady(): void {
     activateGridlessCombat();
     // Map-workshop floor heights apply on every scene with floor regions, gridless or not.
     activateFloorElevation();
+    // After the floor rewrite, so check prompts see the path that actually executes.
+    activateMovementChecks();
 
     void checkForVaultUpdates();
 

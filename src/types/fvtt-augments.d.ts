@@ -24,6 +24,7 @@ declare global {
         "codex-foundry.movementLattice": "continuous" | "hex";
         "codex-foundry.movementDebug": boolean;
         "codex-foundry.enforceClimb": boolean;
+        "codex-foundry.promptMovementChecks": boolean;
         "codex-foundry.playersRollAllDice": boolean;
         "codex-foundry.pradStrictDCs": boolean;
         "codex-foundry.enableCodexSync": boolean;

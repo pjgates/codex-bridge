@@ -93,6 +93,7 @@ Scenes imported by the Map Workshop Importer carry `setElevation` floor regions.
 - A higher rise on a walking-type action stops the token at the ledge with a warning. Climb, Fly, Blink, and Displace may take any rise.
 - **Refuse climbs on foot** (world setting, on by default) controls the refusal. Turned off, tokens still take each floor's height.
 - Tokens dropped onto the map land at the floor under them.
+- **Prompt checks for ledges and gaps** (world setting, on by default): a move that climbs or drops more than one tread posts the system's Climb (Athletics) roll, and a move through a squeeze-width gap posts Squeeze (Acrobatics). The move still happens; the GM reads the result against the DC the terrain warrants.
 - On gridless scenes in hex lattice mode, the drag label previews the planned height at each waypoint, marks waypoints past a refused ledge, and the reachable ring and automatic routes stop at ledges the current movement action cannot climb.
 
 ### Why can't I go there?
