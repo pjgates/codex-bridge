@@ -63,7 +63,7 @@ export function isKnownMovementPoint(point: Point): boolean {
 
 /**
  * PF2e lets a creature use a passage one size smaller as difficult terrain; anything tighter needs Squeeze.
- * Small and Tiny creatures already fit a half space, so a half-space passage costs them nothing.
+ * Small and Tiny creatures already fit a half space, so their cramped passage is a quarter space.
  */
 function passageFootprint(token: NativeToken, base: Waypoint): { full: Point; cramped: Point } {
     const size = token.scene.dimensions.size;
@@ -71,7 +71,8 @@ function passageFootprint(token: NativeToken, base: Waypoint): { full: Point; cr
     const small = token.actor?.size === "sm" || token.actor?.size === "tiny";
     const span = (units: number): number => small && units <= 1 ? half : units * size;
     const full = { x: span(base.width), y: span(base.height) };
-    return { full, cramped: { x: Math.max(half, full.x - size), y: Math.max(half, full.y - size) } };
+    const cramped = small ? { x: full.x / 2, y: full.y / 2 } : { x: Math.max(half, full.x - size), y: Math.max(half, full.y - size) };
+    return { full, cramped };
 }
 
 function movementClearance(token: NativeToken, base: Waypoint, preview = false) {
@@ -91,9 +92,9 @@ function movementClearance(token: NativeToken, base: Waypoint, preview = false) 
     const solid = buildClearance(walls, token.scene.dimensions.rect, full.x, full.y, 0);
     const clearance = full.x === cramped.x && full.y === cramped.y ? solid
         : buildClearance(walls, token.scene.dimensions.rect, cramped.x, cramped.y, 0);
-    // A leg squeezes only where the cramped footprint still overlaps walls after the lattice's
-    // half-cell tolerance, matching the cells the hex field calls squeeze-only.
-    const squeezing = buildClearance(walls, token.scene.dimensions.rect, cramped.x, cramped.y, -token.scene.dimensions.size / 20);
+    // A leg squeezes where the cramped footprint overlaps walls by more than a pixel of slack: the
+    // rules' geometry, not the lattice's routing tolerance.
+    const squeezing = buildClearance(walls, token.scene.dimensions.rect, cramped.x, cramped.y, -1);
     const entry = { key, actor: token.actor?.system, solid, clearance, squeezing, walls, full, cramped };
     clearances.set(token, entry);
     return entry;
@@ -302,10 +303,9 @@ function activatePassageCosts(): void {
             const b = token.document.getCenterPoint({ ...segment, x: to.j, y: to.i });
             const crampedFraction = obstructedFraction(solid, a, b);
             if (!crampedFraction) return measured;
-            // Where the cramped footprint overlaps walls beyond the lattice tolerance the token is
-            // squeezing: greater difficult terrain. Sizes with no cramped allowance only ever squeeze.
+            // Where even the cramped footprint overlaps walls the token is squeezing: greater difficult terrain.
             const squeezedFraction = obstructedFraction(squeezing, a, b);
-            const crampedOnly = solid === clearance ? 0 : Math.max(0, crampedFraction - squeezedFraction);
+            const crampedOnly = Math.max(0, crampedFraction - squeezedFraction);
             const cramped = cost(from, to, distance, { ...segment, terrain: { difficulty: 2 } });
             let total = measured + Math.max(0, cramped - measured) * crampedOnly;
             if (squeezedFraction > 0) {

@@ -76,10 +76,10 @@ An optional setting for PF2e and SF2e gridless scenes. Gridded scenes keep their
 - Every other gridless rule is shared: distance, cover, flanking, areas, terrain, fog, elevation, and movement budgets.
 - Automatic routing preserves placed waypoints and searches for cheaper routes around walls and difficult terrain.
 - Clearance uses the occupied rectangle. Continuous routing permits exact fits. Hex routing requires usable cell centres within the selected clearance.
-- Small creatures use 2.5-foot passages normally. Medium creatures use them as difficult terrain.
+- Small creatures use 2.5-foot passages normally and 1.25-foot passages as difficult terrain. Medium creatures use 2.5-foot passages as difficult terrain.
 - Large, Huge, and Gargantuan creatures can use 5-, 10-, and 15-foot passages, respectively, as difficult terrain.
 - Only the cramped portion costs extra. This penalty does not stack with other difficult terrain.
-- Gaps down to half the cramped footprint are squeezed through as greater difficult terrain: the squeezed stretch costs triple and the ruler label shows a compress icon. Anything tighter is impassable to automatic routing. Small and Tiny creatures, whose normal footprint is already the half space, squeeze through gaps down to 1.25 ft.
+- Gaps down to half the cramped footprint are squeezed through as greater difficult terrain: the squeezed stretch costs triple and the ruler label shows a compress icon. Anything tighter is impassable to automatic routing. Small and Tiny creatures squeeze through gaps down to about 0.6 ft.
 - Terrain uses Region behaviors that modify movement costs, labeled **Difficult Terrain** in PF2e/SF2e.
 - Prepared abilities that ignore all difficult or greater difficult terrain also affect gridless movement costs.
 - Hex search and reachable outlines charge terrain cost on every CELL step. Straightening preserves cheaper terrain detours using sampled terrain costs.
@@ -90,8 +90,8 @@ An optional setting for PF2e and SF2e gridless scenes. Gridded scenes keep their
 Scenes imported by the Map Workshop Importer carry `setElevation` floor regions. Codex Foundry applies their heights on every such scene, gridless or not:
 
 - Entering a floor inserts its height into the path at the entry point. A rise of one 2.5-foot step or any descent is free.
-- A higher rise on a walking-type action stops the token at the ledge with a warning. Climb, Fly, Blink, and Displace may take any rise.
-- **Refuse climbs on foot** (world setting, on by default) controls the refusal. Turned off, tokens still take each floor's height.
+- A higher rise is a climb: by default the token goes up, takes the new height, and the Climb roll is prompted. Climb, Fly, Blink, and Displace may take any rise without question.
+- **Refuse climbs on foot** (world setting, off by default) instead stops a walking-type move at the ledge with a warning.
 - Tokens dropped onto the map land at the floor under them.
 - **Prompt checks for ledges and gaps** (world setting, on by default): a move that climbs or drops more than one tread posts the system's Climb (Athletics) roll, and a move through a squeeze-width gap posts Squeeze (Acrobatics). The move still happens; the GM reads the result against the DC the terrain warrants.
 - On gridless scenes in hex lattice mode, the drag label previews the planned height at each waypoint, marks waypoints past a refused ledge, and the reachable ring and automatic routes stop at ledges the current movement action cannot climb.
@@ -100,8 +100,8 @@ Scenes imported by the Map Workshop Importer carry `setElevation` floor regions.
 
 With the reachable ring on in hex lattice mode, cells just beyond the ring that the token could enter only by other means are filled red, one icon per stretch:
 
-- The **Climb action's marker**, the ladder by default, marks a ledge more than one 2.5-foot step up. Switch to Climb or Fly to take it. Tokens already on a climbing action never see these.
-- A **compress arrow** marks a gap too tight for the token's cramped footprint but wide enough for a Squeeze, half the cramped width. Routes do go through, at triple cost, and the rim stays red until the token enters it. It appears only where the gap leads to ground the token cannot otherwise reach, so ordinary walls stay unmarked.
+- The **Climb action's marker**, the ladder by default, marks a ledge more than one 2.5-foot step up. Amber means the move goes ahead and prompts a Climb roll; red means climbs on foot are refused and the action must change.
+- A **compress arrow** marks a gap too tight for the token's cramped footprint but wide enough for a Squeeze, half the cramped width. Routes do go through, at triple cost, shown in amber. It appears only where the gap leads to ground the token cannot otherwise reach, so ordinary walls stay unmarked.
 
 ### Ruler label
 

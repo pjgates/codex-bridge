@@ -266,7 +266,7 @@ function difficult(token: { scene: { regions: unknown[] } }, from: number, diffi
     }];
 }
 
-it("stops the hex ring at a wall for a token with no cramped allowance", async () => {
+it("stops the hex ring at a wall and opens it when the wall stops blocking", async () => {
     const { token, edge, callbacks } = setup({ lattice: "hex" });
     token.actor.size = "sm";
     const outline = async () => {
@@ -277,7 +277,8 @@ it("stops the hex ring at a wall for a token with no cramped allowance", async (
         return { min: Math.min(...xs), max: Math.max(...xs) };
     };
     const closed = await outline();
-    expect(closed.max).toBeLessThan(490);
+    // The cramped band lets a Small token hug the wall, but never cross it.
+    expect(closed.max).toBeLessThan(500);
     expect(closed.min).toBeLessThan(250);
     edge.move = 0;
     callbacks.updateWall();
@@ -459,29 +460,34 @@ it("squeezes a hex route through a gap below the cramped footprint at triple cos
     const path = await token.findMovementPath(waypoints).promise;
     expect(path.at(-1)?.x).toBe(650);
     // Twenty feet of travel: the 100 px wall band is cramped for the full footprint, and its
-    // middle 40 px also for the tolerant cramped footprint, so 3 ft cost double and 2 ft cost triple.
-    expect(measureProposedMovement(token as unknown as Token.Implementation, path)).toBeCloseTo(27, 0);
+    // middle 48 px also for the cramped footprint, so 2.6 ft cost double and 2.4 ft cost triple.
+    expect(measureProposedMovement(token as unknown as Token.Implementation, path)).toBeCloseTo(27.5, 0);
     gap(token, 8, callbacks);
     expect((await token.findMovementPath(waypoints).promise).at(-1)?.x).toBe(250);
 });
 
-it("lets a Small creature squeeze a gap below its half-space footprint at triple cost", async () => {
+it("gives a Small creature a quarter-space cramped tier and squeezes only below it", async () => {
     const { token, callbacks } = setup({ lattice: "hex" });
     token.actor.size = "sm";
     const waypoints = [{ x: 250, y: 450 }, { x: 650, y: 450 }];
     gap(token, 40, callbacks);
-    const path = await token.findMovementPath(waypoints).promise;
-    expect(path.at(-1)?.x).toBe(650);
-    // Twenty feet of travel; the 40 px band where the tolerant half-space footprint overlaps the wall is squeezed.
-    expect(measureProposedMovement(token as unknown as Token.Implementation, path)).toBeCloseTo(24, 0);
-    gap(token, 8, callbacks);
+    const cramped = await token.findMovementPath(waypoints).promise;
+    expect(cramped.at(-1)?.x).toBe(650);
+    // Twenty feet; the 50 px band where the half-space footprint overlaps the wall is cramped, not squeezed.
+    expect(measureProposedMovement(token as unknown as Token.Implementation, cramped)).toBeCloseTo(22.5, 0);
+    expect(cramped.slice(1).some((to, i) => isSqueezedLeg(token as unknown as Token.Implementation, cramped[i], to))).toBe(false);
+    gap(token, 12, callbacks);
+    const squeezed = await token.findMovementPath(waypoints).promise;
+    expect(squeezed.at(-1)?.x).toBe(650);
+    expect(squeezed.slice(1).some((to, i) => isSqueezedLeg(token as unknown as Token.Implementation, squeezed[i], to))).toBe(true);
+    gap(token, 2, callbacks);
     expect((await token.findMovementPath(waypoints).promise).at(-1)?.x).toBe(250);
 });
 
-it("does not treat a wall brush within lattice tolerance as a squeeze", async () => {
+it("does not treat an exact cramped fit as a squeeze", async () => {
     const { token, callbacks } = setup({ lattice: "hex" });
-    // A 52 px gap: the cramped footprint (50 px) overlaps the walls only inside the 5 px lattice tolerance.
-    gap(token, 52, callbacks);
+    // A 51 px gap: the cramped footprint (50 px) fits with a pixel to spare.
+    gap(token, 51, callbacks);
     const waypoints = [{ x: 250, y: 450 }, { x: 650, y: 450 }];
     const path = await token.findMovementPath(waypoints).promise;
     expect(path.at(-1)?.x).toBe(650);
