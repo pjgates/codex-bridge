@@ -21,6 +21,9 @@ declare global {
         "codex-foundry.heroicRerolls": boolean;
         "codex-foundry.gridlessCombat": boolean;
         "codex-foundry.movementPreview": "off" | "circle" | "ring";
+        "codex-foundry.movementLattice": "continuous" | "hex";
+        "codex-foundry.movementDebug": boolean;
+        "codex-foundry.enforceClimb": boolean;
         "codex-foundry.playersRollAllDice": boolean;
         "codex-foundry.pradStrictDCs": boolean;
         "codex-foundry.enableCodexSync": boolean;

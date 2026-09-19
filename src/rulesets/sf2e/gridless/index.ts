@@ -7,6 +7,7 @@ import { activateGridlessRouting } from "./routing.js";
 
 export { registerGridlessSetting } from "./settings.js";
 export { registerMovementPreviewKeybind } from "./movement.js";
+export { activateFloorElevation, registerFloorSetting } from "./floors.js";
 
 export function activateGridlessCombat(): void {
     if (!["pf2e", "sf2e"].includes(game.system!.id)) return;
