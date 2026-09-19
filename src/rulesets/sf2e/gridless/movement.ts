@@ -46,7 +46,8 @@ function frontierIcon(reason: FrontierReason, size: number): PIXI.Container {
     text.anchor.set(0.5, 0.5);
     return holder;
 }
-const FRONTIER_COLOR = 0xff4d4d;
+/** Red: the token cannot go there. Amber: it can, and a check will be prompted. */
+const FRONTIER_REFUSED = 0xff4d4d, FRONTIER_CHECK = 0xffbf47;
 
 type Waypoint = TokenDocument.MeasuredMovementWaypoint;
 interface RulerData {
@@ -263,9 +264,10 @@ export function activateMovementRings(): void {
                             const { size, rims } = area.frontier;
                             const offsets = hexCorners({ q: 0, r: 0 }, size).flatMap(point => [point.x, point.y]);
                             for (const rim of rims) {
+                                const colour = rim.passable ? FRONTIER_CHECK : FRONTIER_REFUSED;
                                 for (const cell of rim.cells) {
                                     const point = hexCentre(cell, size);
-                                    current.frontierGraphics.lineStyle(1 / drawZoom, FRONTIER_COLOR, 0.6).beginFill(FRONTIER_COLOR, 0.3)
+                                    current.frontierGraphics.lineStyle(1 / drawZoom, colour, 0.6).beginFill(colour, 0.3)
                                         .drawPolygon(offsets.map((value, i) => value + (i % 2 ? point.y : point.x))).endFill();
                                 }
                                 const icon = current.frontierGraphics.addChild(frontierIcon(rim.reason, 18));

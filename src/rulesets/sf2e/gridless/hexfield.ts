@@ -317,7 +317,13 @@ export function floodReachable(field: HexField, start: Hex, budget: number): num
 }
 
 export type FrontierReason = "climb" | "squeeze";
-export interface FrontierRim { reason: FrontierReason; cells: Hex[]; centre: Point }
+export interface FrontierRim {
+    reason: FrontierReason;
+    /** True when the token can go there with a check: a climb that is not refused, or any squeeze. */
+    passable: boolean;
+    cells: Hex[];
+    centre: Point;
+}
 
 function forEachNeighbour(field: HexField, index: number, visit: (next: number) => void): void {
     const offset = index % field.rSpan, q = (index - offset) / field.rSpan, r = offset;
@@ -356,15 +362,20 @@ const SQUEEZE_RIM_DEPTH = 3;
  * otherwise reach, so the cramped strip along an ordinary wall is never marked.
  */
 export function blockedFrontier(field: HexField): FrontierRim[] {
-    const { blocked, squeezeBlocked } = field;
+    const { blocked, squeezeBlocked, floor } = field;
     const squeezeOnly = (index: number): boolean => !!blocked[index] && !squeezeBlocked[index];
-    const reasons = new Map<number, FrontierReason>();
+    const rise = (from: number, to: number): boolean => !Number.isNaN(floor[from]) && !Number.isNaN(floor[to]) && floor[to] - floor[from] > STEP_FEET + EPSILON;
+    const reasons = new Map<number, { reason: FrontierReason; passable: boolean }>();
     const squeezeBand = new Set<number>();
     for (let index = 0; index < blocked.length; index++) {
         if (!reachedIndex(field, index)) continue;
         forEachNeighbour(field, index, next => {
-            if (reachedIndex(field, next)) return;
-            if (!blocked[next]) { if (!canStep(field, index, next)) reasons.set(next, "climb"); }
+            if (reachedIndex(field, next)) {
+                // A ledge the flood climbed: still worth marking, since taking it prompts a check.
+                if (rise(index, next) && !reasons.has(next)) reasons.set(next, { reason: "climb", passable: true });
+                return;
+            }
+            if (!blocked[next]) { if (!canStep(field, index, next)) reasons.set(next, { reason: "climb", passable: false }); }
             else if (field.canSqueeze && squeezeOnly(next)) squeezeBand.add(next);
         });
     }
@@ -393,7 +404,7 @@ export function blockedFrontier(field: HexField): FrontierRim[] {
             while (wave.length) {
                 const index = wave.shift()!;
                 const next = depth.get(index)! + 1;
-                if (squeezeBand.has(index)) reasons.set(index, "squeeze");
+                if (squeezeBand.has(index)) reasons.set(index, { reason: "squeeze", passable: true });
                 if (next > SQUEEZE_RIM_DEPTH) continue;
                 forEachNeighbour(field, index, neighbour => {
                     if (!squeezeOnly(neighbour) || depth.has(neighbour)) return;
@@ -404,7 +415,9 @@ export function blockedFrontier(field: HexField): FrontierRim[] {
     }
     const rims: FrontierRim[] = [];
     const grouped = new Set<number>();
-    for (const [seed, reason] of reasons) {
+    const same = (a: { reason: FrontierReason; passable: boolean }, b?: { reason: FrontierReason; passable: boolean }): boolean =>
+        !!b && a.reason === b.reason && a.passable === b.passable;
+    for (const [seed, kind] of reasons) {
         if (grouped.has(seed)) continue;
         const cells: Hex[] = [];
         const queue = [seed];
@@ -417,11 +430,11 @@ export function blockedFrontier(field: HexField): FrontierRim[] {
             const centre = hexCentre(hex, field.size);
             sumX += centre.x; sumY += centre.y;
             forEachNeighbour(field, index, next => {
-                if (grouped.has(next) || reasons.get(next) !== reason) return;
+                if (grouped.has(next) || !same(kind, reasons.get(next))) return;
                 grouped.add(next); queue.push(next);
             });
         }
-        rims.push({ reason, cells, centre: { x: sumX / cells.length, y: sumY / cells.length } });
+        rims.push({ ...kind, cells, centre: { x: sumX / cells.length, y: sumY / cells.length } });
     }
     return rims;
 }

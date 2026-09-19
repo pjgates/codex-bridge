@@ -20,7 +20,7 @@
             },
             "enforceClimb": {
                 "name": "Refuse climbs on foot",
-                "hint": "On scenes with map-workshop floor regions, a walking-type move onto a floor more than one 2.5 ft step higher is refused and the token stops at the ledge; Climb, Fly, Blink or Displace are needed. When disabled, tokens still take each floor's height but any rise is walkable."
+                "hint": "Off by default: a move up a ledge of more than one 2.5 ft tread goes ahead, takes the new height and prompts the Climb roll. When enabled, a walking-type move is refused at the ledge and Climb, Fly, Blink or Displace are needed."
             },
             "promptMovementChecks": {
                 "name": "Prompt checks for ledges and gaps",

@@ -433,17 +433,24 @@ describe("blocked frontier", () => {
         { floor: 7.5, polygons: [[400, 0, 1000, 0, 1000, 1000, 400, 1000]] },
     ];
 
-    it("marks the ledge as a climb rim only when the action cannot climb it, never as a squeeze", () => {
+    it("marks the ledge red when refused and amber when the flood climbs it, never as a squeeze", () => {
         const walking = field([], { floors, cramped: { width: 50, height: 50 }, squeeze: { width: 25, height: 25 } });
         floodReachable(walking, cellAt(250), 100_000);
         const rims = blockedFrontier(walking);
-        expect(rims.map(r => r.reason)).toEqual(["climb"]);
+        expect(rims.map(r => [r.reason, r.passable])).toEqual([["climb", false]]);
         expect(rims[0].cells.length).toBeGreaterThan(50);
         expect(rims[0].centre.x).toBeGreaterThan(390);
         expect(rims[0].centre.x).toBeLessThan(420);
         const climbing = field([], { floors, climb: true });
         floodReachable(climbing, cellAt(250), 100_000);
-        expect(blockedFrontier(climbing)).toEqual([]);
+        const climbed = blockedFrontier(climbing);
+        expect(climbed.map(r => [r.reason, r.passable])).toEqual([["climb", true]]);
+        expect(climbed[0].centre.x).toBeGreaterThan(395);
+        expect(climbed[0].centre.x).toBeLessThan(425);
+        // Coming down the ledge is free, but the way back up is still a climb, so the same rim shows in amber.
+        const descending = field([], { floors, climb: true });
+        floodReachable(descending, cellAt(750), 100_000);
+        expect(blockedFrontier(descending).map(r => [r.reason, r.passable])).toEqual([["climb", true]]);
     });
 
     it("marks a gap too tight for the cramped footprint but wide enough to squeeze", () => {
@@ -451,7 +458,7 @@ describe("blocked frontier", () => {
         const narrow = field(gapWalls(40), { cramped, squeeze });
         floodReachable(narrow, cellAt(250), 100_000);
         const rims = blockedFrontier(narrow);
-        expect(rims.map(r => r.reason)).toEqual(["squeeze"]);
+        expect(rims.map(r => [r.reason, r.passable])).toEqual([["squeeze", true]]);
         expect(Math.abs(rims[0].centre.y - 500)).toBeLessThan(30);
         expect(Math.abs(rims[0].centre.x - 500)).toBeLessThan(30);
         // The rim hugs the opening rather than running along the whole wall.
