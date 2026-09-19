@@ -470,3 +470,16 @@ it("squeezes a hex route through a gap below the cramped footprint at triple cos
     gap(token, 8, callbacks);
     expect((await token.findMovementPath(waypoints).promise).at(-1)?.x).toBe(250);
 });
+
+it("lets a Small creature squeeze a gap below its half-space footprint at triple cost", async () => {
+    const { token, callbacks } = setup({ lattice: "hex" });
+    token.actor.size = "sm";
+    const waypoints = [{ x: 250, y: 450 }, { x: 650, y: 450 }];
+    gap(token, 40, callbacks);
+    const path = await token.findMovementPath(waypoints).promise;
+    expect(path.at(-1)?.x).toBe(650);
+    // Twenty feet of travel; the 50 px band where the half-space footprint overlaps the wall is squeezed.
+    expect(measureProposedMovement(token as unknown as Token.Implementation, path)).toBeCloseTo(25, 0);
+    gap(token, 8, callbacks);
+    expect((await token.findMovementPath(waypoints).promise).at(-1)?.x).toBe(250);
+});

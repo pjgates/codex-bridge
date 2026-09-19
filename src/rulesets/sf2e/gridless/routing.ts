@@ -254,8 +254,8 @@ function movementHexField(token: NativeToken, base: Waypoint, options: PathOptio
         regions,
         floors: floorHeights(token, base.level),
         climb,
-        // A Squeeze fits half the cramped footprint; Small and Tiny creatures have no cramped footprint to halve.
-        squeeze: full.x !== cramped.x || full.y !== cramped.y ? { width: cramped.x / 2, height: cramped.y / 2 } : undefined,
+        // A Squeeze fits half the cramped footprint; for Small and Tiny that is half their normal half-space.
+        squeeze: { width: cramped.x / 2, height: cramped.y / 2 },
         known: restricted ? isKnownMovementPoint : undefined,
     });
     const entry = { key, actor: token.actor?.system, field };
@@ -266,8 +266,7 @@ function movementHexField(token: NativeToken, base: Waypoint, options: PathOptio
 /** Does this leg force the token's cramped footprint through walls, i.e. a Squeeze? */
 export function isSqueezedLeg(token: Token.Implementation, from: Waypoint, to: Waypoint): boolean {
     const native = token as unknown as NativeToken;
-    const { solid, clearance } = movementClearance(native, to, true);
-    if (solid === clearance) return false;
+    const { clearance } = movementClearance(native, to, true);
     const a = native.document.getCenterPoint({ ...from, width: to.width, height: to.height, shape: to.shape });
     const b = native.document.getCenterPoint(to);
     return obstructedFraction(clearance, a, b) > 0;
@@ -296,13 +295,13 @@ function activatePassageCosts(): void {
             const action = CONFIG.Token.movement.actions[segment.action];
             if (!action?.walls || action.teleport || from.k !== to.k || (segment.terrain?.difficulty ?? 1) >= 2) return measured;
             const { solid, clearance } = movementClearance(token, segment, !!options?.preview);
-            if (solid === clearance) return measured;
             const a = token.document.getCenterPoint({ ...segment, x: from.j, y: from.i });
             const b = token.document.getCenterPoint({ ...segment, x: to.j, y: to.i });
             const crampedFraction = obstructedFraction(solid, a, b);
             if (!crampedFraction) return measured;
-            // Where even the cramped footprint overlaps walls the token is squeezing: greater difficult terrain.
-            const squeezedFraction = obstructedFraction(clearance, a, b);
+            // Where even the cramped footprint overlaps walls the token is squeezing: greater difficult
+            // terrain. Sizes with no cramped allowance squeeze as soon as their footprint overlaps.
+            const squeezedFraction = solid === clearance ? crampedFraction : obstructedFraction(clearance, a, b);
             const cramped = cost(from, to, distance, { ...segment, terrain: { difficulty: 2 } });
             let total = measured + Math.max(0, cramped - measured) * (crampedFraction - squeezedFraction);
             if (squeezedFraction > 0) {

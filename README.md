@@ -79,7 +79,7 @@ An optional setting for PF2e and SF2e gridless scenes. Gridded scenes keep their
 - Small creatures use 2.5-foot passages normally. Medium creatures use them as difficult terrain.
 - Large, Huge, and Gargantuan creatures can use 5-, 10-, and 15-foot passages, respectively, as difficult terrain.
 - Only the cramped portion costs extra. This penalty does not stack with other difficult terrain.
-- Gaps down to half the cramped footprint are squeezed through as greater difficult terrain: the squeezed stretch costs triple and the ruler label shows a compress icon. Anything tighter is impassable to automatic routing.
+- Gaps down to half the cramped footprint are squeezed through as greater difficult terrain: the squeezed stretch costs triple and the ruler label shows a compress icon. Anything tighter is impassable to automatic routing. Small and Tiny creatures, whose normal footprint is already the half space, squeeze through gaps down to 1.25 ft.
 - Terrain uses Region behaviors that modify movement costs, labeled **Difficult Terrain** in PF2e/SF2e.
 - Prepared abilities that ignore all difficult or greater difficult terrain also affect gridless movement costs.
 - Hex search and reachable outlines charge terrain cost on every CELL step. Straightening preserves cheaper terrain detours using sampled terrain costs.
@@ -100,7 +100,7 @@ Scenes imported by the Map Workshop Importer carry `setElevation` floor regions.
 With the reachable ring on in hex lattice mode, cells just beyond the ring that the token could enter only by other means are filled red, one icon per stretch:
 
 - A **hiker** marks a ledge more than one 2.5-foot step up. Switch to Climb or Fly to take it. Tokens already on a climbing action never see these.
-- A **compress arrow** marks a gap too tight for the token's cramped footprint but wide enough for a Squeeze, half the cramped width. Routes do go through, at triple cost, and the rim stays red until the token enters it. It appears only where the gap leads to ground the token cannot otherwise reach, so ordinary walls stay unmarked. Small and Tiny creatures have no cramped footprint and see no squeeze cells.
+- A **compress arrow** marks a gap too tight for the token's cramped footprint but wide enough for a Squeeze, half the cramped width. Routes do go through, at triple cost, and the rim stays red until the token enters it. It appears only where the gap leads to ground the token cannot otherwise reach, so ordinary walls stay unmarked.
 
 ### Ruler label
 

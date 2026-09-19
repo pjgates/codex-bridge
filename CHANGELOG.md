@@ -22,7 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - **Floors:** map-workshop `setElevation` floor regions now move tokens between floor heights from Codex Foundry, including the drop-time path rewrite, the **Refuse climbs on foot** setting, and floor snapping for dropped tokens. The importer module keeps only the region behavior type.
 - **Floor-aware preview:** in hex lattice mode the drag label shows the planned floor height at each waypoint and flags waypoints past a refused ledge. The reachable ring and automatic routes stop at ledges the movement action cannot climb.
 - **Blocked frontier:** in hex lattice mode the reachable ring now shows red cells with a hiker icon along ledges the current action cannot climb and a compress icon at gaps that need a Squeeze, taking the token's movement action and size into account.
-- **Squeezing:** on the hex lattice, gaps between half and the full cramped footprint are now routed as greater difficult terrain. The squeezed stretch costs triple in movement measurement and the ruler label shows a compress icon on that leg.
+- **Squeezing:** on the hex lattice, gaps between half and the full cramped footprint are now routed as greater difficult terrain. The squeezed stretch costs triple in movement measurement and the ruler label shows a compress icon on that leg. Small and Tiny creatures squeeze gaps down to half their half-space footprint.
 
 ### Changed
 
