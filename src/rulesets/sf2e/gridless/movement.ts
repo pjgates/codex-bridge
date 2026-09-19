@@ -27,18 +27,24 @@ function iconGlyph(iconClass: string, fallback: string): string {
 
 /**
  * The climb rim borrows the Climb movement action's own marker: its image when it has one, as the
- * token HUD shows, otherwise its font icon. The squeeze rim uses compress.
+ * token HUD shows, otherwise its font icon. The squeeze rim uses compress. The holder takes the
+ * zoom compensation so the marker itself can be fitted to `size` pixels independently.
  */
-function frontierIcon(reason: FrontierReason, size: number): PIXI.Text | PIXI.Sprite {
+function frontierIcon(reason: FrontierReason, size: number): PIXI.Container {
+    const holder = new PIXI.Container();
     const climb = (CONFIG.Token.movement.actions as Record<string, { icon?: string; img?: string }>).climb;
     if (reason === "climb" && climb?.img) {
-        const sprite = PIXI.Sprite.from(climb.img);
-        sprite.width = sprite.height = size;
-        return sprite;
+        const sprite = holder.addChild(PIXI.Sprite.from(climb.img));
+        sprite.anchor.set(0.5, 0.5);
+        const fit = (): void => { sprite.width = size; sprite.height = size; };
+        if (sprite.texture.valid) fit(); else sprite.texture.baseTexture.once("loaded", fit);
+        return holder;
     }
     const glyph = reason === "squeeze" ? iconGlyph("fa-solid fa-compress", "\uf066")
         : iconGlyph(climb?.icon ?? "fa-solid fa-person-through-window", "\ue5a9");
-    return new PIXI.Text(glyph, { fontFamily: "Font Awesome 7 Pro", fontWeight: "900", fontSize: size, fill: 0xffffff, stroke: 0x000000, strokeThickness: 4 });
+    const text = holder.addChild(new PIXI.Text(glyph, { fontFamily: "Font Awesome 7 Pro", fontWeight: "900", fontSize: size, fill: 0xffffff, stroke: 0x000000, strokeThickness: 4 }));
+    text.anchor.set(0.5, 0.5);
+    return holder;
 }
 const FRONTIER_COLOR = 0xff4d4d;
 
@@ -97,7 +103,7 @@ export function activateMovementRings(): void {
     let fogMask: PIXI.Sprite | null = null;
     const previews = new WeakMap<Token.Implementation, MovementPreview>();
     const rings = new Map<Token.Implementation, {
-        graphics: PIXI.Graphics; frontierGraphics: PIXI.Graphics; frontierIcons: (PIXI.Text | PIXI.Sprite)[]; debugGraphics: PIXI.Graphics; debugLegend: PIXI.Text;
+        graphics: PIXI.Graphics; frontierGraphics: PIXI.Graphics; frontierIcons: PIXI.Container[]; debugGraphics: PIXI.Graphics; debugLegend: PIXI.Text;
         attackGraphics: PIXI.Graphics; attackLabels: PIXI.Text[];
         attackActor: AttackActor | null; attackSource: readonly PreparedAttack[] | undefined;
         attackRanges: (AttackRange & { color: number })[]; tokenHeight: number;
@@ -122,7 +128,7 @@ export function activateMovementRings(): void {
         rings.delete(token);
     }
 
-    function clearFrontier(ring: { frontierGraphics: PIXI.Graphics; frontierIcons: (PIXI.Text | PIXI.Sprite)[] }): void {
+    function clearFrontier(ring: { frontierGraphics: PIXI.Graphics; frontierIcons: PIXI.Container[] }): void {
         ring.frontierGraphics.clear();
         for (const icon of ring.frontierIcons) { ring.frontierGraphics.removeChild(icon); icon.destroy(); }
         ring.frontierIcons = [];
@@ -263,7 +269,6 @@ export function activateMovementRings(): void {
                                         .drawPolygon(offsets.map((value, i) => value + (i % 2 ? point.y : point.x))).endFill();
                                 }
                                 const icon = current.frontierGraphics.addChild(frontierIcon(rim.reason, 18));
-                                icon.anchor.set(0.5, 0.5);
                                 icon.position.set(rim.centre.x, rim.centre.y);
                                 icon.scale.set(1 / drawZoom);
                                 current.frontierIcons.push(icon);

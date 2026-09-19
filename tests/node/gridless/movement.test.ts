@@ -74,6 +74,7 @@ function setupMovementCanvas() {
         anchor = { set() {} };
         width = 0; height = 0;
         src = "";
+        texture = { valid: true, baseTexture: { once() {} } };
         static from(src: string) { const sprite = new Sprite(); sprite.src = src; return sprite; }
     }
     const reaches = new Map<AttackItem, number>();
@@ -170,7 +171,7 @@ function setupMovementCanvas() {
         frontier: () => {
             const layer = visibleGraphics().find(graphic => (graphic as Graphics & { name?: string }).name === "codex-movement-frontier");
             return { cells: layer?.paintedPolygons ?? [],
-                icons: (layer?.children ?? []).map(child => child instanceof Text ? child.text : child instanceof Sprite ? child.src : "?") };
+                icons: (layer?.children ?? []).map(holder => holder.children[0]).map(child => child instanceof Text ? child.text : child instanceof Sprite ? `${child.src}@${child.width}` : "?") };
         },
         setSetting: (key: string, value: unknown) => { settingValues[key] = value; registeredSettings.get(key)?.onChange?.(value); },
         budgetPosition: () => visibleGraphics().find(isBudget)?.position,
@@ -441,6 +442,6 @@ it("paints a red rim with a climb icon along a ledge the token cannot walk up", 
     (CONFIG.Token.movement.actions as Record<string, { img?: string; walls?: string }>).climb = { img: "icons/svg/ladder.svg", walls: "move" };
     binding.onDown();
     await radii();
-    expect(frontier().icons).toEqual(["icons/svg/ladder.svg"]);
+    expect(frontier().icons).toEqual(["icons/svg/ladder.svg@18"]);
     binding.onUp();
 });
