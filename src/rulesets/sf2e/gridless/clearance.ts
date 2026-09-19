@@ -155,21 +155,79 @@ function pointOnSegment(point: Point, a: Point, b: Point): boolean {
         && point.y >= Math.min(a.y, b.y) - tolerance && point.y <= Math.max(a.y, b.y) + tolerance;
 }
 
-function addVertex(vertices: Point[], point: Point, bounds: Bounds, obstacles: readonly Obstacle[]): void {
-    if (point.x < bounds.x || point.x > bounds.x + bounds.width || point.y < bounds.y || point.y > bounds.y + bounds.height) return;
-    for (const obstacle of obstacles) {
-        if (!obstacle.wall.blocksFrom && pointInStrictInterior(obstacle.polygon, point)) return;
+/** Uniform grid over obstacle bounds: candidate pairs and point queries stay local instead of scanning every wall. */
+class ObstacleGrid {
+    private readonly cells = new Map<number, number[]>();
+    private readonly cellSize: number;
+
+    constructor(private readonly obstacles: readonly Obstacle[]) {
+        let extent = 0;
+        for (const { bounds } of obstacles) extent += Math.max(bounds.width, bounds.height);
+        this.cellSize = Math.max(1, obstacles.length ? extent / obstacles.length : 1);
+        obstacles.forEach((obstacle, index) => {
+            this.eachCell(obstacle.bounds, key => {
+                const cell = this.cells.get(key);
+                if (cell) cell.push(index); else this.cells.set(key, [index]);
+            });
+        });
     }
-    for (const existing of vertices) if (pointEqual(existing, point)) return;
-    vertices.push(point);
+
+    private eachCell(bounds: Bounds, visit: (key: number) => void): void {
+        const x0 = Math.floor(bounds.x / this.cellSize), x1 = Math.floor((bounds.x + bounds.width) / this.cellSize);
+        const y0 = Math.floor(bounds.y / this.cellSize), y1 = Math.floor((bounds.y + bounds.height) / this.cellSize);
+        for (let x = x0; x <= x1; x += 1) for (let y = y0; y <= y1; y += 1) visit(x * 0x40000 + y);
+    }
+
+    /** Indices above `index` whose bounds overlap the obstacle's, ascending. */
+    overlapping(index: number): number[] {
+        const { bounds } = this.obstacles[index];
+        const found = new Set<number>();
+        this.eachCell(bounds, key => {
+            for (const other of this.cells.get(key) ?? []) {
+                if (other <= index) continue;
+                const b = this.obstacles[other].bounds;
+                if (b.x <= bounds.x + bounds.width && bounds.x <= b.x + b.width
+                    && b.y <= bounds.y + bounds.height && bounds.y <= b.y + b.height) found.add(other);
+            }
+        });
+        return [...found].sort((a, b) => a - b);
+    }
+
+    /** Is the point strictly inside any solid (non-directional) obstacle? */
+    insideSolid(point: Point): boolean {
+        const key = Math.floor(point.x / this.cellSize) * 0x40000 + Math.floor(point.y / this.cellSize);
+        for (const index of this.cells.get(key) ?? []) {
+            const obstacle = this.obstacles[index];
+            if (!obstacle.wall.blocksFrom && pointInStrictInterior(obstacle.polygon, point)) return true;
+        }
+        return false;
+    }
+}
+
+class VertexSet {
+    readonly points: Point[] = [];
+    private readonly keys = new Set<string>();
+
+    add(point: Point): void {
+        const key = `${point.x}:${point.y}`;
+        if (this.keys.has(key)) return;
+        this.keys.add(key);
+        this.points.push(point);
+    }
+}
+
+function addVertex(vertices: VertexSet, point: Point, bounds: Bounds, grid: ObstacleGrid): void {
+    if (point.x < bounds.x || point.x > bounds.x + bounds.width || point.y < bounds.y || point.y > bounds.y + bounds.height) return;
+    if (grid.insideSolid(point)) return;
+    vertices.add(point);
 }
 
 function addBoundaryIntersections(
     first: readonly Point[],
     second: readonly Point[],
     bounds: Bounds,
-    obstacles: readonly Obstacle[],
-    vertices: Point[],
+    grid: ObstacleGrid,
+    vertices: VertexSet,
 ): void {
     for (let i = 0; i < first.length; i += 1) {
         const a = first[i], b = first[(i + 1) % first.length];
@@ -183,7 +241,7 @@ function addBoundaryIntersections(
             if (Math.abs(denominator) <= scale) {
                 if (Math.abs(cross(qx, qy, rx, ry)) <= scale) {
                     for (const point of [a, b, c, d]) {
-                        if (pointOnSegment(point, a, b) && pointOnSegment(point, c, d)) addVertex(vertices, point, bounds, obstacles);
+                        if (pointOnSegment(point, a, b) && pointOnSegment(point, c, d)) addVertex(vertices, point, bounds, grid);
                     }
                 }
                 continue;
@@ -191,7 +249,7 @@ function addBoundaryIntersections(
             const t = cross(qx, qy, sx, sy) / denominator;
             const u = cross(qx, qy, rx, ry) / denominator;
             if (t < -EPSILON || t > 1 + EPSILON || u < -EPSILON || u > 1 + EPSILON) continue;
-            addVertex(vertices, { x: a.x + t * rx, y: a.y + t * ry }, bounds, obstacles);
+            addVertex(vertices, { x: a.x + t * rx, y: a.y + t * ry }, bounds, grid);
         }
     }
 }
@@ -228,14 +286,22 @@ export function buildClearance(
         obstacles.push({ polygon, wall, bounds: polygonBounds(polygon) });
     }
 
-    const vertices: Point[] = [];
-    for (const obstacle of obstacles) for (const point of obstacle.polygon) addVertex(vertices, point, insetBounds, obstacles);
+    // Only the continuous navigation map reads vertices; lattice and footprint callers never pay for them.
+    let vertices: Point[] | undefined;
+    return { bounds: insetBounds, obstacles, get vertices() { return vertices ??= outlineVertices(obstacles, insetBounds); } };
+}
+
+/** Obstacle corners and pairwise boundary crossings outside every solid obstacle: the continuous search's candidate corners. */
+function outlineVertices(obstacles: readonly Obstacle[], bounds: Bounds): Point[] {
+    const grid = new ObstacleGrid(obstacles);
+    const vertices = new VertexSet();
+    for (const obstacle of obstacles) for (const point of obstacle.polygon) addVertex(vertices, point, bounds, grid);
     for (let i = 0; i < obstacles.length; i += 1) {
-        for (let j = i + 1; j < obstacles.length; j += 1) {
-            addBoundaryIntersections(obstacles[i].polygon, obstacles[j].polygon, insetBounds, obstacles, vertices);
+        for (const j of grid.overlapping(i)) {
+            addBoundaryIntersections(obstacles[i].polygon, obstacles[j].polygon, bounds, grid, vertices);
         }
     }
-    return { bounds: insetBounds, obstacles, vertices };
+    return vertices.points;
 }
 
 function withinBounds(bounds: Bounds, point: Point): boolean {
