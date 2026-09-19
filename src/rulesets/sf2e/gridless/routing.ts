@@ -52,7 +52,7 @@ let maps = new WeakMap<NativeToken, { key: string; actor: object | undefined; ma
 let areas = new WeakMap<NativeToken, { key: string; map: object; job: MovementAreaJob }>();
 let hexFields = new WeakMap<NativeToken, { key: string; actor: object | undefined; field: HexField }>();
 let clearances = new WeakMap<NativeToken, { key: string; actor: object | undefined; solid: Clearance; clearance: Clearance;
-    walls: NavigationWall[]; full: Point; cramped: Point }>();
+    squeezing: Clearance; walls: NavigationWall[]; full: Point; cramped: Point }>();
 /** Last path a token's ruler asked to find, captured before routing resolves. */
 export const dragPaths = new WeakMap<object, Partial<TokenDocument.MeasuredMovementWaypoint>[]>();
 
@@ -91,7 +91,10 @@ function movementClearance(token: NativeToken, base: Waypoint, preview = false) 
     const solid = buildClearance(walls, token.scene.dimensions.rect, full.x, full.y, 0);
     const clearance = full.x === cramped.x && full.y === cramped.y ? solid
         : buildClearance(walls, token.scene.dimensions.rect, cramped.x, cramped.y, 0);
-    const entry = { key, actor: token.actor?.system, solid, clearance, walls, full, cramped };
+    // A leg squeezes only where the cramped footprint still overlaps walls after the lattice's
+    // half-cell tolerance, matching the cells the hex field calls squeeze-only.
+    const squeezing = buildClearance(walls, token.scene.dimensions.rect, cramped.x, cramped.y, -token.scene.dimensions.size / 20);
+    const entry = { key, actor: token.actor?.system, solid, clearance, squeezing, walls, full, cramped };
     clearances.set(token, entry);
     return entry;
 }
@@ -266,10 +269,10 @@ function movementHexField(token: NativeToken, base: Waypoint, options: PathOptio
 /** Does this leg force the token's cramped footprint through walls, i.e. a Squeeze? */
 export function isSqueezedLeg(token: Token.Implementation, from: Waypoint, to: Waypoint): boolean {
     const native = token as unknown as NativeToken;
-    const { clearance } = movementClearance(native, to, true);
+    const { squeezing } = movementClearance(native, to, true);
     const a = native.document.getCenterPoint({ ...from, width: to.width, height: to.height, shape: to.shape });
     const b = native.document.getCenterPoint(to);
-    return obstructedFraction(clearance, a, b) > 0;
+    return obstructedFraction(squeezing, a, b) > 0;
 }
 
 /** Record and preview the same native terrain costs, including cramped passages. */
@@ -294,16 +297,17 @@ function activatePassageCosts(): void {
             const measured = cost(from, to, distance, segment);
             const action = CONFIG.Token.movement.actions[segment.action];
             if (!action?.walls || action.teleport || from.k !== to.k || (segment.terrain?.difficulty ?? 1) >= 2) return measured;
-            const { solid, clearance } = movementClearance(token, segment, !!options?.preview);
+            const { solid, clearance, squeezing } = movementClearance(token, segment, !!options?.preview);
             const a = token.document.getCenterPoint({ ...segment, x: from.j, y: from.i });
             const b = token.document.getCenterPoint({ ...segment, x: to.j, y: to.i });
             const crampedFraction = obstructedFraction(solid, a, b);
             if (!crampedFraction) return measured;
-            // Where even the cramped footprint overlaps walls the token is squeezing: greater difficult
-            // terrain. Sizes with no cramped allowance squeeze as soon as their footprint overlaps.
-            const squeezedFraction = solid === clearance ? crampedFraction : obstructedFraction(clearance, a, b);
+            // Where the cramped footprint overlaps walls beyond the lattice tolerance the token is
+            // squeezing: greater difficult terrain. Sizes with no cramped allowance only ever squeeze.
+            const squeezedFraction = obstructedFraction(squeezing, a, b);
+            const crampedOnly = solid === clearance ? 0 : Math.max(0, crampedFraction - squeezedFraction);
             const cramped = cost(from, to, distance, { ...segment, terrain: { difficulty: 2 } });
-            let total = measured + Math.max(0, cramped - measured) * (crampedFraction - squeezedFraction);
+            let total = measured + Math.max(0, cramped - measured) * crampedOnly;
             if (squeezedFraction > 0) {
                 const greater = cost(from, to, distance, { ...segment, terrain: { difficulty: 3 } });
                 total += Math.max(0, greater - measured) * squeezedFraction;
