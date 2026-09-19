@@ -471,6 +471,26 @@ describe("blocked frontier", () => {
         expect(blockedFrontier(noSqueeze)).toEqual([]);
     });
 
+    it("ignores a sliver between wall chains that no full footprint could stand in", () => {
+        const cramped = { width: 50, height: 50 }, squeeze = { width: 25, height: 25 };
+        // A 40 px gap leading into a 30 px wide dead-end strip between two wall chains.
+        const walls = [...gapWalls(40),
+            { a: { x: 500, y: 480 }, b: { x: 600, y: 480 } }, { a: { x: 500, y: 520 }, b: { x: 600, y: 520 } },
+            { a: { x: 600, y: 480 }, b: { x: 600, y: 520 } }];
+        const strip = field(walls, { cramped, squeeze });
+        floodReachable(strip, cellAt(250), 100_000);
+        expect(blockedFrontier(strip)).toEqual([]);
+    });
+
+    it("keeps a tiny squeeze footprint at least one cell wide", () => {
+        const tiny = field(gapWalls(4), { cramped: { width: 25, height: 25 }, squeeze: { width: 12.5, height: 12.5 } });
+        floodReachable(tiny, cellAt(250), 100_000);
+        expect(blockedFrontier(tiny)).toEqual([]);
+        const fits = field(gapWalls(18), { cramped: { width: 25, height: 25 }, squeeze: { width: 12.5, height: 12.5 } });
+        floodReachable(fits, cellAt(250), 100_000);
+        expect(blockedFrontier(fits).map(r => r.reason)).toEqual(["squeeze"]);
+    });
+
     it("reports nothing on open ground and groups separate rims apart", () => {
         const open = field([]);
         floodReachable(open, cellAt(500), 100_000);

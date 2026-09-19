@@ -203,7 +203,10 @@ export function buildHexField(options: HexFieldOptions): HexField {
     rasteriseClearance(field, space, index => { field.blocked[index] = 1; });
     rasteriseClearance(field, fullSpace, index => { field.fullBlocked[index] = 1; });
     if (options.squeeze) {
-        field.squeezeSpace = buildClearance(walls, bounds, options.squeeze.width, options.squeeze.height, -tolerance);
+        // Keep the effective squeeze footprint wider than one cell: at exactly one cell, cells either
+        // side of a wall are both passable and adjacent, so pockets would walk straight through walls.
+        const squeezeTolerance = Math.max(0, Math.min(tolerance, (Math.min(options.squeeze.width, options.squeeze.height) - size - 2) / 2));
+        field.squeezeSpace = buildClearance(walls, bounds, options.squeeze.width, options.squeeze.height, -squeezeTolerance);
         rasteriseClearance(field, field.squeezeSpace, index => { field.squeezeBlocked[index] = 1; });
     } else {
         field.squeezeBlocked = field.blocked;
@@ -352,6 +355,21 @@ function wallConnected(field: HexField): Uint8Array {
     return connected;
 }
 
+/** Does the sealed-off ground reached from these cells hold a cell where the full footprint fits? */
+function standableBeyond(field: HexField, seeds: readonly number[], connected: Uint8Array): boolean {
+    const seen = new Set<number>(seeds);
+    const queue = [...seeds];
+    while (queue.length) {
+        const index = queue.pop()!;
+        if (!field.fullBlocked[index]) return true;
+        forEachNeighbour(field, index, next => {
+            if (seen.has(next) || field.blocked[next] || connected[next]) return;
+            seen.add(next); queue.push(next);
+        });
+    }
+    return false;
+}
+
 /** Cells of the rim drawn around a squeeze opening: this many lattice steps from where the pocket meets sealed-off ground. */
 const SQUEEZE_RIM_DEPTH = 3;
 
@@ -388,16 +406,18 @@ export function blockedFrontier(field: HexField): FrontierRim[] {
             const queue = [seed];
             seen.add(seed);
             const exits: number[] = [];
+            const beyond: number[] = [];
             while (queue.length) {
                 const index = queue.pop()!;
                 let exit = false;
                 forEachNeighbour(field, index, next => {
                     if (squeezeOnly(next)) { if (!seen.has(next)) { seen.add(next); queue.push(next); } return; }
-                    if (!blocked[next] && !connected[next]) exit = true;
+                    if (!blocked[next] && !connected[next]) { exit = true; beyond.push(next); }
                 });
                 if (exit) exits.push(index);
             }
-            if (!exits.length) continue;
+            // Only ground a full footprint can stand on is worth squeezing towards; slivers between wall chains are not.
+            if (!exits.length || !standableBeyond(field, beyond, connected)) continue;
             // Mark only the part of the band near the opening, not the cramped strip along every wall it joins.
             const depth = new Map<number, number>(exits.map(index => [index, 0]));
             const wave = [...exits];

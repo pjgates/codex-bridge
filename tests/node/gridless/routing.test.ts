@@ -476,7 +476,7 @@ it("gives a Small creature a quarter-space cramped tier and squeezes only below 
     // Twenty feet; the 50 px band where the half-space footprint overlaps the wall is cramped, not squeezed.
     expect(measureProposedMovement(token as unknown as Token.Implementation, cramped)).toBeCloseTo(22.5, 0);
     expect(cramped.slice(1).some((to, i) => isSqueezedLeg(token as unknown as Token.Implementation, cramped[i], to))).toBe(false);
-    gap(token, 12, callbacks);
+    gap(token, 18, callbacks);
     const squeezed = await token.findMovementPath(waypoints).promise;
     expect(squeezed.at(-1)?.x).toBe(650);
     expect(squeezed.slice(1).some((to, i) => isSqueezedLeg(token as unknown as Token.Implementation, squeezed[i], to))).toBe(true);
