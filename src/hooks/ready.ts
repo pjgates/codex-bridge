@@ -8,7 +8,7 @@ import { activateHeroicRerolls, isHeroicRerollsEnabled } from "../rulesets/sf2e/
 import { isPradEnabled, applyDCBaseSetting, registerAttackInterceptHook, registerPradSheetHooks } from "../rulesets/sf2e/prad/index.js";
 import { activateTargetHelper, setPradOvercomeEnabled } from "../rulesets/sf2e/target-helper/index.js";
 import { checkForVaultUpdates } from "../sync/index.js";
-import { activateElevationTooltip, activateFloorElevation, activateGridlessCombat, activateMovementChecks } from "../rulesets/sf2e/gridless/index.js";
+import { activateElevationTooltip, activateFloorElevation, activateFloorProbe, activateGridlessCombat, activateMovementChecks } from "../rulesets/sf2e/gridless/index.js";
 
 export function onReady(): void {
     const isEnabled = game.settings!.get(MODULE_ID, "enableCustomRules");
@@ -24,6 +24,7 @@ export function onReady(): void {
     activateFloorElevation();
     // Token tooltips read heights against the floor below and the selected token, across levels.
     activateElevationTooltip();
+    activateFloorProbe();
     // After the floor rewrite, so check prompts see the path that actually executes.
     activateMovementChecks();
 

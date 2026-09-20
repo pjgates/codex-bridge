@@ -11,6 +11,7 @@ export { registerMovementPreviewKeybind } from "./movement.js";
 export { activateFloorElevation, registerFloorSetting } from "./floors.js";
 export { activateMovementChecks, registerMovementCheckSetting } from "./checks.js";
 export { activateElevationTooltip } from "./tooltip.js";
+export { activateFloorProbe } from "./probe.js";
 export { registerAbsoluteElevationKeybind } from "./elevation-key.js";
 
 export function activateGridlessCombat(): void {

@@ -33,7 +33,7 @@ interface TooltipPlaceable extends TooltipToken {
 }
 interface TokenClass { prototype: { _getTooltipText(): string } }
 
-function currentReference(): TooltipPlaceable | null {
+export function currentReference(): TooltipPlaceable | null {
     const tokens = canvas!.tokens as unknown as { controlled: TooltipPlaceable[]; placeables: TooltipPlaceable[] };
     const character = game.user!.character as object | null;
     return referenceToken(tokens.controlled, character ? tokens.placeables.filter(token => token.actor === character) : []);
