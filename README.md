@@ -96,6 +96,16 @@ Scenes imported by the Map Workshop Importer carry `setElevation` floor regions.
 - **Prompt checks for ledges and gaps** (world setting, on by default): a move that climbs or drops more than one tread posts the system's Climb (Athletics) roll, and a move through a squeeze-width gap posts Squeeze (Acrobatics). The move still happens; the GM reads the result against the DC the terrain warrants.
 - On gridless scenes in hex lattice mode, the drag label previews the planned height at each waypoint, marks waypoints past a refused ledge, and the reachable ring and automatic routes stop at ledges the current movement action cannot climb.
 
+#### Heights players can read
+
+On these scenes the elevation label over a token reads against the ground, not the level:
+
+- Your selected token (or your character's token when none or several are selected) shows its height above the floor beneath it, even when that floor belongs to a level below. A token 20 ft above a cave floor reads **+20 ft**, whatever level the cave is on.
+- Every other token shows its height relative to yours, so **-15 ft** is 15 ft lower than you.
+- Hold **Show absolute elevation** (`H` by default, editable under **Configure Controls → Codex Foundry**) to see scene elevations instead.
+- While that key is held, a label at the cursor reads the top visible floor beneath it, for example **-15 ft · 20 ft below you**, on whichever level that floor lies. Off the floors it shows nothing.
+- Scenes without floor regions keep Foundry's own labels.
+
 ### Why can't I go there?
 
 With the reachable ring on in hex lattice mode, cells just beyond the ring that the token could enter only by other means are filled red, one icon per stretch:
