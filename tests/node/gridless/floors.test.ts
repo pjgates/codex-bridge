@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { activateFloorElevation, floorCrossings, floorRegions } from "../../../src/rulesets/sf2e/gridless/floors.js";
+import { activateFloorElevation, allFloors, floorCrossings, floorRegions, surfaceBelow } from "../../../src/rulesets/sf2e/gridless/floors.js";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -54,6 +54,37 @@ describe("floor regions", () => {
         const through = floorCrossings(token as any, floors, [{ x: 0, y: 0 }, wp(400)]);
         expect(through.map(c => c.floor)).toEqual([2.5, 7.5]);
         expect(through[0].exit!.x).toBeGreaterThanOrEqual(250);
+    });
+});
+
+describe("surfaces across levels", () => {
+    // Upper level: a terrace at 10 ft over x 100..300. Lower level: a 0 ft cave floor spanning everything, with a -15 ft pit past 300.
+    const floor = (level: string, elevation: number, minX: number, maxX: number) => ({
+        levels: new Set([level]), polygonTree: { testPoint: (p: { x: number }) => p.x >= minX && p.x < maxX },
+        behaviors: [{ type: "map-workshop-importer.setElevation", disabled: false, system: { elevation } }],
+    });
+    const other = { levels: new Set(["upper"]), polygonTree: { testPoint: () => true }, behaviors: [{ type: "environment", disabled: false, system: {} }] };
+    const scene = { regions: [floor("upper", 10, 100, 300), floor("lower", 0, -Infinity, 300), floor("lower", -15, 300, Infinity), other] };
+
+    it("reads setElevation floors on every level", () => {
+        expect(allFloors(scene as any).map(f => f.floor)).toEqual([10, 0, -15]);
+    });
+
+    it("picks the highest floor under the point at or below the elevation", () => {
+        const floors = allFloors(scene as any);
+        expect(surfaceBelow(floors, { x: 200, y: 0 }, 10)).toBe(10);
+        // Hovering 5 ft above the cave floor, under the terrace's height: the cave floor is the surface below.
+        expect(surfaceBelow(floors, { x: 200, y: 0 }, 5)).toBe(0);
+        expect(surfaceBelow(floors, { x: 400, y: 0 }, 5)).toBe(-15);
+        // Below every floor: nothing is beneath.
+        expect(surfaceBelow(floors, { x: 200, y: 0 }, -1)).toBeNull();
+    });
+
+    it("ignores elevation when asked for the top floor at a point", () => {
+        const floors = allFloors(scene as any);
+        expect(surfaceBelow(floors, { x: 200, y: 0 })).toBe(10);
+        expect(surfaceBelow(floors, { x: 50, y: 0 })).toBe(0);
+        expect(surfaceBelow([], { x: 50, y: 0 })).toBeNull();
     });
 });
 

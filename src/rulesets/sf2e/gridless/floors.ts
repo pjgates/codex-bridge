@@ -33,9 +33,13 @@ interface PendingMovement {
 export interface Floor { region: FloorRegion; floor: number }
 
 export function floorRegions(scene: FloorScene, levelId: string): Floor[] {
+    return allFloors(scene).filter(({ region }) => region.levels.has(levelId));
+}
+
+/** Every setElevation floor on the scene, whatever level it belongs to. */
+export function allFloors(scene: Pick<FloorScene, "regions">): Floor[] {
     const out: Floor[] = [];
     for (const region of scene.regions) {
-        if (!region.levels.has(levelId)) continue;
         for (const behavior of region.behaviors) {
             if (behavior.type !== SET_ELEVATION_TYPE || behavior.disabled) continue;
             out.push({ region, floor: behavior.system.elevation ?? 0 });
@@ -43,6 +47,22 @@ export function floorRegions(scene: FloorScene, levelId: string): Floor[] {
         }
     }
     return out;
+}
+
+const SURFACE_EPSILON = 1e-6;
+
+/**
+ * The height of the highest floor under a point that is at or below `elevation`: the surface
+ * something at that height would land on, across every level. Without an elevation, the top
+ * floor at the point. Null when no floor lies there.
+ */
+export function surfaceBelow(floors: readonly Floor[], point: Point, elevation = Infinity): number | null {
+    let best: number | null = null;
+    for (const { region, floor } of floors) {
+        if (floor > elevation + SURFACE_EPSILON || (best !== null && floor <= best)) continue;
+        if (region.polygonTree.testPoint(point)) best = floor;
+    }
+    return best;
 }
 
 /** The floor height under a movement origin, from the floor regions on that level. */
