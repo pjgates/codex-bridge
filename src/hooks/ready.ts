@@ -9,6 +9,7 @@ import { isPradEnabled, applyDCBaseSetting, registerAttackInterceptHook, registe
 import { activateTargetHelper, setPradOvercomeEnabled } from "../rulesets/sf2e/target-helper/index.js";
 import { checkForVaultUpdates } from "../sync/index.js";
 import { activateElevationTooltip, activateFloorElevation, activateFloorProbe, activateGridlessCombat, activateMovementChecks } from "../rulesets/sf2e/gridless/index.js";
+import { activateFlying } from "../rulesets/sf2e/flying/index.js";
 
 export function onReady(): void {
     const isEnabled = game.settings!.get(MODULE_ID, "enableCustomRules");
@@ -27,6 +28,8 @@ export function onReady(): void {
     activateFloorProbe();
     // After the floor rewrite, so check prompts see the path that actually executes.
     activateMovementChecks();
+    // The Flying effect keeps the fly movement action on airborne tokens.
+    activateFlying();
 
     void checkForVaultUpdates();
 

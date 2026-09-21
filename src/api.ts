@@ -13,6 +13,7 @@ import {
     rollAttackCardArmorSaves,
     rollWeaponDamage,
 } from "./rulesets/sf2e/prad/index.js";
+import { toggleFlying } from "./rulesets/sf2e/flying/index.js";
 
 export type CodexFoundryApiErrorCode =
     | "disabled"
@@ -56,7 +57,15 @@ export interface RollArmorSavesRequest extends MessageRequest {
     readonly targetTokenUuids: readonly string[];
 }
 
+export interface ToggleFlyingRequest {
+    readonly tokenUuids: readonly string[];
+}
+
 export interface CodexFoundryApi {
+    readonly flying: {
+        /** Add the Flying effect to each token's actor, or remove it from actors that already fly. */
+        toggleFlying(request: ToggleFlyingRequest): Promise<CodexFoundryApiResult>;
+    };
     readonly targetHelper: {
         setTargets(request: SetTargetsRequest): Promise<CodexFoundryApiResult>;
         rollPlayerSaves(request: RollTargetsRequest): Promise<CodexFoundryApiResult>;
@@ -260,6 +269,18 @@ async function invokeCreatedMessage(operation: () => Promise<string>): Promise<C
 
 export function createRuntimeApi(): CodexFoundryApi {
     return {
+        flying: {
+            async toggleFlying(request) {
+                if (!isRecord(request)) return failure("invalid-argument", "request must be an object.");
+                if (!isEnabled("enableCustomRules")) return failure("disabled", "Custom rules are disabled.");
+                const tokens = resolveTokens(request.tokenUuids, false);
+                if (!Array.isArray(tokens)) return tokens;
+                if (!game.user?.isGM && tokens.some((token) => !token.isOwner)) {
+                    return failure("unauthorized", "The current user does not own every token.");
+                }
+                return invoke(() => toggleFlying(tokens as unknown as Parameters<typeof toggleFlying>[0]));
+            },
+        },
         targetHelper: {
             async setTargets(request) {
                 if (!isRecord(request)) return failure("invalid-argument", "request must be an object.");

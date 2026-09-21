@@ -106,6 +106,10 @@ On these scenes the elevation label over a token reads against the ground, not t
 - While that key is held, a label at the cursor reads the top visible floor beneath it, for example **-15 ft · 20 ft below you**, on whichever level that floor lies. Off the floors it shows nothing.
 - Scenes without floor regions keep Foundry's own labels.
 
+### Flying
+
+An "Effect: Flying" item marks an airborne creature. The GM's client creates a **Toggle Flying** script macro on first load; running it with tokens selected adds the effect to their actors, or removes it from actors that already fly. Share the macro with players to let them toggle their own tokens. While the effect is present the token's movement action is Fly, so ledges and gaps never prompt Climb, and removing the effect (by macro or from the sheet) hands the action back to the system's default. Scripts can call `game.modules.get("codex-foundry").api.flying.toggleFlying({ tokenUuids })`.
+
 ### Why can't I go there?
 
 With the reachable ring on in hex lattice mode, cells just beyond the ring that the token could enter only by other means are filled red, one icon per stretch:
