@@ -7,7 +7,7 @@ type Hook = (...args: any[]) => unknown;
 
 function actorWith(slugs: string[]) {
     const items = slugs.map((slug, index) => ({ id: `item${index}`, type: "effect", system: { slug }, delete: vi.fn() }));
-    const tokens: { update: ReturnType<typeof vi.fn> }[] = [];
+    const tokens: { update: (changes: { movementAction: string | null }) => unknown }[] = [];
     return {
         items, created: [] as object[], tokens,
         getActiveTokens: () => tokens,
