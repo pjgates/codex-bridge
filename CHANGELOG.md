@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Added
 
 - **Flying:** a **Toggle Flying** macro (created once for the GM) adds or removes an "Effect: Flying" item on the selected tokens' actors. While the effect is present the token uses the native Fly movement action, so the ruler, ledge rules and check prompts treat it as airborne; removing the effect restores the system's default action. Also exposed as `api.flying.toggleFlying`.
+- **Falling:** a flying creature that moves on foot, or gains Prone, Unconscious, Paralyzed, Petrified or Grabbed, loses the effect and lands on the surface below, changing level when that surface belongs to a lower one. A chat card gives the distance and the rulebook damage as an inline roll, after Cat Fall, Wind Pillow, Superhero Landing, Plumekith, Rubbery Body, Land on Your Feet and the no-damage abilities, and lists reactions such as Impressive Landing and Arrest a Fall. Nothing is applied automatically.
 - **Flying reminder:** at the start of a flying creature's turn a chat message states its height above the surface below, read across levels like the token tooltips.
 - **Gridless Combat:** optional PF2e/SF2e support with continuous distance and reach, native flanking, center-based automatic cover, and wall-aware area targeting.
 - **Gridless guides:** a flanking position guide and a turn-based remaining-movement ring with native action glyphs. Movement rings appear during movement or hold-to-preview.
