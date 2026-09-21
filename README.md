@@ -110,6 +110,8 @@ On these scenes the elevation label over a token reads against the ground, not t
 
 An "Effect: Flying" item marks an airborne creature. The GM's client creates a **Toggle Flying** script macro on first load; running it with tokens selected adds the effect to their actors, or removes it from actors that already fly. Share the macro with players to let them toggle their own tokens. While the effect is present the token's movement action is Fly, so ledges and gaps never prompt Climb, and removing the effect (by macro or from the sheet) hands the action back to the system's default. Scripts can call `game.modules.get("codex-foundry").api.flying.toggleFlying({ tokenUuids })`.
 
+At the start of a flying creature's turn in an encounter, a public chat message reminds the table that it is airborne and how far above the surface below it is, measured across levels.
+
 ### Why can't I go there?
 
 With the reachable ring on in hex lattice mode, cells just beyond the ring that the token could enter only by other means are filled red, one icon per stretch:

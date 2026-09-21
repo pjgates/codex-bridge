@@ -3,7 +3,8 @@
         "flying": {
             "effectName": "Effect: Flying",
             "effectDescription": "<p>This creature is airborne. Its token moves with the Fly action. Moving on foot, or falling Prone, Unconscious, Paralyzed, Petrified or Grabbed, ends the flight and the creature falls to the surface below.</p>",
-            "macroName": "Toggle Flying"
+            "macroName": "Toggle Flying",
+            "reminder": "{name} is flying, {height} {units} above the surface below."
         }
     }
 }

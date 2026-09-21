@@ -24,3 +24,4 @@ export function activateGridlessCombat(): void {
     activateMovementLabel();
     activateFlankingGuide();
 }
+export { allFloors, surfaceBelow } from "./floors.js";
