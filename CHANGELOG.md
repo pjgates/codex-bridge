@@ -12,6 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - **Flying:** a **Toggle Flying** macro (created once for the GM) adds or removes an "Effect: Flying" item on the selected tokens' actors. While the effect is present the token uses the native Fly movement action, so the ruler, ledge rules and check prompts treat it as airborne; removing the effect restores the system's default action. Also exposed as `api.flying.toggleFlying`.
 - **Falling:** a flying creature that moves on foot, or gains Prone, Unconscious, Paralyzed, Petrified or Grabbed, loses the effect and lands on the surface below, changing level when that surface belongs to a lower one. A chat card gives the distance and the rulebook damage as an inline roll, after Cat Fall, Wind Pillow, Superhero Landing, Plumekith, Rubbery Body, Land on Your Feet and the no-damage abilities, and lists reactions such as Impressive Landing and Arrest a Fall. Nothing is applied automatically.
 - **Flying reminder:** at the start of a flying creature's turn a chat message states its height above the surface below, read across levels like the token tooltips.
+- **Clip tiles to regions:** a **Clip to region** select on the tile configuration's appearance tab stencils the tile's texture to a region's polygons, holes included, and keeps the stencil in step with tile and region edits. Pairs with the map-workshop floor and water regions for clipped textures.
+
 - **Gridless Combat:** optional PF2e/SF2e support with continuous distance and reach, native flanking, center-based automatic cover, and wall-aware area targeting.
 - **Gridless guides:** a flanking position guide and a turn-based remaining-movement ring with native action glyphs. Movement rings appear during movement or hold-to-preview.
 - **Movement preview options:** the remaining-movement overlay renders as the reachable-area ring (default), a plain circle of the remaining distance that still includes routed path costs, or nothing at all.
@@ -29,11 +31,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - **Small cramped tier:** Small and Tiny creatures treat 1.25 to 2.5 ft passages as difficult terrain like every other size treats one size down, and squeeze only below that.
 - **Squeeze rims only where worth it:** a squeeze opening now counts only if a full footprint could stand on the ground beyond it, so slivers between double-drawn wall chains stay unmarked, and the squeeze footprint never shrinks below a lattice cell.
 - **Check prompts:** moving up or down a ledge of more than one tread posts the system's Climb roll, and squeezing through a tight gap posts Squeeze, for the moving token's actor. Prompt only, controlled by a new **Prompt checks for ledges and gaps** setting.
-- **Squeezing:** on the hex lattice, gaps between half and the full cramped footprint are now routed as greater difficult terrain. The squeezed stretch costs triple in movement measurement and the ruler label shows a compress icon on that leg. Small and Tiny creatures squeeze gaps down to half their half-space footprint.
-
 - **Floor-relative heights:** on scenes with map-workshop floors, a token's elevation label shows its height above the floor beneath it in green (**+20 ft above ground**), even when that floor is on another level, and other tokens show their height relative to the selected token or the player's character. Holding the new **Show absolute elevation** key (H by default) shows scene elevation instead.
 - **Water:** over a region carrying the map-workshop `water` behaviour the label reads against the surface in blue (**+10 ft above water**, **5 ft below surface**).
 - **Floor probe:** while that key is held, a label at the cursor reads the height of the top visible floor beneath it, on any level, and how far below or above the selected token it lies; over water it adds the depth.
+- **Squeezing:** on the hex lattice, gaps between half and the full cramped footprint are now routed as greater difficult terrain. The squeezed stretch costs triple in movement measurement and the ruler label shows a compress icon on that leg. Small and Tiny creatures squeeze gaps down to half their half-space footprint.
+
 ### Changed
 
 - **One ruler label:** the remaining-movement text and action glyph moved from a separate overlay label into the native ruler waypoint label, alongside distance, surcharge, and elevation. The reachable ring is now outline only.

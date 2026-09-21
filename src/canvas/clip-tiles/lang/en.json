@@ -1,0 +1,9 @@
+{
+    "codex-foundry": {
+        "clipTiles": {
+            "label": "Clip to region",
+            "none": "None",
+            "hint": "Show this tile only inside the chosen region's shape. Map-workshop exports provide a region per floor height and per water patch."
+        }
+    }
+}

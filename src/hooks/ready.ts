@@ -9,9 +9,14 @@ import { isPradEnabled, applyDCBaseSetting, registerAttackInterceptHook, registe
 import { activateTargetHelper, setPradOvercomeEnabled } from "../rulesets/sf2e/target-helper/index.js";
 import { checkForVaultUpdates } from "../sync/index.js";
 import { activateElevationTooltip, activateFloorElevation, activateFloorProbe, activateGridlessCombat, activateMovementChecks } from "../rulesets/sf2e/gridless/index.js";
+import { activateClipTileConfig, activateClipTiles } from "../canvas/clip-tiles/index.js";
 import { activateFlying } from "../rulesets/sf2e/flying/index.js";
 
 export function onReady(): void {
+    // Tile clipping is a canvas feature, not a house rule, so it ignores the master switch.
+    activateClipTiles();
+    activateClipTileConfig();
+
     const isEnabled = game.settings!.get(MODULE_ID, "enableCustomRules");
 
     if (!isEnabled) {

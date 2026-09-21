@@ -115,6 +115,14 @@ Flight ends when the token completes a move whose final leg used a ground action
 
 At the start of a flying creature's turn in an encounter, a public chat message reminds the table that it is airborne and how far above the surface below it is, measured across levels.
 
+### Clip tiles to regions
+
+Any tile can be shown only inside a region's shape. Open the tile's configuration, appearance tab, and pick a region under **Clip to region**. The tile's texture is stencilled to that region's polygons, holes included, on every client, and follows the tile and the region as either is moved or edited. Map-workshop exports provide one region per floor height and one per water patch, so an animated water texture dropped over a pool and clipped to its water region stops at the shoreline. Clipping is visual only: overhead occlusion still uses the tile's full rectangle, so keep clipped textures at floor elevation. From a script, `game.modules.get("codex-foundry")` exposes nothing for this yet; set the flag directly:
+
+```js
+tile.document.update({ "flags.codex-foundry.clipRegion": region.id }); // "" to clear
+```
+
 ### Why can't I go there?
 
 With the reachable ring on in hex lattice mode, cells just beyond the ring that the token could enter only by other means are filled red, one icon per stretch:

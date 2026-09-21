@@ -50,6 +50,12 @@ export default [
                 },
                 {
                     type: "feature",
+                    pattern: "src/canvas/*",
+                    mode: "folder",
+                    capture: ["elementName"],
+                },
+                {
+                    type: "feature",
                     pattern: "src/rulesets/sf2e/*",
                     mode: "folder",
                     capture: ["elementName"],
