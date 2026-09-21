@@ -38,6 +38,15 @@ describe("probeText", () => {
         expect(probeText(floors, [pool], { x: 400, y: 0 }, null, "ft")!.water).toBe(false);
     });
 
+    it("measures depth to the floor under the point and yields to a floor above the water", () => {
+        vi.stubGlobal("game", { i18n });
+        // The region's bottom is the lowest cell of its whole patch; the pit floor at -15 is what is actually under this point.
+        const deepBand = { ...pool, bed: -25 };
+        expect(probeText(floors, [deepBand], { x: 600, y: 0 }, null, "ft")!.text).toBe("-10 ft · probeDepth:5");
+        const shelf = { region: floor("upper", -5, 300, Infinity), floor: -5 };
+        expect(probeText([...floors, shelf], [pool], { x: 600, y: 0 }, null, "ft")).toEqual({ text: "-5 ft", water: false });
+    });
+
     it("shows only the absolute height without a reference, and nothing off the floors", () => {
         vi.stubGlobal("game", { i18n });
         expect(probeText(floors, [], { x: 400, y: 0 }, null, "ft")!.text).toBe("-15 ft");

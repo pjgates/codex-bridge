@@ -21,11 +21,17 @@ export interface Probe { text: string; water: boolean }
  */
 export function probeText(floors: readonly Floor[], water: readonly Water[], point: Point,
     reference: Pick<TooltipToken, "document"> | null, units: string): Probe | null {
-    const pool = waterAt(water, point);
-    const surface = pool ? pool.surface : surfaceBelow(floors, point);
+    const floor = surfaceBelow(floors, point);
+    const candidate = waterAt(water, point);
+    // Water counts only where its surface is the top surface; the depth reads to the floor under the point.
+    const pool = candidate && (floor === null || candidate.surface > floor) ? candidate : null;
+    const surface = pool ? pool.surface : floor;
     if (surface === null) return null;
     const parts = [`${signed(round(surface))} ${units}`.trim()];
-    if (pool) parts.push(game.i18n!.format("codex-foundry.gridless.probeDepth", { depth: String(round(pool.surface - pool.bed)), units }));
+    if (pool) {
+        const bed = surfaceBelow(floors, point, pool.surface) ?? pool.bed;
+        parts.push(game.i18n!.format("codex-foundry.gridless.probeDepth", { depth: String(round(pool.surface - bed)), units }));
+    }
     if (reference) {
         const difference = round(reference.document.elevation - surface);
         const key = difference > 0 ? "probeBelow" : difference < 0 ? "probeAbove" : "probeLevel";

@@ -51,6 +51,17 @@ describe("tooltipReading", () => {
         expect(tooltipReading(tok("mole", 400, -20), floors, water, null, false)).toBeNull();
     });
 
+    it("prefers a floor that lies above the water surface", () => {
+        // An upper-level shelf at -5 ft over the pool: a token on it stands on ground, with the lake far below.
+        const shelf = floor("upper", -5, 300, Infinity);
+        const withShelf = [...floors, { region: shelf, floor: -5 }];
+        const boots = tok("boots", 400, 0);
+        expect(tooltipReading(boots, withShelf, water, boots, false)).toEqual({ value: 5, kind: "ground" });
+        // Under the shelf, in the water, the surface is what is above.
+        const diver = tok("diver", 400, -12);
+        expect(tooltipReading(diver, withShelf, water, diver, false)).toEqual({ value: -2, kind: "waterBelow" });
+    });
+
     it("defers to native when there is no floor under a floor-relative token", () => {
         const flyer = tok("flyer", 200, -20);
         expect(tooltipReading(flyer, floors, water, flyer, false)).toBeNull();

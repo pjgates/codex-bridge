@@ -29,13 +29,15 @@ export function tooltipReading(token: TooltipToken, floors: readonly Floor[], wa
     const elevation = token.document.elevation;
     if (absolute) return { value: elevation, kind: "absolute" };
     if (reference && reference.id !== token.id) return { value: elevation - reference.document.elevation, kind: "relative" };
+    // Whichever surface is highest under the token wins: a floor above the water surface, or
+    // water whose surface sits above the floor beneath it.
+    const floor = surfaceBelow(floors, token.center, elevation);
     const pool = waterAt(water, token.center);
-    if (pool && elevation >= pool.bed - EPSILON) {
+    if (pool && elevation >= pool.bed - EPSILON && (floor === null || pool.surface > floor + EPSILON)) {
         const value = elevation - pool.surface;
         return { value, kind: value > EPSILON ? "waterAbove" : "waterBelow" };
     }
-    const surface = surfaceBelow(floors, token.center, elevation);
-    return surface === null ? null : { value: elevation - surface, kind: "ground" };
+    return floor === null ? null : { value: elevation - floor, kind: "ground" };
 }
 
 export const round = (value: number): number => Math.round(value * 100) / 100;
