@@ -11,7 +11,8 @@ const floor = (level: string, elevation: number, minX: number, maxX: number) => 
 // Upper level: terrace at 10 ft over x 100..300. Lower level: cave floor at 0 ft to 300, pit at -15 ft beyond.
 const regions = [floor("upper", 10, 100, 300), floor("lower", 0, -Infinity, 300), floor("lower", -15, 300, Infinity)];
 const floors = regions.map(region => ({ region, floor: region.behaviors[0].system.elevation }));
-const i18n = { format: (key: string, data: Record<string, string>) => `${key.split(".").pop()}:${data.distance ?? ""}` };
+const i18n = { format: (key: string, data: Record<string, string>) => `${key.split(".").pop()}:${data.distance ?? data.depth}` };
+const pool = { region: { polygonTree: { testPoint: (p: { x: number }) => p.x >= 500 } }, surface: -10, bed: -15 } as any;
 
 describe("visibleFloors", () => {
     it("keeps floors on the levels the viewer can currently see", () => {
@@ -25,14 +26,21 @@ describe("visibleFloors", () => {
 describe("probeText", () => {
     it("reads the top visible floor under the cursor, absolute and relative to the reference", () => {
         vi.stubGlobal("game", { i18n });
-        expect(probeText(floors, { x: 400, y: 0 }, { document: { elevation: 5 } }, "ft")).toBe("-15 ft · probeBelow:20");
-        expect(probeText(floors, { x: 200, y: 0 }, { document: { elevation: 5 } }, "ft")).toBe("+10 ft · probeAbove:5");
-        expect(probeText(floors, { x: 50, y: 0 }, { document: { elevation: 0 } }, "ft")).toBe("0 ft · probeLevel:0");
+        expect(probeText(floors, [], { x: 400, y: 0 }, { document: { elevation: 5 } }, "ft")).toEqual({ text: "-15 ft · probeBelow:20", water: false });
+        expect(probeText(floors, [], { x: 200, y: 0 }, { document: { elevation: 5 } }, "ft")!.text).toBe("+10 ft · probeAbove:5");
+        expect(probeText(floors, [], { x: 50, y: 0 }, { document: { elevation: 0 } }, "ft")!.text).toBe("0 ft · probeLevel:0");
+    });
+
+    it("reads the water surface and depth over a pool", () => {
+        vi.stubGlobal("game", { i18n });
+        expect(probeText(floors, [pool], { x: 600, y: 0 }, { document: { elevation: 5 } }, "ft")).toEqual({ text: "-10 ft · probeDepth:5 · probeBelow:15", water: true });
+        expect(probeText(floors, [pool], { x: 600, y: 0 }, null, "ft")!.text).toBe("-10 ft · probeDepth:5");
+        expect(probeText(floors, [pool], { x: 400, y: 0 }, null, "ft")!.water).toBe(false);
     });
 
     it("shows only the absolute height without a reference, and nothing off the floors", () => {
         vi.stubGlobal("game", { i18n });
-        expect(probeText(floors, { x: 400, y: 0 }, null, "ft")).toBe("-15 ft");
-        expect(probeText([], { x: 400, y: 0 }, null, "ft")).toBeNull();
+        expect(probeText(floors, [], { x: 400, y: 0 }, null, "ft")!.text).toBe("-15 ft");
+        expect(probeText([], [], { x: 400, y: 0 }, null, "ft")).toBeNull();
     });
 });

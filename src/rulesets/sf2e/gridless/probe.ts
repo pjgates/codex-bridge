@@ -1,7 +1,7 @@
 import type { Point } from "./geometry.js";
-import { allFloors, surfaceBelow, type Floor } from "./floors.js";
+import { allFloors, allWater, surfaceBelow, waterAt, type Floor, type Water } from "./floors.js";
 import { onAbsoluteElevationChange } from "./elevation-key.js";
-import { currentReference, type TooltipToken } from "./tooltip.js";
+import { currentReference, GROUND_COLOR, round, signed, WATER_COLOR, type TooltipToken } from "./tooltip.js";
 
 // Foundry 14 level shapes not yet represented by fvtt-types.
 type ProbeScene = Parameters<typeof allFloors>[0] & { levels: Iterable<{ id: string; isVisible: boolean }> };
@@ -13,18 +13,25 @@ export function visibleFloors(scene: ProbeScene): Floor[] {
     return allFloors(scene).filter(({ region }) => visible.some(id => (region as unknown as LevelledRegion).includedInLevel(id)));
 }
 
-const round = (value: number): number => Math.round(value * 100) / 100;
-const signed = (value: number): string => (value > 0 ? "+" : "") + String(value);
+export interface Probe { text: string; water: boolean }
 
-/** "-15 ft · 20 ft below you": the top floor under the point, absolute, then relative to the reference token. */
-export function probeText(floors: readonly Floor[], point: Point, reference: Pick<TooltipToken, "document"> | null, units: string): string | null {
-    const surface = surfaceBelow(floors, point);
+/**
+ * "-15 ft · 20 ft below you": the top floor under the point, absolute, then relative to the
+ * reference token. Over water the surface comes first and its depth is added: "-10 ft · 5 ft deep · 15 ft below you".
+ */
+export function probeText(floors: readonly Floor[], water: readonly Water[], point: Point,
+    reference: Pick<TooltipToken, "document"> | null, units: string): Probe | null {
+    const pool = waterAt(water, point);
+    const surface = pool ? pool.surface : surfaceBelow(floors, point);
     if (surface === null) return null;
-    const absolute = `${signed(round(surface))} ${units}`.trim();
-    if (!reference) return absolute;
-    const difference = round(reference.document.elevation - surface);
-    const key = difference > 0 ? "probeBelow" : difference < 0 ? "probeAbove" : "probeLevel";
-    return `${absolute} · ${game.i18n!.format(`codex-foundry.gridless.${key}`, { distance: String(Math.abs(difference)), units })}`;
+    const parts = [`${signed(round(surface))} ${units}`.trim()];
+    if (pool) parts.push(game.i18n!.format("codex-foundry.gridless.probeDepth", { depth: String(round(pool.surface - pool.bed)), units }));
+    if (reference) {
+        const difference = round(reference.document.elevation - surface);
+        const key = difference > 0 ? "probeBelow" : difference < 0 ? "probeAbove" : "probeLevel";
+        parts.push(game.i18n!.format(`codex-foundry.gridless.${key}`, { distance: String(Math.abs(difference)), units }));
+    }
+    return { text: parts.join(" · "), water: !!pool };
 }
 
 const PROBE_OFFSET = 12;
@@ -36,10 +43,11 @@ export function activateFloorProbe(): void {
         if (!label || !canvas?.ready) return;
         const scene = canvas.scene as unknown as ProbeScene;
         const point = canvas.mousePosition!;
-        const text = probeText(visibleFloors(scene), point, currentReference(), canvas.grid!.units);
-        label.visible = text !== null;
-        if (text === null) return;
-        label.text = text;
+        const probe = probeText(visibleFloors(scene), allWater(scene), point, currentReference(), canvas.grid!.units);
+        label.visible = probe !== null;
+        if (probe === null) return;
+        label.text = probe.text;
+        label.style.fill = probe.water ? WATER_COLOR : GROUND_COLOR;
         label.position.set(point.x, point.y - PROBE_OFFSET);
     };
     const show = (): void => {

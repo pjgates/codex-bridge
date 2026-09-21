@@ -100,10 +100,11 @@ Scenes imported by the Map Workshop Importer carry `setElevation` floor regions.
 
 On these scenes the elevation label over a token reads against the ground, not the level:
 
-- Your selected token (or your character's token when none or several are selected) shows its height above the floor beneath it, even when that floor belongs to a level below. A token 20 ft above a cave floor reads **+20 ft**, whatever level the cave is on.
-- Every other token shows its height relative to yours, so **-15 ft** is 15 ft lower than you.
+- Your selected token (or your character's token when none or several are selected) shows its height above the floor beneath it in green, even when that floor belongs to a level below. A token 20 ft above a cave floor reads **+20 ft above ground**, whatever level the cave is on.
+- Over water it reads against the surface in blue: **+10 ft above water**, or **5 ft below surface** for a token wading on the bed. Water is recognised by the map-workshop `water` region behaviour (exports from format 6; older scenes need the behaviour added to their Water regions).
+- Every other token shows its height relative to yours in plain white, so **-15 ft** is 15 ft lower than you.
 - Hold **Show absolute elevation** (`H` by default, editable under **Configure Controls → Codex Foundry**) to see scene elevations instead.
-- While that key is held, a label at the cursor reads the top visible floor beneath it, for example **-15 ft · 20 ft below you**, on whichever level that floor lies. Off the floors it shows nothing.
+- While that key is held, a label at the cursor reads the top visible floor beneath it, for example **-15 ft · 20 ft below you**, on whichever level that floor lies. Over water it reads the surface and depth: **-10 ft · 5 ft deep · 15 ft below you**. Off the floors it shows nothing.
 - Scenes without floor regions keep Foundry's own labels.
 
 ### Flying

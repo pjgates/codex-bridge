@@ -30,8 +30,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - **Check prompts:** moving up or down a ledge of more than one tread posts the system's Climb roll, and squeezing through a tight gap posts Squeeze, for the moving token's actor. Prompt only, controlled by a new **Prompt checks for ledges and gaps** setting.
 - **Squeezing:** on the hex lattice, gaps between half and the full cramped footprint are now routed as greater difficult terrain. The squeezed stretch costs triple in movement measurement and the ruler label shows a compress icon on that leg. Small and Tiny creatures squeeze gaps down to half their half-space footprint.
 
-- **Floor-relative heights:** on scenes with map-workshop floors, a token's elevation label shows its height above the floor beneath it, even when that floor is on another level, and other tokens show their height relative to the selected token or the player's character. Holding the new **Show absolute elevation** key (H by default) shows scene elevation instead.
-- **Floor probe:** while that key is held, a label at the cursor reads the height of the top visible floor beneath it, on any level, and how far below or above the selected token it lies.
+- **Floor-relative heights:** on scenes with map-workshop floors, a token's elevation label shows its height above the floor beneath it in green (**+20 ft above ground**), even when that floor is on another level, and other tokens show their height relative to the selected token or the player's character. Holding the new **Show absolute elevation** key (H by default) shows scene elevation instead.
+- **Water:** over a region carrying the map-workshop `water` behaviour the label reads against the surface in blue (**+10 ft above water**, **5 ft below surface**).
+- **Floor probe:** while that key is held, a label at the cursor reads the height of the top visible floor beneath it, on any level, and how far below or above the selected token it lies; over water it adds the depth.
 ### Changed
 
 - **One ruler label:** the remaining-movement text and action glyph moved from a separate overlay label into the native ruler waypoint label, alongside distance, surcharge, and elevation. The reachable ring is now outline only.

@@ -4,6 +4,8 @@ import { planElevationPath, STEP_FEET, type ElevationWaypoint, type FloorCrossin
 
 /** Region behaviour type registered by the map-workshop importer; its `elevation` field is the floor height in feet. */
 export const SET_ELEVATION_TYPE = "map-workshop-importer.setElevation";
+/** Marker behaviour on map-workshop water regions; the region's elevation band runs from the bed to the surface. */
+export const WATER_TYPE = "map-workshop-importer.water";
 export const SETTING_ENFORCE_CLIMB = "enforceClimb";
 const REWRITTEN = `${MODULE_ID}Rewritten`;
 
@@ -12,6 +14,7 @@ interface FloorRegion {
     levels: Set<string>;
     behaviors: Iterable<{ type: string; disabled: boolean; system: { elevation?: number } }>;
     polygonTree: { testPoint(point: Point): boolean };
+    elevation?: { bottom: number; top: number };
 }
 interface FloorScene { regions: Iterable<FloorRegion>; initialLevel?: { id: string } | null; _source: { initialLevel?: string } }
 interface MovementOrigin extends Point { elevation: number; width: number; height: number; depth?: number; shape: number }
@@ -47,6 +50,33 @@ export function allFloors(scene: Pick<FloorScene, "regions">): Floor[] {
         }
     }
     return out;
+}
+
+export interface Water { region: FloorRegion; surface: number; bed: number }
+
+/** Every marked water region on the scene with a finite surface, whatever level it belongs to. */
+export function allWater(scene: Pick<FloorScene, "regions">): Water[] {
+    const out: Water[] = [];
+    for (const region of scene.regions) {
+        const band = region.elevation;
+        if (!band || !Number.isFinite(band.top)) continue;
+        for (const behavior of region.behaviors) {
+            if (behavior.type !== WATER_TYPE || behavior.disabled) continue;
+            out.push({ region, surface: band.top, bed: band.bottom });
+            break;
+        }
+    }
+    return out;
+}
+
+/** The water with the highest surface under a point, or null on dry ground. */
+export function waterAt(water: readonly Water[], point: Point): Water | null {
+    let best: Water | null = null;
+    for (const candidate of water) {
+        if ((best && candidate.surface <= best.surface) || !candidate.region.polygonTree.testPoint(point)) continue;
+        best = candidate;
+    }
+    return best;
 }
 
 const SURFACE_EPSILON = 1e-6;

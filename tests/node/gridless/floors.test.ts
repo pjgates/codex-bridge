@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { activateFloorElevation, allFloors, floorCrossings, floorRegions, surfaceBelow } from "../../../src/rulesets/sf2e/gridless/floors.js";
+import { activateFloorElevation, allFloors, allWater, floorCrossings, floorRegions, surfaceBelow, waterAt } from "../../../src/rulesets/sf2e/gridless/floors.js";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -78,6 +78,17 @@ describe("surfaces across levels", () => {
         expect(surfaceBelow(floors, { x: 400, y: 0 }, 5)).toBe(-15);
         // Below every floor: nothing is beneath.
         expect(surfaceBelow(floors, { x: 200, y: 0 }, -1)).toBeNull();
+    });
+
+    it("reads marked water regions from their elevation band", () => {
+        const pool = { levels: new Set(["lower"]), polygonTree: { testPoint: (p: { x: number }) => p.x >= 300 }, elevation: { bottom: -15, top: -10 },
+            behaviors: [{ type: "map-workshop-importer.water", disabled: false, system: {} }] };
+        const unmarked = { ...pool, behaviors: [{ type: "modifyMovementCost", disabled: false, system: {} }] };
+        const open = { ...pool, elevation: { bottom: -15, top: Infinity } };
+        const water = allWater({ regions: [...scene.regions, pool, unmarked, open] } as any);
+        expect(water).toEqual([{ region: pool, surface: -10, bed: -15 }]);
+        expect(waterAt(water, { x: 400, y: 0 })).toBe(water[0]);
+        expect(waterAt(water, { x: 100, y: 0 })).toBeNull();
     });
 
     it("ignores elevation when asked for the top floor at a point", () => {
