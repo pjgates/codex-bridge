@@ -9,8 +9,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Native surface visibility:** scoped preview/adoption, managed companion planes, preserved sound/unrelated blockers, active-GM reconciliation and cleanup on geometry disable/delete.
+
+- **Surface geometry:** manual solid/finite/unknown extent, fractional underside and presets; shared face validation prevents climbing across the empty space beneath a suspended deck. Partial climbs retain and revalidate their face and landing before applying progress.
+- **Workshop geometry compatibility:** read and migrate the optional importer's surface geometry subtype. Legacy regions without geometry request a ruling when a climb needs a connecting face.
+
+- **Exploration notices:** optional compact Climb/Swim messages when exploration checks are disabled.
+- **Swim upkeep:** private GM choices for sinking, current movement or no consequence after a turn without a successful Swim; active SF2e environmental protection suppresses air-loss reminders. Breath tracking remains manual.
+
+- **Region ownership:** Codex floor/water definitions, dual-namespace readers, explicit scene migration and optional importer integration.
+- **Movement:** paused Climb, Grab an Edge and Arrest a Fall; cross-level falls; typed damage with IWR/temporary HP; configurable hold-F forced movement and GM macro API; water endpoints and optional flight-upkeep confirmation.
+- **Settings:** grouped native options, live dependency controls, independent utilities, preference-preserving migration and opt-in application of consequences.
+- **Terrain authoring:** floor behaviours own Climb/Grab an Edge DCs; water behaviours own Swim DCs, with terrain presets, custom overrides and legacy DC fallback.
+- **Exploration checks:** separate Climb/Swim switches outside combat and a temporary GM scene-session override; ordinary travel can proceed freely while fall safeguards remain.
+- **Terrain statuses:** visible Climbing/Swimming effects, automatic lifecycle tracking and GM toggle macros; speed/feat-aware Off-Guard, Combat Climber hand allowance and Quick Swim progress.
+- **Adaptive Travelling:** prefer ground movement, use prepared Climb/Swim Speeds on ordinary terrain and flight where needed; preserve explicit actions, hazardous checks and forced-movement safeguards.
+- **Cross-level climbing:** recognize an unambiguous higher floor on another native level as a climb destination.
+- **Reaction checks:** preselect the strongest eligible Acrobatics/Reflex bonus, including action-specific modifiers, while retaining manual selection.
+- **Native movement continuation:** retain movement ancestry across Foundry checkpoints, reject superseded paths and prevent repeated decisions for unresolved hazards.
+
+
 - **Flying:** a **Toggle Flying** macro (created once for the GM) adds or removes an "Effect: Flying" item on the selected tokens' actors. While the effect is present the token uses the native Fly movement action, so the ruler, ledge rules and check prompts treat it as airborne; removing the effect restores the system's default action. Also exposed as `api.flying.toggleFlying`.
-- **Falling:** a flying creature that moves on foot, or gains Prone, Unconscious, Paralyzed, Petrified or Grabbed, loses the effect and lands on the surface below, changing level when that surface belongs to a lower one. A chat card gives the distance and the rulebook damage as an inline roll, after Cat Fall, Wind Pillow, Superhero Landing, Plumekith, Rubbery Body, Land on Your Feet and the no-damage abilities, and lists reactions such as Impressive Landing and Arrest a Fall. Nothing is applied automatically.
+- **Falling:** paused choices and system damage replace immediate relocation and advisory inline damage. Cross-level support never falls back to a level base.
 - **Flying reminder:** at the start of a flying creature's turn a chat message states its height above the surface below, read across levels like the token tooltips.
 - **Clip tiles to regions:** a **Clip to region** select on the tile configuration's appearance tab stencils the tile's texture to a region's polygons, holes included, and keeps the stencil in step with tile and region edits. Pairs with the map-workshop floor and water regions for clipped textures.
 
@@ -24,13 +44,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - **Pathfinder compatibility:** the module manifest now permits PF2e worlds.
 - **Movement Debug:** an optional client-only overlay fills reachable hex cells at low opacity. Terrain tags select fill colors. White, amber, and red outlines show movement cost.
 - **Hex flanking guide:** low-opacity red cells mark native flank-eligible positions on the shared lattice, with normal token-footprint wall clearance. Continuous mode retains directional wedges.
-- **Floors:** map-workshop `setElevation` floor regions now move tokens between floor heights from Codex Foundry, including the drop-time path rewrite, the **Refuse climbs on foot** setting, and floor snapping for dropped tokens. The importer module keeps only the region behavior type.
-- **Floor-aware preview:** in hex lattice mode the drag label shows the planned floor height at each waypoint and flags waypoints past a refused ledge. The reachable ring and automatic routes stop at ledges the movement action cannot climb.
 - **Blocked frontier:** in hex lattice mode the reachable ring now shows red cells with the Climb action's own marker (its ladder image by default) along ledges the current action cannot climb and a compress icon at gaps that need a Squeeze, taking the token's movement action and size into account.
-- **Ledges prompt instead of refusing:** "Refuse climbs on foot" now defaults off, so a walking move up a ledge goes ahead, takes the height and posts the Climb roll. Ledge rims show amber where a climb will prompt and red where it is refused.
 - **Small cramped tier:** Small and Tiny creatures treat 1.25 to 2.5 ft passages as difficult terrain like every other size treats one size down, and squeeze only below that.
 - **Squeeze rims only where worth it:** a squeeze opening now counts only if a full footprint could stand on the ground beyond it, so slivers between double-drawn wall chains stay unmarked, and the squeeze footprint never shrinks below a lattice cell.
-- **Check prompts:** moving up or down a ledge of more than one tread posts the system's Climb roll, and squeezing through a tight gap posts Squeeze, for the moving token's actor. Prompt only, controlled by a new **Prompt checks for ledges and gaps** setting.
 - **Floor-relative heights:** on scenes with map-workshop floors, a token's elevation label shows its height above the floor beneath it in green (**+20 ft above ground**), even when that floor is on another level, and other tokens show their height relative to the selected token or the player's character. Holding the new **Show absolute elevation** key (H by default) shows scene elevation instead.
 - **Water:** over a region carrying the map-workshop `water` behaviour the label reads against the surface in blue (**+10 ft above water**, **5 ft below surface**).
 - **Floor probe:** while that key is held, a label at the cursor reads the height of the top visible floor beneath it, on any level, and how far below or above the selected token it lies; over water it adds the depth.
@@ -38,11 +54,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **Unchecked exploration:** preserve Climb/Swim route segments and distances in the tooltip, hide action budgets and estimate markers when checks are waived, and include measured distances in the optional chat notice.
+
+- **Climb down by default:** voluntary walking/Travelling over mapped drops greater than 5 ft offers Climb down with the upper ledge’s DC, including cross-level and partial descents. Forced falls and unknown landings retain their safeguards.
+
+- **Climb continuation:** Travelling continues an existing partial climb; resolved checks report vertical progress and remaining height. Critical failures retain the ledge DC for fall reactions.
+- **Manual movement resolution:** the GM control now moves to the requested destination while retaining native wall and closed-door collision.
+
+- **Movement tooltip:** right-aligned action glyphs beside movement types, ordered distance segments, parenthesized remaining movement and separate elevation/hazard rows. Estimated modes use `*`; tooltip width is 160–240px. Mixed Climb/Crawl routes no longer mislabel the native action multiplier as extra terrain cost.
+- Retired unchecked floor-height rewriting and the old climb bypass. Squeeze retains its own prompt. Previews and execution use the same support contacts.
+
+
 - **One ruler label:** the remaining-movement text and action glyph moved from a separate overlay label into the native ruler waypoint label, alongside distance, surcharge, and elevation. The reachable ring is now outline only.
 - Normal movement no longer draws a hex-cell trail. The native ruler line and movement outline remain available.
 
 ### Fixed
 
+- **Movement tooltip readability:** compact stacked rows replace the wide single line, with readable 14px text that stays the same size when zooming. Shorter hints retain distance, action budgets, DCs and reaction symbols.
 - **Dense wall scenes:** the wall-clearance build no longer compares every wall against every other one. A 4,000-wall level built in 35 seconds and froze the tab; it now takes a fraction of a second.
 - **Squeeze over-detection:** a leg counted as squeezed as soon as the cramped footprint touched a wall, so wall-hugging routes the lattice treats as ordinary cramped passages were charged triple, flagged on the label and prompted a Squeeze roll. Squeeze detection now uses the same half-cell tolerance as the lattice.
 - **Two labels on every hex drag:** hex routes ended on the destination's cell centre, a few pixels from the request, so Foundry appended the request as an unreachable waypoint with a second label. Routes now finish on the exact request whenever the last leg fits.

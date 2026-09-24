@@ -1,3 +1,4 @@
+import { utilityEnabled } from "../../../settings/migration.js";
 /**
  * Statblock importer — paste-markdown → benchmark preview → NPC actor.
  *
@@ -130,7 +131,7 @@ async function runImportFlow(): Promise<void> {
 export function initStatblockImporter(): void {
     Hooks.on("renderActorDirectory", (_app: object, element: HTMLElement) => {
         if (!game.user?.isGM) return;
-        if (!game.settings!.get(MODULE_ID, "enableCustomRules") || !game.settings!.get(MODULE_ID, "enableStatblockImporter")) return;
+        if (!utilityEnabled("enableStatblockImporter")) return;
         if (element.querySelector(".ssi-import-button")) return;
         const anchor =
             element.querySelector(".directory-header .header-actions") ??

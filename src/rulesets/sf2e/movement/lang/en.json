@@ -1,0 +1,50 @@
+{
+    "codex-foundry": {
+        "settings": {
+            "explorationMovementNotices": {
+                "name": "Announce unchecked exploration movement",
+                "hint": "Post one compact Climb/Swim message after movement when the relevant checks are disabled outside combat."
+            },
+            "enableClimbing": {
+                "name": "Resolve climbing checks",
+                "hint": "Pause climbs for system checks. Configure terrain presets and custom DCs on Set Floor Elevation behaviours."
+            },
+            "enableFalling": {
+                "name": "Detect and resolve falls",
+                "hint": "Detect loss of support across scene levels and offer available reactions. Movement outcomes controls whether resolved consequences are applied."
+            },
+            "enableFlightUpkeep": {
+                "name": "Check flight upkeep at turn end",
+                "hint": "Requires falling. Confirm whether the creature used Fly this turn before resolving a fall."
+            },
+            "enableForcedMovement": {
+                "name": "Enable forced movement",
+                "hint": "Hold F while dragging; configure the binding in Configure Controls. Dangerous destinations require the effect type. Also enables the GM macro API."
+            },
+            "movementOutcomeMode": {
+                "name": "Movement outcomes",
+                "hint": "Advisory reports proposed outcomes for manual resolution. Apply after choices moves tokens and applies damage and conditions after checks or reactions. New consequences require opt-in."
+            },
+            "climbOutsideCombat": {
+                "name": "Require Climb checks outside combat",
+                "hint": "Turn off for free ordinary exploration climbing. Falls still pause. The GM token-control toggle temporarily requires terrain checks until leaving the scene or reloading."
+            },
+            "swimOutsideCombat": {
+                "name": "Require Swim checks outside combat",
+                "hint": "Turn off for free ordinary exploration swimming. The GM token-control toggle temporarily requires terrain checks this scene session."
+            },
+            "enableSwimming": {
+                "name": "Resolve swimming checks",
+                "hint": "Pause movement through authored water for Swim. Set water conditions and custom DCs on the Water behaviour. Calm water normally grants automatic critical success. At turn end, the GM chooses sinking, current movement or no consequence. Breath tracking stays manual; active environmental protection supplies air."
+            }
+        },
+        "movement": {
+            "advisory": "Advisory",
+            "apply": "Apply after choices",
+            "forcedName": "Forced movement modifier",
+            "forcedHint": "Hold while dragging a token to mark a shove or other forced movement. Release or Escape clears the modifier.",
+            "forced": "Forced",
+            "falling": "Falling"
+        }
+    }
+}

@@ -1,0 +1,24 @@
+.codex-reaction .action-glyph {
+    font-family: "Pathfinder2eActions", sans-serif;
+    font-size: 1.3em;
+    font-weight: normal;
+    display: inline !important;
+}
+.codex-movement-card {
+    --codex-accent: var(--color-text-hyperlink, #9b83c9);
+    border-top: 2px solid var(--codex-accent);
+    padding: 10px 2px 2px;
+    h3 { margin: 0 0 8px; font-size: 1.2em; border: 0; }
+    .codex-movement-state { font-size: .75em; text-transform: uppercase; font-weight: bold; }
+    .codex-movement-character { font-size: .85em; opacity: .85; margin: 8px 0; }
+    .codex-movement-description { line-height: 1.5; margin: 10px 0; }
+    .codex-movement-facts { border-block: 1px solid var(--color-border-light-primary, #666); padding: 8px 0; font-size: .9em; }
+    .codex-movement-decisions { display: grid; gap: 6px; margin-top: 12px; }
+    button { width: 100%; height: auto; min-height: 32px; white-space: normal; line-height: 1.4; padding: 6px; margin: 0; }
+    .codex-movement-primary { border-color: var(--codex-accent); background: color-mix(in srgb, var(--codex-accent) 25%, transparent); font-weight: bold; }
+    details { border-top: 1px solid var(--color-border-light-primary, #666); padding-top: 8px; margin-top: 8px; }
+    summary { cursor: pointer; font-size: .85em; }
+    details button { margin-top: 6px; }
+    &[data-state="resolved"] .codex-movement-description { border-left: 2px solid var(--codex-accent); padding-left: 8px; }
+    :is(button, summary):focus-visible { outline: 2px solid var(--codex-accent); outline-offset: 2px; }
+}

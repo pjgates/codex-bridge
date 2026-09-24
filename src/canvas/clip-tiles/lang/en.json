@@ -1,9 +1,11 @@
 {
     "codex-foundry": {
         "clipTiles": {
-            "label": "Clip to region",
-            "none": "None",
-            "hint": "Show this tile only inside the chosen region's shape. Map-workshop exports provide a region per floor height and per water patch."
+            "title": "Region masks",
+            "includeLabel": "Show inside regions",
+            "includeHint": "Show artwork inside any selected region. Leave empty to show the whole tile.",
+            "excludeLabel": "Hide inside regions",
+            "excludeHint": "Cut out every selected region. These exclusions take priority over Show inside regions."
         }
     }
 }

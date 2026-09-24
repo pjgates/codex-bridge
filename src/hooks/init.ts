@@ -14,11 +14,20 @@ import {
     registerSyncSettings,
     registerSyncSettingsButton,
     registerSyncTemplates,
-    SETTING_ENABLE_SYNC,
 } from "../sync/index.js";
-import { resolveHtmlRoot } from "../shared/html.js";
+import { activateSettingsPresentation } from "../settings/presentation.js";
+
+import { registerMovementSettings, registerForcedMovement, registerTerrainPolicy } from "../rulesets/sf2e/movement/index.js";
+import { registerSettingsMigration } from "../settings/migration.js";
+
+import { registerRegionBehaviors, activateGeometryConfig } from "../canvas/regions/index.js";
 
 export function onInit(): void {
+    registerRegionBehaviors();
+    game.settings!.register(MODULE_ID,'surfaceFading',{name:'Fade suspended surface artwork by default',hint:'Off keeps artwork opaque. Override individual surfaces in Surface Geometry. Sight and light blocking are unchanged.',scope:'world',config:true,type:Boolean,default:false,requiresReload:true});
+    game.settings!.register(MODULE_ID,'coveredTokenOutlines',{name:'Outline visible tokens beneath artwork',hint:'Shows a silhouette and elevation only when the current PC vision sources can see a covered token.',scope:'client',config:true,type:Boolean,default:true,requiresReload:true});
+    activateGeometryConfig();
+    registerSettingsMigration();
     // Register module settings (order matters for the settings UI)
     registerSettings();
 
@@ -27,6 +36,9 @@ export function onInit(): void {
     registerGridlessSetting();
     registerFloorSetting();
     registerMovementCheckSetting();
+    registerMovementSettings();
+    registerTerrainPolicy();
+    registerForcedMovement();
     registerMovementPreviewKeybind();
     registerAbsoluteElevationKeybind();
 
@@ -50,9 +62,8 @@ export function onInit(): void {
     initStatblockImporter();
 
     // Hook into settings UI to enforce dependency: PRAD requires Target Helper
-    Hooks.on("renderSettingsConfig", onRenderSettingsConfig);
+    activateSettingsPresentation();
 }
-
 // ─── Settings Registration ───────────────────────────────────────────────────
 
 /**
@@ -81,79 +92,4 @@ function registerSettings(): void {
         default: true,
         requiresReload: true,
     });
-}
-
-// ─── Settings UI: Dependency Enforcement ─────────────────────────────────────
-
-/**
- * When the settings config dialog renders, find the PRAD checkbox and
- * disable it if Target Helper is off. Also disable Target Helper (and PRAD)
- * if the master switch is off.
- */
-function onRenderSettingsConfig(
-    _app: object,
-    html: HTMLElement,
-    _data: object,
-): void {
-    try {
-        const root = html instanceof HTMLElement ? html : resolveHtmlRoot(html);
-        if (!root) return;
-
-        const thEnabled = game.settings!.get(MODULE_ID, "enableTargetHelper") as boolean;
-        const masterEnabled = game.settings!.get(MODULE_ID, "enableCustomRules") as boolean;
-
-        // Find the PRAD setting row and disable it if Target Helper is off
-        const pradInput = root.querySelector<HTMLInputElement>(
-            `input[name="${MODULE_ID}.playersRollAllDice"]`,
-        );
-        if (pradInput) {
-            const shouldDisable = !thEnabled || !masterEnabled;
-            pradInput.disabled = shouldDisable;
-            if (shouldDisable) {
-                pradInput.closest(".form-group")?.classList.add("disabled");
-                pradInput.title = game.i18n!.localize(
-                    "codex-foundry.settings.playersRollAllDice.requiresTargetHelper",
-                );
-            }
-        }
-
-        // Find the Target Helper setting row and disable it if master is off
-        const thInput = root.querySelector<HTMLInputElement>(
-            `input[name="${MODULE_ID}.enableTargetHelper"]`,
-        );
-        if (thInput && !masterEnabled) {
-            thInput.disabled = true;
-            thInput.closest(".form-group")?.classList.add("disabled");
-        }
-
-        // Find the Heroic Rerolls setting row and disable it if master is off
-        const heroicRerollsInput = root.querySelector<HTMLInputElement>(
-            `input[name="${MODULE_ID}.heroicRerolls"]`,
-        );
-        if (heroicRerollsInput && !masterEnabled) {
-            heroicRerollsInput.disabled = true;
-            heroicRerollsInput.closest(".form-group")?.classList.add("disabled");
-        }
-
-        // Find the Vault Sync setting row and disable it if master is off
-        const syncInput = root.querySelector<HTMLInputElement>(
-            `input[name="${MODULE_ID}.${SETTING_ENABLE_SYNC}"]`,
-        );
-        if (syncInput && !masterEnabled) {
-            syncInput.disabled = true;
-            syncInput.closest(".form-group")?.classList.add("disabled");
-        }
-
-        // Disable the strict DC setting when PRAD is off
-        const pradEnabled = game.settings!.get(MODULE_ID, "playersRollAllDice") as boolean;
-        const strictInput = root.querySelector<HTMLInputElement>(
-            `input[name="${MODULE_ID}.pradStrictDCs"]`,
-        );
-        if (strictInput && (!pradEnabled || !masterEnabled)) {
-            strictInput.disabled = true;
-            strictInput.closest(".form-group")?.classList.add("disabled");
-        }
-    } catch (err) {
-        console.error(`${MODULE_ID} | Error in renderSettingsConfig hook`, err);
-    }
 }

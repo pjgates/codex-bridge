@@ -3,6 +3,7 @@
  * The game is fully loaded and all data is available at this point.
  */
 
+import {activateCoveredTokenOutlines} from "../canvas/covered-tokens.js";
 import { MODULE_ID } from "../constants.js";
 import { activateHeroicRerolls, isHeroicRerollsEnabled } from "../rulesets/sf2e/heroic-rerolls/index.js";
 import { isPradEnabled, applyDCBaseSetting, registerAttackInterceptHook, registerPradSheetHooks } from "../rulesets/sf2e/prad/index.js";
@@ -12,10 +13,25 @@ import { activateElevationTooltip, activateFloorElevation, activateFloorProbe, a
 import { activateClipTileConfig, activateClipTiles } from "../canvas/clip-tiles/index.js";
 import { activateFlying } from "../rulesets/sf2e/flying/index.js";
 
-export function onReady(): void {
+import { activateTerrainStatuses, ensureTerrainMacros, activateMovementTransitions, activateMovementDecisions, openDecision, resolveMovementChoice, movementControls, activateForcedPreview, requestFall, activateFlightUpkeep, clearTerrainOverride } from "../rulesets/sf2e/movement/index.js";
+import { migrateSettings } from "../settings/migration.js";
+import { activateExplorationNotices, activateSwimUpkeep } from "../rulesets/sf2e/movement/index.js";
+import {activateSurfaceVisibility} from '../canvas/regions/index.js';
+
+export async function onReady(): Promise<void> {
+    await clearTerrainOverride();
+    try { await migrateSettings(); }
+    catch (error) {
+        console.error(`${MODULE_ID} | Settings migration incomplete`, error);
+        ui.notifications!.error(game.i18n!.localize(`${MODULE_ID}.settings.migrationFailed`));
+    }
     // Tile clipping is a canvas feature, not a house rule, so it ignores the master switch.
     activateClipTiles();
     activateClipTileConfig();
+    activateSurfaceVisibility();
+    activateCoveredTokenOutlines();
+
+    void checkForVaultUpdates();
 
     const isEnabled = game.settings!.get(MODULE_ID, "enableCustomRules");
 
@@ -26,17 +42,24 @@ export function onReady(): void {
 
     console.log(`${MODULE_ID} | Custom rules are active.`);
     activateGridlessCombat();
+    activateForcedPreview();
     // Map-workshop floor heights apply on every scene with floor regions, gridless or not.
     activateFloorElevation();
+    activateMovementDecisions(resolveMovementChoice, movementControls);
+    activateMovementTransitions(openDecision);
+    activateExplorationNotices();
+    activateTerrainStatuses();
+    void ensureTerrainMacros();
     // Token tooltips read heights against the floor below and the selected token, across levels.
     activateElevationTooltip();
     activateFloorProbe();
     // After the floor rewrite, so check prompts see the path that actually executes.
     activateMovementChecks();
     // The Flying effect keeps the fly movement action on airborne tokens.
-    activateFlying();
+    activateFlying(requestFall);
+    activateFlightUpkeep(requestFall);
+    activateSwimUpkeep();
 
-    void checkForVaultUpdates();
 
     // ─── Heroic Rerolls (Hero Point rerolls have a minimum d20 of 10) ───
     if (isHeroicRerollsEnabled()) {

@@ -23,8 +23,8 @@
                 "hint": "Off by default: a move up a ledge of more than one 2.5 ft tread goes ahead, takes the new height and prompts the Climb roll. When enabled, a walking-type move is refused at the ledge and Climb, Fly, Blink or Displace are needed."
             },
             "promptMovementChecks": {
-                "name": "Prompt checks for ledges and gaps",
-                "hint": "When a move climbs or drops more than one 2.5 ft tread, post the system's Climb (Athletics) roll; when it squeezes through a tight gap, post the Squeeze (Acrobatics) roll. The move still happens; the GM reads the result."
+                "name": "Prompt Squeeze checks",
+                "hint": "Offer the system Squeeze action when moving through a tight passage. Climbing uses the separate movement setting."
             },
             "movementLattice": {
                 "name": "Movement Lattice",

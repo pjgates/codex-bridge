@@ -1,20 +1,35 @@
-// Ruler waypoint label additions on gridless scenes.
-.waypoint-label {
-    .codex-remaining-movement {
-        display: block;
-        font-size: 0.85em;
-        opacity: 0.85;
-    }
+// Counter the canvas zoom, without PF2e's additional 55% ruler shrink.
+#measurement .waypoint-label.codex-waypoint {
+    transform: scale(var(--counter-scale, 1)) translate(var(--transformX), var(--transformY));
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+    width: max-content;
+    min-width: 160px;
+    max-width: 240px;
+    padding: 6px 8px;
+    font-size: 14px;
+    line-height: 1.35;
+    white-space: normal;
+    text-align: left;
 
-    .codex-squeezed {
-        color: #ffbf47;
+    .codex-measurement-row, .codex-measurement-details, .codex-terrain-preview {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 4px 8px;
     }
-
-    .codex-climb-refused {
-        color: #ff6b6b;
-    }
-
-    .img.codex-climb-refused {
-        filter: sepia(1) saturate(6) hue-rotate(-30deg);
-    }
+    .codex-mode-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+    .codex-mode-row strong { min-width: 0; overflow-wrap: anywhere; }
+    .codex-action-budget { display: inline-flex; align-items: center; flex-shrink: 0; margin-left: auto; }
+    .codex-measurement-row { gap: 4px 5px; }
+    .codex-distance { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+    .total-measurement, .delta-measurement, .action-label, .icon { font-size: inherit; }
+    .total-measurement { font-weight: 600; }
+    .codex-elevation-row, .codex-remaining-movement { color: var(--color-text-secondary); }
+    .codex-terrain-preview { border-top: 1px solid #ffffff15; padding-top: 4px; font-size: 13px; }
+    .codex-squeezed, &.codex-paused-route .codex-terrain-preview { color: #ffbf47; }
+    .action-glyph { font-size: 1.3em; }
+    .codex-action-budget .action-glyph { font-size: 21px; }
 }

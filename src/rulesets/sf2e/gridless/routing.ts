@@ -1,3 +1,4 @@
+import { isFloorType } from "../../../canvas/regions/index.js";
 import type { Bounds, Point } from "./geometry.js";
 import { buildClearance, clearSegment, obstructedFraction, rayClearance, type Clearance, type NavigationWall } from "./clearance.js";
 import { navigationPath, reachablePolygons, searchNavigation, type NavigationMap } from "./navigation.js";
@@ -6,8 +7,7 @@ import { activateGridlessTerrainCosts } from "./terrain.js";
 import { hexAt } from "./hex.js";
 import { blockedFrontier, buildHexField, floodReachable, hexContours, hexPull, hexRoute, modeArrays, type FrontierRim, type HexClearanceMode, type HexField, type HexRegion } from "./hexfield.js";
 import { snapshotMovementDebug, type MovementDebugData, type MovementDebugRegion } from "./debug.js";
-import { CLIMB_ACTIONS } from "./elevation.js";
-import { climbsEnforced, SET_ELEVATION_TYPE } from "./floors.js";
+import { forcedMovementHeld } from "../movement/index.js";
 import type { HexFloor } from "./hexfield.js";
 
 // Foundry 14's terrain/level additions are not yet represented by fvtt-types.
@@ -218,7 +218,7 @@ function floorHeights(token: NativeToken, level: string): HexFloor[] {
     const floors: HexFloor[] = [];
     for (const region of token.scene.regions) {
         if (region.hidden || !region.includedInLevel(level)) continue;
-        const behavior = region.behaviors.find(b => !b.disabled && b.type === SET_ELEVATION_TYPE);
+        const behavior = region.behaviors.find(b => !b.disabled && isFloorType(b.type ?? ""));
         if (!behavior) continue;
         const floor = (behavior.system as { elevation?: number }).elevation ?? 0;
         floors.push({ floor, polygons: region.polygons.map(polygon => polygon.points) });
@@ -242,9 +242,9 @@ function terrainStepCosts(token: NativeToken, base: Waypoint, preview: boolean):
 }
 
 /** The per-token lattice field, cached on the same key as the continuous clearance. */
-function movementHexField(token: NativeToken, base: Waypoint, options: PathOptions) {
+function movementHexField(token: NativeToken, base: Waypoint, options: PathOptions, climb = true) {
     const { key: clearanceKey, walls, full, cramped } = movementClearance(token, base, !!options.preview);
-    const climb = CLIMB_ACTIONS.has(base.action) || !climbsEnforced();
+    // Routes may reach a pending climb; the movement-area overlay still marks it as conditional.
     const key = `${clearanceKey}:${climb}`;
     const prior = hexFields.get(token);
     if (prior?.key === key && prior.actor === token.actor?.system) return prior;
@@ -409,7 +409,7 @@ export function getMovementArea(token: Token.Implementation, center: Point, budg
     const action = CONFIG.Token.movement.actions[base.action];
     if (action.teleport || !action.walls) return { result: [], promise: Promise.resolve([]), cancel() {} };
     const entry = movementLatticeMode() === "hex"
-        ? movementHexField(native, base, { preview: true })
+        ? movementHexField(native, base, { preview: true }, ["climb", "fly", "blink", "displace"].includes(base.action))
         : movementMap(native, base, { preview: true });
     const key = `${center.x}:${center.y}:${budget}:${debug}`;
     const prior = areas.get(native);
@@ -496,6 +496,10 @@ export function activateGridlessRouting(): void {
     };
     const original = prototype.findMovementPath;
     prototype.findMovementPath = function (points, options = {}): Job<Waypoint[]> {
+        if(forcedMovementHeld() || points.some(point=>point.action==="codex-forced")) {
+            return original.call(this,points.map(point=>({...point,action:"codex-forced"})),
+                {...options,constrainOptions:{...options.constrainOptions,ignoreCost:true}});
+        }
         if (!isGridlessActive() || options.constrainOptions?.ignoreWalls || options.constrainOptions?.ignoreCost) {
             return original.call(this, points, options);
         }

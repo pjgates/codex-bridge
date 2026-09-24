@@ -1,0 +1,21 @@
+import {afterEach,expect,it,vi} from 'vitest';
+import {activateExplorationNotices} from '../../../src/rulesets/sf2e/movement/exploration-notices.js';
+afterEach(()=>vi.unstubAllGlobals());
+it('posts one small notice for a completed unchecked climb, and honours the setting',async()=>{
+ let enabled=true;const callbacks:Record<string,Function>={},create=vi.fn();
+ vi.stubGlobal('Hooks',{on:(key:string,fn:Function)=>callbacks[key]=fn});
+ vi.stubGlobal('foundry',{utils:{escapeHTML:(s:string)=>s}});vi.stubGlobal('ChatMessage',{create});
+ vi.stubGlobal('game',{user:{id:'gm'},users:{activeGM:{id:'gm'},get:()=>undefined},settings:{get:(_n:string,k:string)=>k==='explorationMovementNotices'?enabled:k==='terrainCheckOverride'?'':!['climbOutsideCombat','swimOutsideCombat'].includes(k)}});
+ const origin={x:0,y:0,elevation:0,level:'upper'},end={...origin,x:100,elevation:20,action:'climb'};
+ const token={uuid:'t',name:'Bob',movement:{id:'m'},parent:{id:'s',grid:{units:'ft'},regions:[]},measureMovementPath:()=>({waypoints:[{distance:0},{distance:20}]}),getMovementOrigin:(p:object)=>p};
+ const move={id:'m',origin,passed:{waypoints:[end]},pending:{waypoints:[]}};
+ activateExplorationNotices();await callbacks.moveToken(token,move,{}, {id:'p'});await callbacks.moveToken(token,move,{}, {id:'p'});
+ expect(create).toHaveBeenCalledTimes(1);expect(create).toHaveBeenCalledWith(expect.objectContaining({content:'<p>Bob climbs 20 ft.</p>'}));
+ token.movement.id='root';const partial={...move,id:'root',pending:{waypoints:[end]}};
+ await callbacks.moveToken(token,partial,{}, {id:'p'});await callbacks.moveToken(token,partial,{}, {id:'p'});
+ expect(create).toHaveBeenCalledTimes(1);
+ token.movement.id='continuation';
+ await callbacks.moveToken(token,{...move,id:'continuation',chain:['root'],passed:{waypoints:[{...end,action:'swim'}]}},{},{id:'p'});
+ expect(create).toHaveBeenLastCalledWith(expect.objectContaining({content:'<p>Bob climbs 20 ft and swims 20 ft.</p>'}));
+ enabled=false;token.movement.id='n';await callbacks.moveToken(token,{...move,id:'n'},{},{id:'p'});expect(create).toHaveBeenCalledTimes(2);
+});

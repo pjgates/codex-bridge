@@ -11,10 +11,26 @@
 
 
 declare global {
+    interface FlagConfig {
+        Combatant: {"codex-foundry"?: {swimSuccessRound?: number}};
+    }
 
     // ─── Module Settings Registration ────────────────────────────────────
 
     interface SettingConfig {
+        "codex-foundry.climbOutsideCombat": boolean;
+        "codex-foundry.swimOutsideCombat": boolean;
+        "codex-foundry.terrainCheckOverride": string;
+        "codex-foundry.enableClimbing": boolean;
+        "codex-foundry.surfaceFading": boolean;
+        "codex-foundry.coveredTokenOutlines": boolean;
+        "codex-foundry.enableSwimming": boolean;
+        "codex-foundry.explorationMovementNotices": boolean;
+        "codex-foundry.enableFalling": boolean;
+        "codex-foundry.enableForcedMovement": boolean;
+        "codex-foundry.enableFlightUpkeep": boolean;
+        "codex-foundry.movementOutcomeMode": "advisory" | "apply";
+        "codex-foundry.settingsVersion": number;
         "codex-foundry.enableCustomRules": boolean;
         "codex-foundry.enableStatblockImporter": boolean;
         "codex-foundry.enableTargetHelper": boolean;

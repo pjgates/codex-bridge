@@ -1,13 +1,13 @@
 # Regions and movement consolidation
 
-Status: core design approved by the user on 2026-09-21; configuration requirements confirmed and added in the [configuration supplement](CONFIGURATION.md). Implementation has not started.
+Status: core design approved by the user on 2026-09-21; configuration requirements confirmed and added in the [configuration supplement](CONFIGURATION.md). Implementation and independent review complete; final runtime evidence is maintained in [the verification record](../../../testing/regions-movement.md).
 
 ## Objective and confirmed decisions
 
 Codex Foundry owns region semantics and PF2e/SF2e elevation movement. Map Workshop produces geometry and imports scenes, and remains useful without Codex. Existing maps retain their meaning through compatible registration or migration.
 
 - Pause at consequential transitions, offer applicable checks/reactions, then apply the resolved movement, damage and conditions.
-- Store optional Climb and Grab an Edge DCs on regions; ask the GM when the necessary DC is absent.
+- Store Climb/Grab an Edge DCs on floor behaviours and Swim DCs on water behaviours, with terrain presets and custom overrides; ask the GM when terrain is unspecified. The approved exploration extension adds separate outside-combat switches and a temporary GM scene-session override.
 - Find supporting surfaces across native Foundry v14 Scene Levels, using absolute scene elevation.
 - When no landing surface is mapped, pause for a GM ruling; a level base is not proof of ground.
 - Mark forced movement explicitly through a held drag modifier and a macro API. Ordinary GM dragging does not imply forced movement.
