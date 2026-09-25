@@ -11,6 +11,7 @@ Codex Foundry supplies generic sensory channels, selective glow rendering, and s
 - Tiles choose the same world Effect item and have their own rank.
 - Existing applications follow edits to the world Effect's sensory settings. An actor's effect counter or a tile's rank remains individual.
 - Signals can be configured to remain perceptible through walls; material thickness is not modelled.
+- Cross-floor perception is required. Read emitters across all levels of the current scene, including levels that are not rendered, and include vertical separation in range.
 - The initial visual representation is an indistinct glow. Greater signal strength produces a brighter glow, rather than revealing token or tile artwork.
 
 ## Approach
@@ -69,11 +70,11 @@ A viewpoint requires all of the following on the current client:
 
 Do not infer eligibility from token visibility, assigned character, Observer permission, or an Effect carried by some other owned actor. Apply the same selection requirement to the GM's gameplay view; GM privileges do not automatically enable all signals or audio. Foundry's native permission rules determine ownership for a GM. The explicit native sound-configuration preview is a separate authoring operation described below.
 
-For visual perception, test each eligible viewpoint against each matching emitter. A signal is perceptible if at least one viewpoint qualifies for that emitter's position. Draw an emitter's glow once; multiple viewpoints do not add brightness. Never combine one token's eligibility with another token's position or longer range.
+For visual perception, test each eligible viewpoint against each matching emitter across the current scene's levels. A signal is perceptible if at least one viewpoint qualifies for that emitter's position. Draw an emitter's glow once; multiple viewpoints do not add brightness. Never combine one token's eligibility with another token's position or longer range.
 
-For tagged sounds, use only the eligible matching listeners in the native spatial audio calculation. Several listeners do not multiply volume or start duplicate playback. Ordinary ambient sounds keep their native listeners and playback behaviour.
+For tagged sounds, use only the eligible matching listeners in the native spatial audio calculation. Retain listener elevation and native level context; do not flatten listeners onto the viewed floor. Several listeners do not multiply volume or start duplicate playback. Ordinary ambient sounds keep their native listeners and playback behaviour.
 
-Deselecting a token, changing ownership, removing or expiring an Effect, lowering a rank, disabling a capability, changing a definition, or leaving the scene removes the affected contribution. Recheck eligibility before applying asynchronous results so an earlier eligible state cannot restore a glow or sound after revocation.
+Deselecting a token, changing ownership, removing or expiring an Effect, lowering a rank, disabling a capability, changing a definition, or leaving the scene removes the affected contribution. Moving or changing elevation/level recomputes range and directional cues. Viewing another floor refreshes the projected overlay without granting a viewpoint; tokens that are no longer selected contribute nothing. Recheck eligibility before applying asynchronous results so an earlier eligible state cannot restore a glow or sound after revocation.
 
 ## Visual contract
 
@@ -83,16 +84,23 @@ An observer does not see its own token's emission through this overlay. Another 
 
 Strength maps monotonically to brightness with a bounded display intensity. It does not enlarge perception range or illuminate surrounding terrain. Use a diffuse marker at a token's occupied position or a tile's transformed footprint, without exposing its artwork. Respect a tile's configured region clipping when shaping the glow.
 
-Two conservative boundaries are proposed for initial review:
+### Cross-floor geometry and presentation
 
-- GM-hidden token and tile documents do not emit player-visible glows. This is separate from PF2e Hidden or Undetected conditions; the module does not globally change those conditions.
-- Glow rendering covers the active Foundry scene level. It does not reveal objects on another level or infer cross-floor detection. Range is measured in that level's scene plane, using the scene's distance scale.
+Read candidates from the scene's token and tile documents, not only the current canvas placeables. Off-level emitters must work without a rendered token or tile object. Derive token positions from native document geometry, and tile positions and clipping from persistent document geometry. Native level visibility and ordinary line of sight must not suppress a wall-ignoring signal.
 
-These boundaries must be accepted or revised during spec review before implementation. Ordinary blinded/deafened conditions do not automatically suppress a custom channel: its rules are defined by the configured Effect, and existing rule elements can control that Effect. This feature visualises an imprecise signal; per-observer Hidden flat-check and targeting automation are outside its scope.
+Measure glow range as straight-line three-dimensional distance: convert horizontal scene-pixel displacement to scene distance units, then include the difference between absolute document elevations. Do not add a level's base to a token elevation that is already absolute, substitute a level index for elevation, or compare raw pixels with scene units. A signal directly 20 feet above a viewer is 20 feet away, not zero feet away.
+
+Project a detected off-level emitter at its scene x/y position on the current map. Include a small above/below cue so it cannot be mistaken for an object on the viewer's floor; do not reveal a level name, exact height, artwork, or map geometry. For multiple eligible viewpoints, use the nearest qualifying viewpoint for this cue, with stable token UUID ordering to break ties. The range and capability must qualify on that same viewpoint.
+
+Wall-ignoring perception passes through walls, ceilings, and floors. Do not treat a level boundary or background image as an additional barrier. When wall blocking is enabled, use Foundry's cross-level collision semantics; do not invent material thickness or change ordinary sight. The cross-floor overlay does not grant level navigation access or alter Foundry's level visibility configuration.
+
+GM-hidden token and tile documents remain excluded from player-visible glows as a proposed boundary for spec review. This is separate from PF2e Hidden or Undetected conditions; the module does not globally change those conditions. Ordinary blinded/deafened conditions do not automatically suppress a custom channel: its rules are defined by the configured Effect, and existing rule elements can control that Effect. This feature visualises an imprecise signal; per-observer Hidden flat-check and targeting automation are outside its scope.
 
 ## Audio contract
 
 A tagged sound can play only when a selected, owned token has matching hearing capability at the required rank and qualifies under the sound's native spatial settings. Players without such a listener hear none of that sound.
+
+Cross-floor tagged audio follows the native sound's configured elevation, level coverage, and wall behaviour. A sound being on an unrendered level is not by itself a reason to omit it: use scene sound documents and native source geometry as needed. This requirement does not make every sound pass through floors or replace its native attenuation with the glow's range rule.
 
 Filter listeners before calculating the sound's spatial playback, rather than merely toggling audibility because some eligible actor exists. A nearby ineligible token must not supply the distance, volume, or wall result for a distant eligible token. Exclude flagged sounds from ungated playback before scheduling their eligible playback; there must be no initial burst or refresh race that exposes them to an ineligible client.
 
@@ -111,10 +119,11 @@ The detailed implementation plan follows written-spec approval. The delivery ord
 1. Define the shared sensory model and resolve selected owned viewers and application ranks.
 2. Add the Effect sensory editor and canonical-reference handling for native application.
 3. Add tile Effect bindings and emission resolution.
-4. Render selective glows for tokens and tiles, with scene lifecycle cleanup.
-5. Add the Ambient Sound Effect picker.
-6. Gate tagged audio using eligible listener positions and handle definition/selection changes.
-7. Complete the native workflow documentation and record GM/player runtime evidence.
+4. Resolve three-dimensional signal range across scene levels, including off-level document geometry.
+5. Render selective glows for tokens and tiles, including above/below cues and scene lifecycle cleanup.
+6. Add the Ambient Sound Effect picker.
+7. Gate tagged audio using eligible listener positions and handle definition/selection changes.
+8. Complete the native workflow documentation and record GM/player runtime evidence.
 
 Each slice has one concern, targets roughly 200 changed code/test lines, and splits before exceeding 400. Tests accompany the owning behaviour. Preserve unrelated movement work and existing module features.
 
@@ -128,9 +137,10 @@ Focused tests cover:
 - Shared definition edits with unchanged individual ranks; expired/removed applications and unresolved definitions.
 - Emit-only and receive-only Effects sharing a channel; fixed and rank-derived strength; strongest-emission deduplication.
 - Tile bindings, transformed/clipped footprints, and wall-blocked versus wall-ignoring glows without ordinary map revelation.
+- Above/below emitters on unrendered levels, vertical-only and diagonal range boundaries, absolute elevations, and different nearest qualifying viewers. Native level visibility must not erase eligible signals.
 - Correct eligible listener position, ordinary sounds remaining ordinary, same-file private/public sources, and revocation during pending audio work.
 
-Verify end to end in a disposable Foundry v14 PF2e scene using separate GM, owner, and non-owner player clients. Record the installed core and system versions; the local PF2e source checkout is evidence about interfaces, not proof of the installed runtime. Use two owned tokens, another user's token, a wall and unexplored fog, a clipped crystal/water tile, and tagged and ordinary sounds. Apply the world Effect through the native workflow, change its sensory settings and individual ranks, select/deselect tokens, revoke ownership, expire/remove the Effect, change scenes, and reload clients. Confirm both persistence and immediate removal of private contributions.
+Verify end to end in a disposable Foundry v14 PF2e scene using separate GM, owner, and non-owner player clients. Record the installed core and system versions; the local PF2e source checkout is evidence about interfaces, not proof of the installed runtime. Use two owned tokens, another user's token, a wall and unexplored fog, a clipped crystal/water tile, and tagged and ordinary sounds. Include emitters on unrendered levels above and below the viewer, including one directly overhead; verify three-dimensional range and cues without exposing another floor's artwork or granting level navigation. Check cross-floor tagged audio against the native sound's configured elevation/level coverage. Apply the world Effect through the native workflow, change its sensory settings and individual ranks, select/deselect tokens, revoke ownership, expire/remove the Effect, change levels and scenes, and reload clients. Confirm both persistence and immediate removal of private contributions.
 
 Capture screenshots and audio/playback observations with browser console output in `docs/testing/sensory-effects.md` during implementation. Browser autoplay restrictions and disabled audio are reported as test-environment issues, not mistaken for successful gating. Do not mutate live campaign scenes to obtain verification.
 
@@ -142,3 +152,4 @@ The feature is complete only when in-game configuration, actor and tile applicat
 - Existing module Tile sheet configuration and clipping: `src/canvas/clip-tiles/config.ts` and `clip.ts`.
 - Local PF2e implementation: `/Users/peterg/code/pf2e/src/module/item/base/document.ts` records copy provenance; `item/effect/document.ts` provides badges and expiry; `scene/token-document/document.ts` rebuilds native detection modes.
 - Foundry v14 [AmbientSound synchronization](https://foundryvtt.com/api/v14/classes/foundry.canvas.placeables.AmbientSound.html#sync), [listener positions and spatial synchronization](https://foundryvtt.com/api/v14/classes/foundry.canvas.layers.SoundsLayer.html), and [document flags and ownership](https://foundryvtt.com/api/v14/classes/foundry.documents.BaseItem.html).
+- Foundry v14 [scene level access](https://foundryvtt.com/api/v14/classes/foundry.documents.Scene.html#availableLevels), [Level documents](https://foundryvtt.com/api/v14/classes/foundry.documents.Level.html), and [native token document geometry](https://foundryvtt.com/api/v14/classes/foundry.documents.BaseToken.html#getCenterPoint) distinguish scene-wide stored geometry from the currently rendered level. Existing `src/rulesets/sf2e/flying/height.ts` and `gridless/floors.ts` already query across scene levels.
