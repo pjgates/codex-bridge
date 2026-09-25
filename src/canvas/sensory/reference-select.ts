@@ -11,5 +11,6 @@ export function sensoryReferenceSelect(currentUuid: string): HTMLSelectElement {
     if (currentUuid && !Array.from(select.options).some(node => node.value === currentUuid)) {
         option(currentUuid, `${game.i18n!.localize(`${MODULE_ID}.sensory.missing`)} (${currentUuid})`);
     }
+    select.value = currentUuid;
     return select;
 }

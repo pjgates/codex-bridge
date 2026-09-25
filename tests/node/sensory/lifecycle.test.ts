@@ -19,19 +19,24 @@ it("removes actual overlay output on deselection, ownership loss and teardown wi
     let queued: (() => void) | undefined;
     const layer = new Container();
     const viewer = token("Token.viewer"), target = token("Token.upper", { x: 150, elevation: 20, levelId: "upper" });
+    Object.assign(viewer.actor, { type: "character" });
     const selected = [{ document: viewer }];
+    const mesh = { unoccludedAlpha: 0.8, occludedAlpha: 0.2 };
+    const tile = { document: { flags: { "codex-foundry": { sensoryVisibility: { effectUuid: "Item.signal", minRank: 2 } } } }, mesh, renderFlags: { set: vi.fn() } };
     const world = { uuid: "Item.signal", type: "effect", flags: { "codex-foundry": { sensory: definition() } } };
     vi.stubGlobal("PIXI", { Container, Graphics, filters: { BlurFilter: class { destroy() {} } } });
     vi.stubGlobal("Hooks", { on: (name: string, fn: any) => { hooks[name] = fn; } });
     vi.stubGlobal("game", { user: { id: "viewer" }, items: new Map([["signal", world]]), audio: { locked: true } });
-    vi.stubGlobal("canvas", { ready: true, interface: layer, tokens: { controlled: selected }, dimensions: { distancePixels: 10 },
+    vi.stubGlobal("canvas", { ready: true, tiles: { placeables: [tile] }, interface: layer, tokens: { controlled: selected }, dimensions: { distancePixels: 10 },
         scene: { tokens: [viewer, target], tiles: [], regions: new Map() } });
     vi.stubGlobal("requestAnimationFrame", (fn: () => void) => { queued = fn; return 1; });
     vi.stubGlobal("cancelAnimationFrame", () => { queued = undefined; });
     const flush = () => { const fn = queued; queued = undefined; fn?.(); };
     activateSensoryCanvas(); hooks.controlToken?.(); flush();
     expect(layer.children.flatMap(child => child.children)).toHaveLength(1);
-    selected.length = 0; hooks.controlToken(); flush();
+    selected.length = 0; hooks.controlToken();
+    expect(mesh.unoccludedAlpha).toBe(0); expect(mesh.occludedAlpha).toBe(0);
+    flush();
     expect(layer.children.flatMap(child => child.children)).toHaveLength(0);
     selected.push({ document: viewer }); viewer.actor.testUserPermission = () => false;
     hooks.updateActor(); flush();

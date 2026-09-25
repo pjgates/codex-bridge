@@ -24,7 +24,7 @@ it("closes audible output synchronously when real selection callbacks revoke the
     vi.stubGlobal("CONFIG", { Canvas: { soundSourceClass: Source } });
     vi.stubGlobal("foundry", { utils: { deepClone: structuredClone } });
     vi.stubGlobal("game", { user: { id: "viewer" }, items: new Map([["signal", world]]), audio: { locked: false, environment: {}, create: () => node } });
-    vi.stubGlobal("canvas", { ready: true, scene: { sounds: [sound], levels: new Map([["upper", { id: "upper", elevation: { bottom: 20, top: 40 } }]]) }, tokens: { controlled: selected }, darknessLevel: 0,
+    vi.stubGlobal("canvas", { ready: true, tiles: { placeables: [] }, scene: { sounds: [sound], levels: new Map([["upper", { id: "upper", elevation: { bottom: 20, top: 40 } }]]) }, tokens: { controlled: selected }, darknessLevel: 0,
         level: { id: "middle" }, inferLevelFromElevation: () => ({ id: "middle" }), sounds: { sources: sourceCollection, _configurePlayback() {} } });
     vi.stubGlobal("requestAnimationFrame", () => 1); vi.stubGlobal("cancelAnimationFrame", () => {});
     activateSensoryCanvas(); hooks.controlToken?.();

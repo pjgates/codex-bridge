@@ -5,6 +5,7 @@ import { clearSensoryGlows, renderSensoryGlows } from "./glow.js";
 import { selectedObservers } from "./observers.js";
 import type { SensoryTokenDocument, SensoryUser } from "./types.js";
 import { clearSensoryAudio, refreshSensoryAudio } from "./audio.js";
+import { refreshSensoryTileVisibility } from "./tile-visibility.js";
 let registered: typeof Hooks | null = null;
 let frame: number | null = null;
 let generation = 0;
@@ -16,6 +17,7 @@ export function refreshSensoryGlows(): void {
         canvas.dimensions!.distancePixels, nativeSensoryWallBlocks));
 }
 function schedule(): void {
+    refreshSensoryTileVisibility();
     refreshSensoryAudio();
     if (frame !== null) return;
     const current = generation;
