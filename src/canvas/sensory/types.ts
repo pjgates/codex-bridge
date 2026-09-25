@@ -21,3 +21,11 @@ export interface SensoryItem {
     type: string; flags: unknown; sourceId?: string | null; isExpired?: boolean;
     badge?: { type: string; value?: unknown } | null;
 }
+export interface SensoryUser { id: string }
+export interface SensoryTokenDocument {
+    uuid: string; level: string; hidden: boolean;
+    actor: { items: Iterable<SensoryItem>; testUserPermission(user: SensoryUser, permission: "OWNER"): boolean } | null;
+    getCenterPoint(): { x: number; y: number; elevation: number };
+    getListenerPosition(): { x: number; y: number; elevation: number };
+    getSize(): { width: number; height: number };
+}
