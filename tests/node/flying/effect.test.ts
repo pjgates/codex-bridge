@@ -69,3 +69,11 @@ describe("movement action sync", () => {
         expect(token.update).not.toHaveBeenCalled();
     });
 });
+
+it('serializes takeoff and landing when the actor write is still pending',async()=>{
+ const {setFlying}=await import('../../../src/rulesets/sf2e/flying/effect.js');
+ let finish!:()=>void;const delayed=new Promise<void>(resolve=>finish=resolve);
+ const actor={items:[] as any[],getActiveTokens:()=>[],async createEmbeddedDocuments(_type:string,docs:any[]){await delayed;actor.items.push({...docs[0],delete:async()=>{actor.items.length=0;}});}};
+ const takeoff=setFlying(actor,true,true),landing=setFlying(actor,false,true);
+ finish();await Promise.all([takeoff,landing]);expect(isFlying(actor)).toBe(false);
+});

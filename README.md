@@ -83,18 +83,60 @@ An optional setting for PF2e and SF2e gridless scenes. Gridded scenes keep their
 - Terrain uses Region behaviors that modify movement costs, labeled **Difficult Terrain** in PF2e/SF2e.
 - Prepared abilities that ignore all difficult or greater difficult terrain also affect gridless movement costs.
 - Hex search and reachable outlines charge terrain cost on every CELL step. Straightening preserves cheaper terrain detours using sampled terrain costs.
-- Routing stays on the current elevation and level. Explicit vertical transitions, teleportation, and unconstrained movement retain native behavior.
+- Horizontal routing searches the current level. The movement resolver handles consequential elevation transitions; explicit teleportation retains native behavior.
 
-### Floors (map-workshop caves)
+### Regions and movement
 
-Scenes imported by the Map Workshop Importer carry `setElevation` floor regions. Codex Foundry applies their heights on every such scene, gridless or not:
+Floors now support an additive **Surface Geometry** behaviour. Add it to the same region as **Set Floor Elevation**: choose **Solid terrain** for a continuous ledge, or a finite **Solid bridge / balcony** or **Grated catwalk** with an authored underside. Thickness is the floor top minus underside; the top and DCs remain on the floor behaviour. Foundry-authored thickness can use fractional feet. Missing, disabled or conflicting geometry asks for a GM ruling instead of assuming a wall extends to the landing. Climb Speed and waived exploration checks do not create a face across open air.
 
-- Entering a floor inserts its height into the path at the entry point. A rise of one 2.5-foot step or any descent is free.
-- A higher rise is a climb: by default the token goes up, takes the new height, and the Climb roll is prompted. Climb, Fly, Blink, and Displace may take any rise without question.
-- **Refuse climbs on foot** (world setting, off by default) instead stops a walking-type move at the ledge with a warning.
-- Tokens dropped onto the map land at the floor under them.
-- **Prompt checks for ledges and gaps** (world setting, on by default): a move that climbs or drops more than one tread posts the system's Climb (Athletics) roll, and a move through a squeeze-width gap posts Squeeze (Acrobatics). The move still happens; the GM reads the result against the DC the terrain warrants.
-- On gridless scenes in hex lattice mode, the drag label previews the planned height at each waypoint, marks waypoints past a refused ledge, and the reachable ring and automatic routes stop at ledges the current movement action cannot climb.
+Workshop format7 preserves this geometry. Existing scene migration preserves IDs/data and recognizes the importer geometry subtype, but does not infer thickness for old maps. Re-export/import creates a new scene rather than repairing an existing campaign scene. After saving geometry, use **Configure native visibility…** to preview/apply a native plane. Explicitly select any old native surface to adopt; unrelated blockers stay unchanged and are reported. Adopted sound settings remain on the source, while sight/light follow the floor-height companion. Enabled definitions reconcile on GM edits. Artwork fading defaults to off. Enable **Fade suspended surface artwork by default** in module settings, or choose **Module default / Off / On** under a region’s Surface Geometry → Configure native visibility → Artwork fading. Manual Occlusion edits on its managed native companion save the same override and survive reloads. Sight/light restrictions remain independent. **Outline visible tokens beneath artwork** is a client setting: active PC sight can reveal a cyan token silhouette and elevation relative to the viewed level, without revealing hidden or unseen creatures. GM Vision must be off and a PC controlled to preview this as GM. Workshop exports separate deck fill and a faint outline; native occlusion fades the fill when a visible creature is below, including when viewing from above. See [surface verification and remaining acceptance](docs/testing/surface-visibility.md).
+
+Codex owns **Set Floor Elevation (map workshop)** and **Water (map workshop)**. These data-only behaviours work independently of the importer. The importer uses Codex types when available, or retains inert legacy data when used alone.
+
+With **Apply resolved outcomes**, **Travelling** prefers walking, uses prepared Climb/Swim Speeds for ordinary authored terrain, and uses an available Fly Speed when needed. Climb presets through Expert and calm/flowing water waive ordinary checks; custom, unspecified and harder terrain retain the decision workflow. Explicit movement actions and forced movement keep their own rules. Flight never substitutes for swimming underwater.
+
+**Climbing** and **Swimming** effects show token icons while those states persist, with GM **Toggle Climbing** and **Toggle Swimming** macros for rulings. Automatic tracking follows the corresponding feature switch and Apply mode. Special Speeds remove the associated Off-Guard penalty while retaining the status. Combat Climber and Underwater Marauder are recognised; speed changes refresh the effects. Other sources of Off-Guard remain intact. Quick Swim adjusts resolved progress, and Combat Climber permits one occupied hand. Swimming marks the movement state; it does not apply the system’s full Aquatic Combat package.
+
+Under **Configure Settings → Codex Foundry**, settings are grouped into Rules, Movement and terrain, Gridless combat, Imports and sync, and Diagnostics. **Enable Custom Rules** controls rules; Vault Sync and statblock import retain independent switches. Upgrades preserve disabled preferences. **Movement outcomes** defaults to **Advisory**; choose **Apply after choices** to apply resolved movement, system damage and conditions.
+
+- Separate switches control climbing, swimming, falling, forced movement and flight upkeep. Flight upkeep requires falling and defaults off.
+- Native movement pauses before a climb or loss of support. The resolver finds the highest mapped floor below across native scene levels, including holes that expose another level. It never invents a floor at a level base.
+- Ordinary walking/Travelling down mapped ledges greater than 5 ft defaults to Climb down, including across levels, using the upper ledge’s Climb DC. Existing exploration-check settings and prepared Speeds apply. Forced movement and explicit falls retain fall handling; unknown landings still require a ruling.
+- Small 2.5 ft treads remain traversable. Larger climbs use the system Climb check and advance only as far as that action allows. Quick Climb and prepared climb Speed are respected. Partial climbs and caught edges get a source-marked Off-Guard condition. Continue a partial climb with Climb or Travelling; the Climbing status keeps ordinary drags in climbing mode. Successful checks move the token and report vertical progress. Failure makes no progress; critical failure triggers a fall with available reactions.
+- Set terrain presets and optional **Climb DC** / **Grab an Edge DC** on the **Set Elevation** behaviour, and **Swim terrain** / **Swim DC** on the **Water** behaviour. Custom DCs override presets. Edge DC falls back to Climb DC; unspecified terrain asks the GM. Existing region DC flags remain a fallback for legacy floor behaviours.
+- Separate **Climb checks outside combat** and **Swim checks outside combat** switches allow free ordinary exploration movement. They start enabled to preserve preferences. The GM's token-control toggle **Require terrain checks this scene session** temporarily requires both checks; it clears when that GM leaves the scene or reloads. Falls and dangerous forced movement remain guarded. **Announce unchecked exploration movement** posts one compact notice with the measured distance climbed/swum per completed move; turn it off to keep this travel silent.
+- Authored water uses system Swim checks, prepared swim Speed and action-limited progress. Calm water grants the normal automatic critical success. At turn end without a successful Swim, a private GM prompt offers sinking up to 10 ft, movement with a specified current, or no consequence. Mapped beds and native wall collision constrain those moves. Breath tracking stays manual: critical failures remind the GM of air loss, except while SF2e Automation’s environmental protection is active. Oxygen does not prevent sinking.
+- Falls offer Grab an Edge and eligible Arrest a Fall before descending. The GM confirms normal gravity and a clear landing; cancel that confirmation for creature collisions or other exceptional falls. Confirm reaction availability in the dialog and track expenditure on the sheet. Damage uses system resistances and temporary HP; Prone depends on actual applied damage.
+- Hold **F** while dragging to mark forced movement. Change the key under **Configure Controls → Codex Foundry**. Releasing it after submission retains the intent. Dangerous destinations require push/pull or explicit effect permission; forbidden destinations stop safely. Forced movement uses no voluntary movement budget and retains wall collision.
+- Water uses the local surface and depth. The GM chooses surface/swimming or bed and confirms an intentional dive. Shallow water caps the reduction; a dry bridge above the water remains solid ground.
+- Missing or ambiguous support, uncertain mitigation, blocked landings and falls longer than 500 ft require a GM ruling. **Resolve manually** moves along the requested path, bypassing terrain checks while still respecting walls and closed doors. The GM handles any additional consequences. Interrupted application enters recovery and is never automatically retried.
+- Explicit jump/teleport paths remain under their originating action's control. This feature does not validate jump distance, shove direction or effect range. Placement remains a separate operation.
+- Previews share the transition evaluator and show the safe height before unresolved outcomes. The old **Refuse climbs on foot** bypass is retired; **Prompt Squeeze checks** only controls Squeeze.
+
+To migrate existing maps, keep the importer enabled, back up the world and preview an explicit scene scope:
+
+```js
+const api = game.modules.get("codex-foundry").api;
+await api.regions.migrateLegacy({sceneUuids: [canvas.scene.uuid]});
+// After inspecting the preview:
+await api.regions.migrateLegacy({sceneUuids: [canvas.scene.uuid], apply: true});
+```
+
+Migration preserves embedded IDs, names, flags, geometry and system data, changing only the two legacy behaviour types. It is repeatable; per-scene errors are returned. Disable the importer only after all required legacy scenes are migrated.
+
+GM macros can submit an already legal forced path:
+
+```js
+await game.modules.get("codex-foundry").api.movement.forceMove({
+  tokenUuid: canvas.tokens.controlled[0].document.uuid,
+  waypoints: [{x: 1200, y: 800}],
+  danger: "allowed" // push/pull or explicit permission; otherwise "forbidden"
+});
+```
+
+Movement chat cards explain the paused transition, put relevant choices first, and replace those controls with the resolved outcome. GM controls are secondary; internal choice receipts are private and hidden, while native check rolls remain visible. Grab an Edge and Arrest a Fall show the native PF2e reaction symbol.
+
+The API returns the submission result; the movement chat request records resolution. See [runtime evidence and player checks](docs/testing/regions-movement.md).
 
 #### Heights players can read
 
@@ -111,28 +153,42 @@ On these scenes the elevation label over a token reads against the ground, not t
 
 An "Effect: Flying" item marks an airborne creature. The GM's client creates a **Toggle Flying** script macro on first load; running it with tokens selected adds the effect to their actors, or removes it from actors that already fly. Share the macro with players to let them toggle their own tokens. While the effect is present the token's movement action is Fly, so ledges and gaps never prompt Climb, and removing the effect (by macro or from the sheet) hands the action back to the system's default. Scripts can call `game.modules.get("codex-foundry").api.flying.toggleFlying({ tokenUuids })`.
 
-Flight ends when the token completes a move whose final leg used a ground action (walk, climb, swim, crawl or jump; Fly, Blink, Displace and teleports keep it airborne), or when the actor gains Prone, Unconscious, Paralyzed, Petrified or Grabbed. The token lands on the surface below across levels, or the level's base when no floor region lies there, moving to the lower level when the surface is in one. A chat card states the distance and the falling damage as an inline roll: half the effective distance in bludgeoning, nothing at 5 ft or less, Prone if any damage lands. It applies Cat Fall and Superhero Landing by skill rank, Wind Pillow, the half-damage abilities (Plumekith, Rubbery Body, Land on Your Feet) and the no-damage ones (Unbreakable-er Goblin, Current Rider, Basic Insectile Flight, Bouncy Orb Bantrid, Ash Form), and lists optional reactions the actor has (Impressive Landing, Arrest a Fall with a fly Speed, Rolling Landing). Water landings and glide feats are not modelled. Nothing is applied automatically.
+Flight loss from grounding conditions, fly-Speed loss or effect removal uses the same paused fall workflow. Flying and forced displacement preserve altitude until a landing or resolved loss of flight. Grabbed and unusual flight anatomy require GM adjudication. The optional turn-end upkeep prompt asks whether Fly was used, including stationary hovering; movement distance alone does not prove action expenditure.
 
 At the start of a flying creature's turn in an encounter, a public chat message reminds the table that it is airborne and how far above the surface below it is, measured across levels.
 
 ### Clip tiles to regions
 
-Any tile can be shown only inside a region's shape. Open the tile's configuration, appearance tab, and pick a region under **Clip to region**. The tile's texture is stencilled to that region's polygons, holes included, on every client, and follows the tile and the region as either is moved or edited. Map-workshop exports provide one region per floor height and one per water patch, so an animated water texture dropped over a pool and clipped to its water region stops at the shoreline. Clipping is visual only: overhead occlusion still uses the tile's full rectangle, so keep clipped textures at floor elevation. From a script, `game.modules.get("codex-foundry")` exposes nothing for this yet; set the flag directly:
+Open **Tile configuration → Appearance → Region masks**:
+
+- **Show inside regions** keeps artwork inside any selected region. Empty means the whole tile.
+- **Hide inside regions** cuts out every selected region, including overlapping exclusions. Exclusions take priority.
+
+Regions' holes are respected. Masks follow tile transforms and region edits, and persist across reloads. Existing single-region masks continue working without migration. Missing references remain visible in the selector so they can be removed; missing inclusion regions contribute no visible area, while missing exclusions cut out nothing.
+
+Masking changes artwork only, not movement, lighting or native overhead occlusion. Codex's covered-token outlines respect the resulting mask; native overhead occlusion still uses the tile's full rectangle, so keep clipped textures at floor elevation when they should not occlude tokens.
+
+Scripts can set the two lists directly (an explicit empty `clipRegions` list overrides the old `clipRegion` flag):
 
 ```js
-tile.document.update({ "flags.codex-foundry.clipRegion": region.id }); // "" to clear
+await tile.document.update({
+    "flags.codex-foundry.clipRegions": [islandA.id, islandB.id],
+    "flags.codex-foundry.excludeRegions": [bridge.id]
+});
 ```
 
 ### Why can't I go there?
 
 With the reachable ring on in hex lattice mode, cells just beyond the ring that the token could enter only by other means are filled red, one icon per stretch:
 
-- The **Climb action's marker**, the ladder by default, marks a ledge more than one 2.5-foot step up. Amber means the move goes ahead and prompts a Climb roll; red means climbs on foot are refused and the action must change.
+- The **Climb action's marker**, the ladder by default, marks a ledge more than one 2.5-foot step up. The marker identifies conditional movement that needs climbing resolution.
 - A **compress arrow** marks a gap too tight for the token's cramped footprint but wide enough for a Squeeze, half the cramped width. Routes do go through, at triple cost, shown in amber. It appears only where the gap leads to ground the token cannot otherwise reach, so ordinary walls stay unmarked.
 
 ### Ruler label
 
-On gridless scenes the native ruler label carries everything in one place: distance, any cramped-passage or terrain surcharge as an added cost, elevation, the action glyph, and the remaining movement for the turn. The module supplies its own waypoint-label template while Gridless Combat is on and draws only the reachable outline itself.
+With Custom Rules enabled, the native ruler label shows distance, terrain surcharge, elevation and movement-action budgets on gridless, square and hex scenes. Budgets use the relevant walk, climb, swim or fly Speed and include recorded movement on the current turn. Mixed modes count separately; check-dependent progress is labelled as an estimate on success. Unchecked exploration retains the movement types, segment distances and elevation, while hiding action budgets and remaining movement. This estimates movement actions, not actions spent elsewhere on the character sheet. Terrain transitions show the required check or ruling, with the PF2e reaction glyph for offered fall reactions. An amber pause marker identifies the safe point. Gridless Combat still controls the reachable-area outline and movement rings.
+
+Only the final tooltip is shown; intermediate waypoint markers remain. The tooltip puts movement types first with action glyphs aligned right, then distance and remaining movement, followed by elevation. Mixed routes retain their ordered segments: `Walk → Climb → Walk` above `5 ft + 10 ft + 5 ft`. A suffix such as `Climb*` means estimated progress on success; the action glyph's accessible description gives the full budget. The label stays between 160 and 240px wide. Forced movement shows a dash for zero movement actions; more than three actions shows the three-action glyph plus `+`.
 - Movement budgets require native history recording. PF2e Toolbelt's per-user **Better Movement → No History Record** option must be off.
 
 Automatic cover is this module's geometric approximation, not native PF2e/SF2e automation. Region outlines do not clip to walls.

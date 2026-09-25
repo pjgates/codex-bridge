@@ -1,10 +1,8 @@
 import { MODULE_ID } from "../../../constants.js";
-import { STEP_FEET } from "./elevation.js";
 import { isGridlessActive } from "./settings.js";
 import { isSqueezedLeg } from "./routing.js";
 
 export const SETTING_PROMPT_CHECKS = "promptMovementChecks";
-const EPSILON = 1e-6;
 
 interface CheckWaypoint { x: number; y: number; elevation: number; action: string; level?: string; width: number; height: number; shape: number; depth?: number }
 interface CheckMovement { origin: CheckWaypoint; passed: { waypoints: CheckWaypoint[] } }
@@ -16,23 +14,18 @@ function systemAction(slug: string): SystemAction | undefined {
     return system?.actions?.get(slug);
 }
 
-/** Which system actions a move calls for: Climb for any ledge taken up or down, Squeeze for a squeezed gap. */
-export function movementChecks(legs: { from: CheckWaypoint; to: CheckWaypoint; squeezed: boolean }[]): Set<"climb" | "squeeze"> {
-    const checks = new Set<"climb" | "squeeze">();
-    for (const { from, to, squeezed } of legs) {
+/** Retain Squeeze prompting; climbing is resolved by the shared transition owner. */
+export function movementChecks(legs: { from: CheckWaypoint; to: CheckWaypoint; squeezed: boolean }[]): Set<"squeeze"> {
+    const checks = new Set<"squeeze">();
+    for (const { to, squeezed } of legs) {
         const actionConfig = (CONFIG.Token.movement.actions as Record<string, { teleport?: boolean } | undefined>)[to.action];
-        if (actionConfig?.teleport || to.action === "fly" || to.action === "blink" || to.action === "displace") continue;
-        if (Math.abs(to.elevation - from.elevation) > STEP_FEET + EPSILON) checks.add("climb");
+        if (actionConfig?.teleport || to.action === "fly" || to.action === "blink" || to.action === "displace" || to.action === "codex-forced" || to.action === "codex-fall") continue;
         if (squeezed) checks.add("squeeze");
     }
     return checks;
 }
 
-/**
- * Post the system's own Climb or Squeeze action roll when a move takes a ledge or a squeeze gap.
- * Prompt only: the move proceeds and the GM reads the result. Runs after the floor rewrite, so it
- * sees exactly the path that executes.
- */
+/** Squeeze remains a prompt; it does not claim elevation movement. */
 function onPreMoveToken(token: CheckToken, movement: CheckMovement): boolean {
     if (!token.actor || !game.settings!.get(MODULE_ID, SETTING_PROMPT_CHECKS)) return true;
     const path = [movement.origin, ...movement.passed.waypoints];
@@ -43,7 +36,9 @@ function onPreMoveToken(token: CheckToken, movement: CheckMovement): boolean {
             && isSqueezedLeg(token.object!, from as never, to as never);
         return { from, to, squeezed };
     });
-    for (const slug of movementChecks(legs)) void systemAction(slug)?.use({ actors: [token.actor] });
+    for (const slug of movementChecks(legs)) {
+        void systemAction(slug)?.use({ actors: [token.actor] });
+    }
     return true;
 }
 
@@ -58,8 +53,9 @@ export function registerMovementCheckSetting(): void {
     });
 }
 
-/** Register after the floor rewrite so the hook only sees moves that will actually happen. */
+/** Register after transition interception. */
 export function activateMovementChecks(): void {
     const hooks = Hooks as unknown as { on(name: string, callback: (...args: never[]) => unknown): void };
-    hooks.on("preMoveToken", onPreMoveToken);
+    hooks.on("preMoveToken", (token: CheckToken, movement: CheckMovement, options:{codexManualMovement?:boolean}={}) =>
+        options.codexManualMovement && game.user?.isGM ? true : onPreMoveToken(token, movement));
 }

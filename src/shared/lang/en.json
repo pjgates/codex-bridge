@@ -3,12 +3,21 @@
         "settings": {
             "enableCustomRules": {
                 "name": "Enable Custom Rules",
-                "hint": "Toggle all custom rules provided by this module on or off."
+                "hint": "Enable game-rule automation. Imports, Vault Sync and region definitions have independent controls."
             },
             "enableTargetHelper": {
                 "name": "Enable Target Helper",
                 "hint": "Show per-target save rows on spell, area, and action chat cards. Required for Players Roll All Dice."
-            }
+            },
+            "groups": {
+                "rules": "Rules",
+                "movement": "Movement and terrain",
+                "gridless": "Gridless combat",
+                "utilities": "Imports and sync",
+                "diagnostics": "Diagnostics"
+            },
+            "dependencyHint": "Enable the required parent settings to use this option. Your saved preference is retained.",
+            "migrationFailed": "Settings upgrade is incomplete. Existing utility gates remain in effect; reload as GM to retry."
         },
         "degree": {
             "criticalSuccess": "Critical Success",

@@ -1,54 +1,32 @@
-<div class="waypoint-label {{cssClass}}">
-    {{#if action.img}}
-        <div class="img" style="background-image: url({{action.img}})"></div>
-    {{else if action.icon}}
-        <i class="icon {{action.icon}}" inert></i>
-    {{else if action.label}}
-        <label class="action-label">{{localize action.label}}</label>
-    {{/if}}
-    <span class="total-measurement">
-        {{~distance.total}}
-        {{#if cost.additional.total}}
-            + <span class="additional-cost">{{cost.additional.total}}</span>
-        {{/if}}
-        {{units~}}
-    </span>
-    {{#if distance.delta}}
-        <span class="delta-measurement">(
-            {{~distance.delta}}
-            {{~#if cost.additional.delta}}
-                + <span class="additional-cost">{{cost.additional.delta}}</span>
-            {{~/if~}}
-        )</span>
-    {{/if}}
-
+<div class="waypoint-label codex-waypoint {{cssClass}}">
+    <div class="codex-mode-row">
+        <strong>{{#if movementLabel}}{{movementLabel}}{{else}}{{localize action.label}}{{/if}}</strong>
+        {{#unless hideBudget}}<span class="codex-action-budget" role="img" aria-label="{{budgetDescription}}" title="{{budgetDescription}}">
+            {{#if actionCost}}<span class="action-glyph" aria-hidden="true">{{actionCost.actions}}</span>{{#if actionCost.overage}}<span class="overage" aria-hidden="true">+</span>{{/if}}
+            {{else if budgetKnown}}<span aria-hidden="true">—</span>{{else}}{{budgetLabel}}{{/if}}
+        </span>{{/unless}}
+    </div>
+    <div class="codex-measurement-row">
+        <span class="codex-distance">
+            <span aria-hidden="true">→</span>
+            <span class="total-measurement">{{#if distanceSegments}}{{#each distanceSegments}}{{#unless @first}} + {{/unless}}{{this}} {{../units}}{{/each}}{{else}}{{distance.total}} {{units}}{{/if}}{{#if cost.additional.total}} + <span class="additional-cost" title="Additional terrain cost">{{cost.additional.total}} {{units}}</span>{{/if}}</span>
+            {{#if distance.delta}}<span class="delta-measurement">({{distance.delta}}{{#if cost.additional.delta}} + {{cost.additional.delta}}{{/if}})</span>{{/if}}
+        </span>
+        {{#if remaining}}<span class="codex-remaining-movement" title="Remaining movement in this action">({{remaining}})</span>{{/if}}
+    </div>
     {{#if (and elevation (not elevation.hidden))}}
-        <i class="icon {{elevation.icon}}" inert></i>
-        <span class="total-elevation">{{elevation.total}} {{units}}</span>
-        {{#if elevation.delta}}
-            <span class="delta-elevation">({{elevation.delta}})</span>
-        {{/if}}
+        <div class="codex-elevation-row"><i class="{{elevation.icon}}" inert></i> {{elevation.total}} {{units}}{{#if elevation.delta}} ({{elevation.delta}}){{/if}}</div>
     {{/if}}
-    {{#if squeezed}}
-        <i class="icon fa-solid fa-compress codex-squeezed" inert></i>
+    {{#if terrain.paused}}
+        <div class="codex-terrain-preview">
+            {{#if terrain.reaction}}<span class="codex-reaction" role="img" aria-label="Reaction"><span class="action-glyph" aria-hidden="true">R</span></span>{{/if}}
+            <span>{{warningLabel}}{{#if (and warningLabel terrain.hint)}} · {{/if}}{{terrain.hint}}</span>
+        </div>
     {{/if}}
-    {{#if climbRefused}}
-        {{#if climbImg}}
-            <div class="img codex-climb-refused" style="background-image: url({{climbImg}})"></div>
-        {{else}}
-            <i class="icon {{climbIcon}} codex-climb-refused" inert></i>
-        {{/if}}
-    {{/if}}
-    {{#if actionCost}}
-    <span class="action-glyph">
-        {{~actionCost.actions~}}
-        {{~#if actionCost.overage}}<span class="overage">!</span>{{/if~}}
-    </span>
-    {{/if}}
-    {{#if remaining}}
-        <span class="codex-remaining-movement">{{remaining}}</span>
-    {{/if}}
-    {{#if secret}}
-        <i class="icon fa-solid fa-eye-slash" inert></i>
+    {{#if (or squeezed secret)}}
+        <div class="codex-measurement-details">
+            {{#if squeezed}}<i class="fa-solid fa-compress codex-squeezed" aria-label="Squeezing"></i>{{/if}}
+            {{#if secret}}<i class="fa-solid fa-eye-slash" aria-label="Hidden movement"></i>{{/if}}
+        </div>
     {{/if}}
 </div>

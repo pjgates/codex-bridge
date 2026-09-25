@@ -81,3 +81,9 @@ describe("endsFlight", () => {
         expect(endsFlight([], actions)).toBe(false);
     });
 });
+it('halves effective distance for Rubbery Body, including the five-foot threshold',()=>{
+ expect(fallOutcome(10,profile({abilities:abilities('rubbery-body')}))).toMatchObject({damage:0,prone:false});
+});
+it('ignores expired mitigation effects',()=>{
+ expect(fallProfile({items:[{type:'effect',name:'Ash Form',isExpired:true,system:{slug:'spell-effect-ash-form'}}],system:{}}).abilities.size).toBe(0);
+});

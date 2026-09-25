@@ -10,14 +10,14 @@ function setup() {
     const constructed = vi.fn();
     const nativeTest = vi.fn(() => true);
     class NativeRule {
-        static defineSchema() { return { predicate: "native-predicate" }; }
+        static defineSchema(): Record<string, unknown> { return { predicate: "native-predicate" }; }
         constructor(source: unknown, options: unknown) { constructed(source, options); }
         test() { return nativeTest(); }
     }
     class Field {
         label = ""; parent: object | null = null;
         constructor(public options: any) {}
-        toInput(config: any) { const input = document.createElement("input"); input.name = config.name; input.value = String(config.value ?? ""); return input; }
+        toInput(config: any): HTMLElement { const input = document.createElement("input"); input.name = config.name; input.value = String(config.value ?? ""); return input; }
         toFormGroup(_group: any, config: any) { const group = document.createElement("div"); group.append(this.toInput(config)); return group; }
     }
     class Schema extends Field {

@@ -1,0 +1,65 @@
+{
+    "TYPES": {
+        "RegionBehavior": {
+            "codex-foundry.setElevation": "Set Floor Elevation (map workshop)",
+            "codex-foundry.water": "Water (map workshop)",
+            "codex-foundry.surfaceGeometry": "Surface Geometry"
+        }
+    },
+    "codex-foundry": {
+        "regions": {
+            "setElevation": {
+                "FIELDS": {
+                    "elevation": {
+                        "label": "Floor Elevation",
+                        "hint": "Absolute floor height in scene units."
+                    },
+                    "climbPreset": {
+                        "label": "Climb terrain",
+                        "hint": "Choose the closest sample task; custom DC takes precedence."
+                    },
+                    "climbDC": {
+                        "label": "Custom Climb DC",
+                        "hint": "Optional override. Existing region DCs remain readable until replaced."
+                    },
+                    "grabEdgeDC": {
+                        "label": "Grab an Edge DC",
+                        "hint": "Optional override; otherwise uses the Climb DC."
+                    }
+                }
+            },
+            "water": {
+                "FIELDS": {
+                    "swimPreset": {
+                        "label": "Water conditions",
+                        "hint": "Calm water normally needs no roll. Unspecified terrain asks the GM."
+                    },
+                    "swimDC": {
+                        "label": "Custom Swim DC",
+                        "hint": "Optional override, including a check in calm water."
+                    }
+                }
+            },
+            "surfaceGeometry": {
+                "FIELDS": {
+                    "extent": {
+                        "label": "Material extent",
+                        "hint": "Unknown asks for a ruling. Solid continues downward; finite has an authored underside."
+                    },
+                    "underside": {
+                        "label": "Underside elevation",
+                        "hint": "Absolute feet; must be below the floor top. Leave blank for solid or unknown."
+                    },
+                    "blocksSight": {
+                        "label": "Blocks sight",
+                        "hint": "Desired native surface restriction; configure managed visibility to apply."
+                    },
+                    "blocksLight": {
+                        "label": "Blocks light",
+                        "hint": "Desired native surface restriction; sound is edited separately."
+                    }
+                }
+            }
+        }
+    }
+}

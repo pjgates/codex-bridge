@@ -1,3 +1,4 @@
+import { utilityEnabled } from "../settings/migration.js";
 import { MODULE_ID } from "../constants.js";
 import { resolveHtmlRoot } from "../shared/html.js";
 import { computeSyncPlan, actionKey, type SyncPlan } from "./plan.js";
@@ -39,8 +40,7 @@ function ensureVaultUpdateNotificationHandler(): void {
 
 function syncGatesPass(): boolean {
     if (!game.user?.isGM) return false;
-    if (!game.settings!.get(MODULE_ID, "enableCustomRules")) return false;
-    if (!game.settings!.get(MODULE_ID, SETTING_ENABLE_SYNC)) return false;
+    if (!utilityEnabled(SETTING_ENABLE_SYNC)) return false;
     return true;
 }
 

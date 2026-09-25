@@ -76,6 +76,7 @@ export default defineConfig({
                 { src: "src/sync/templates/**/*", dest: "templates/sync" },
                 { src: "src/rulesets/sf2e/gridless/templates/**/*", dest: "templates/gridless" },
                 { src: "module.json", dest: "." },
+                { src: "src/rulesets/sf2e/movement/icons/*.svg", dest: "icons" },
             ],
         }),
         // Merge per-feature lang files into a single dist/lang/en.json

@@ -496,3 +496,9 @@ it("does not treat an exact cramped fit as a squeeze", async () => {
     // Cramped surcharge only: 5 ft of the 20 ft path at double cost.
     expect(measureProposedMovement(token as unknown as Token.Implementation, path)).toBeCloseTo(25, 0);
 });
+it('keeps a forced path straight for native wall constraints instead of routing around obstacles',async()=>{
+ const {token}=setup();
+ (CONFIG.Token.movement.actions as any)['codex-forced']={walls:'move'};
+ const path=await token.findMovementPath([{x:250,y:450,action:'codex-forced'},{x:650,y:450,action:'codex-forced'}]).promise;
+ expect(path).toHaveLength(2);expect(path.every(p=>p.y===450)).toBe(true);
+});

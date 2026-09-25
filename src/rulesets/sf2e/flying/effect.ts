@@ -6,12 +6,12 @@ const MACRO_FLAG = "macro";
 const MACRO_KIND = "toggleFlying";
 
 // PF2e and Foundry shapes not represented by the type packages.
-export interface FlyingItem { id?: string; type: string; system: { slug?: string | null }; actor?: FlyingActor | null; delete(): Promise<unknown> }
+export interface FlyingItem { id?: string; type: string; system: { slug?: string | null }; actor?: FlyingActor | null; delete(options?:object): Promise<unknown> }
 export interface FlyingToken { update(changes: { movementAction: string | null }): Promise<unknown> | unknown }
 export interface FlyingActor {
     items: Iterable<Pick<FlyingItem, "type" | "system" | "delete">>;
     getActiveTokens(linked?: boolean, document?: boolean): FlyingToken[];
-    createEmbeddedDocuments(name: "Item", data: object[]): Promise<unknown>;
+    createEmbeddedDocuments(name: "Item", data: object[], options?:object): Promise<unknown>;
 }
 
 const localize = (key: string, fallback: string): string =>
@@ -45,10 +45,16 @@ export function isFlying(actor: FlyingActor | null | undefined): boolean {
     return !!flyingItem(actor);
 }
 
-export async function setFlying(actor: FlyingActor, flying: boolean): Promise<void> {
-    const item = flyingItem(actor);
-    if (flying && !item) await actor.createEmbeddedDocuments("Item", [flyingEffectData()]);
-    else if (!flying && item) await item.delete();
+const flightWrites=new WeakMap<FlyingActor,Promise<void>>();
+export function setFlying(actor: FlyingActor, flying: boolean, preserveMovementAction=false): Promise<void> {
+    // A native continuation can land before the preceding takeoff write returns.
+    const write=(flightWrites.get(actor)??Promise.resolve()).catch(()=>{}).then(async()=>{
+        const item = flyingItem(actor);
+        if (flying && !item) await actor.createEmbeddedDocuments("Item", [flyingEffectData()], {codexPreserveMovementAction:preserveMovementAction});
+        else if (!flying && item) await item.delete({codexPreserveMovementAction:preserveMovementAction});
+    });
+    flightWrites.set(actor,write);
+    return write;
 }
 
 /** Toggle flight for each distinct actor behind the given tokens. */
@@ -60,8 +66,8 @@ export async function toggleFlying(tokens: Iterable<{ actor: FlyingActor | null 
 
 /** Keep the native movement action in step with the effect, so the ruler, climb rules and checks see a flyer. */
 function onItemChange(flying: boolean) {
-    return (item: FlyingItem, _options: object, userId: string): void => {
-        if (userId !== game.user!.id || item.type !== "effect" || item.system.slug !== FLYING_SLUG || !item.actor) return;
+    return (item: FlyingItem, options: {codexPreserveMovementAction?:boolean}, userId: string): void => {
+        if (options.codexPreserveMovementAction || userId !== game.user!.id || item.type !== "effect" || item.system.slug !== FLYING_SLUG || !item.actor) return;
         for (const token of item.actor.getActiveTokens(false, true)) void token.update({ movementAction: flying ? "fly" : null });
     };
 }

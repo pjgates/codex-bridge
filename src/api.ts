@@ -1,3 +1,6 @@
+import { setTerrainStatus, hasTerrainStatus } from "./rulesets/sf2e/movement/index.js";
+import { movementFeatureEnabled } from "./rulesets/sf2e/movement/index.js";
+import { migrateLegacy,configureSurfaceVisibility } from "./canvas/regions/index.js";
 import { MODULE_ID } from "./constants.js";
 import {
     canUpdateMessage,
@@ -61,7 +64,14 @@ export interface ToggleFlyingRequest {
     readonly tokenUuids: readonly string[];
 }
 
+export interface ForceMoveRequest {
+    tokenUuid:string;
+    waypoints:{x:number;y:number;elevation?:number;level?:string}[];
+    danger:"allowed"|"forbidden";
+}
 export interface CodexFoundryApi {
+    readonly movement:{forceMove(request:ForceMoveRequest):Promise<CodexFoundryApiResult>;toggleStatus(request:{status:"climbing"|"swimming";tokenUuids:string[]}):Promise<CodexFoundryApiResult>};
+    readonly regions: { migrateLegacy: typeof migrateLegacy;configureSurfaceVisibility:typeof configureSurfaceVisibility };
     readonly flying: {
         /** Add the Flying effect to each token's actor, or remove it from actors that already fly. */
         toggleFlying(request: ToggleFlyingRequest): Promise<CodexFoundryApiResult>;
@@ -269,6 +279,37 @@ async function invokeCreatedMessage(operation: () => Promise<string>): Promise<C
 
 export function createRuntimeApi(): CodexFoundryApi {
     return {
+        regions: { migrateLegacy,configureSurfaceVisibility },
+        movement: {
+            async toggleStatus(request) {
+                if(!isRecord(request) || !["climbing","swimming"].includes(request.status))return failure("invalid-argument","Choose climbing or swimming.");
+                if(!game.user?.isGM)return failure("unauthorized","Only a GM can toggle terrain statuses.");
+                if(!movementFeatureEnabled(request.status))return failure("disabled","This movement feature is disabled.");
+                const tokens=resolveTokens(request.tokenUuids,false);
+                if(!Array.isArray(tokens))return tokens;
+                return invoke(async()=>{for(const token of tokens) {
+                    if(!token.actor)continue;
+                    const actor=token.actor as unknown as Parameters<typeof setTerrainStatus>[0];
+                    await setTerrainStatus(actor,token.uuid,request.status,!hasTerrainStatus(actor,token.uuid,request.status));
+                }});
+            },
+            async forceMove(request) {
+                if(!isRecord(request) || typeof request.tokenUuid!=="string" || !/^Scene\.[A-Za-z0-9_-]+\.Token\.[A-Za-z0-9_-]+$/.test(request.tokenUuid) ||
+                    request.tokenUuid.length>512 || !["allowed","forbidden"].includes(request.danger) ||
+                    !Array.isArray(request.waypoints) || !request.waypoints.length || request.waypoints.length>100 ||
+                    request.waypoints.some(point=>!isRecord(point) || !Number.isFinite(point.x) || !Number.isFinite(point.y) ||
+                        (point.elevation!==undefined && !Number.isFinite(point.elevation)) || (point.level!==undefined && (typeof point.level!=="string" || !UUID_SEGMENT.test(point.level))))) {
+                    return failure("invalid-argument","Supply a token UUID, 1–100 finite waypoints and allowed or forbidden danger.");
+                }
+                if(!game.user?.isGM) return failure("unauthorized","Only a GM can force movement.");
+                if(!movementFeatureEnabled("forcedMovement")) return failure("disabled","Forced movement is disabled.");
+                const token=resolveUuid(request.tokenUuid);
+                if(!token) return failure("not-found","The token was not found.");
+                if(!hasDocumentName(token,"Token")) return failure("invalid-argument","The UUID must identify a token.");
+                const native=token as unknown as {move(waypoints:ForceMoveRequest["waypoints"],options:object):Promise<unknown>};
+                return invoke(()=>native.move(request.waypoints,{codexMovementIntent:{kind:"forced",danger:request.danger}}));
+            },
+        },
         flying: {
             async toggleFlying(request) {
                 if (!isRecord(request)) return failure("invalid-argument", "request must be an object.");
