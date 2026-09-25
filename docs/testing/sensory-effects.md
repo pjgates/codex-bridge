@@ -31,6 +31,17 @@ English locale hashes matched. JavaScript SHA-256:
 `04446670b809cf26db8edb2c0b778c9f60af24cfbba8d1a3f7ad8571174c8ede`.
 Reload clients to load the new build.
 
+Editor repair: the first browser attempt exposed Foundry's single-parent ownership
+rule for schema fields. Reusing native animation child fields prevented the Effect
+sheet from opening. The editor now constructs fresh speed/intensity/reverse fields
+from their native options; the regression fixture enforces the same ownership rule.
+All 711 tests and runtime typecheck passed. After deployment and reload, Nakondis
+Particles opened with all light controls, and selecting Light appearance persisted
+through closing/reopening. Gold, hearing rank 1 and perception rank 2/range 30 remained.
+Repair backup: `/home/ubuntu/codex-light-editor-fix-20260925-mF4Wjf/dist/`.
+Deployed JavaScript SHA-256:
+`0ea79e2c29167b7906c47af652e5b3c4565ba2258fdbd158f8bc53d556fc41d3`.
+
 Manual checks after reloading:
 
 1. On Nakondis Particles → Rules → Emit Signal, choose Light appearance, Dim 5,

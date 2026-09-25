@@ -15,20 +15,26 @@ function setup() {
         test() { return nativeTest(); }
     }
     class Field {
-        label = "";
+        label = ""; parent: object | null = null;
         constructor(public options: any) {}
         toInput(config: any) { const input = document.createElement("input"); input.name = config.name; input.value = String(config.value ?? ""); return input; }
         toFormGroup(_group: any, config: any) { const group = document.createElement("div"); group.append(this.toInput(config)); return group; }
     }
     class Schema extends Field {
-        constructor(public fields: any, options = {}) { super(options); }
+        constructor(public fields: any, options = {}) {
+            super(options);
+            for (const [name, field] of Object.entries(fields) as [string, Field][]) {
+                if (field.parent) throw Error(`${name} already belongs to a parent`);
+                field.parent = this;
+            }
+        }
         toInput(config: any) { return this._toInput(config); }
         _toInput(_config: any): HTMLElement { throw Error("SchemaField has no native input renderer"); }
     }
     const custom: Record<string, typeof NativeRule & { autogenForms: boolean }> = {};
     vi.stubGlobal("game", { pf2e: { RuleElement: NativeRule, RuleElements: { custom } } });
     vi.stubGlobal("foundry", { data: { fields: { StringField: Field, NumberField: Field,
-        BooleanField: Field, ColorField: Field, SchemaField: Schema }, LightData: { defineSchema: () => ({ ...Object.fromEntries(["dim", "alpha", "angle", "bright", "attenuation", "saturation"].map(key => [key, new Field({})])), animation: { fields: { speed: new Field({}), intensity: new Field({}) } }, negative: new Field({}) }) } }, utils: { deepClone: structuredClone } });
+        BooleanField: Field, ColorField: Field, SchemaField: Schema }, LightData: { defineSchema: () => ({ ...Object.fromEntries(["dim", "alpha", "angle", "bright", "attenuation", "saturation"].map(key => [key, new Field({})])), animation: new Schema({ speed: new Field({}), intensity: new Field({}), reverse: new Field({}) }), negative: new Field({}) }) } }, utils: { deepClone: structuredClone } });
     vi.stubGlobal("CONFIG", { Canvas: { lightAnimations: { torch: { label: "Torch" } } } });
     return { custom, constructed, nativeTest };
 }

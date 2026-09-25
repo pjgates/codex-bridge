@@ -49,7 +49,9 @@ export function registerSensoryRuleElements(): void {
             const native = foundry.data.LightData.defineSchema();
             const { alpha, angle, bright, dim, attenuation, saturation } = native;
             const animation = new AppearanceFields({
-                ...native.animation.fields,
+                speed: new NumberField(native.animation.fields.speed.options),
+                intensity: new NumberField(native.animation.fields.intensity.options),
+                reverse: new BooleanField(native.animation.fields.reverse.options),
                 type: new StringField({ nullable: true, blank: false, initial: null, label: "Animation",
                     choices: () => Object.fromEntries(Object.entries(CONFIG.Canvas.lightAnimations).map(([key, value]) => [key, value.label])) }),
             });
