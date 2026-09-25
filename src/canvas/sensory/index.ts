@@ -5,3 +5,4 @@ export { registerSensoryEffectConfig } from "./effect-config.js";
 export { registerSensoryTileConfig } from "./tile-config.js";
 export { collectEmitters } from "./geometry.js";
 export { detectGlows, nativeSensoryWallBlocks } from "./frame.js";
+export { activateSensoryCanvas, refreshSensoryGlows } from "./lifecycle.js";
