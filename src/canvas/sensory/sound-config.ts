@@ -1,12 +1,7 @@
-import type { SensorySoundDocument } from "./types.js";
 import { MODULE_ID } from "../../constants.js";
 import { resolveHtmlRoot } from "../../shared/html.js";
-import { sensoryFlag } from "./definition.js";
-import { sensoryReferenceSelect } from "./reference-select.js";
-export function hasSensorySoundAssignment(document: Pick<SensorySoundDocument, "flags">): boolean {
-    const value = sensoryFlag(document.flags, "sensoryEffect");
-    return value !== undefined && value !== "";
-}
+import { hasSensorySoundAssignment, resolveSensorySoundChannel } from "./sound-channel.js";
+export { hasSensorySoundAssignment } from "./sound-channel.js";
 let registered: typeof Hooks | null = null;
 export function registerSensorySoundConfig(): void {
     if (registered === Hooks) return;
@@ -14,18 +9,30 @@ export function registerSensorySoundConfig(): void {
     Hooks.on("renderAmbientSoundConfig", (app, html) => {
         const root = resolveHtmlRoot(html);
         if (!root || root.querySelector('[data-codex-sensory="sound"]')) return;
-        const group = document.createElement("label"); group.className = "form-group"; group.dataset.codexSensory = "sound";
-        const label = document.createElement("span"); label.textContent = game.i18n!.localize(`${MODULE_ID}.sensory.soundTitle`);
-        const current = sensoryFlag(app.document.flags, "sensoryEffect");
-        const select = sensoryReferenceSelect(typeof current === "string" ? current : "");
-        if (hasSensorySoundAssignment(app.document) && typeof current !== "string") {
-            const invalid = document.createElement("option"); invalid.value = "invalid";
-            invalid.textContent = game.i18n!.localize(`${MODULE_ID}.sensory.missing`); select.append(invalid); select.value = "invalid";
-        }
-        select.name = `flags.${MODULE_ID}.sensoryEffect`;
-        group.append(label, select);
-        const hint = document.createElement("p"); hint.className = "hint";
-        hint.textContent = game.i18n!.localize(`${MODULE_ID}.sensory.soundHint`); group.append(hint);
-        (root.querySelector("form") ?? root).append(group);
+        const section = document.createElement("fieldset"); section.dataset.codexSensory = "sound";
+        section.disabled = !app.isEditable;
+        const localize = (key: string) => game.i18n!.localize(`${MODULE_ID}.sensory.${key}`);
+        const toggleLabel = document.createElement("label"); toggleLabel.className = "form-group";
+        const toggleText = document.createElement("span"); toggleText.textContent = localize("soundTitle");
+        const enabled = document.createElement("input"); enabled.type = "checkbox";
+        enabled.checked = hasSensorySoundAssignment(app.document);
+        toggleLabel.append(toggleText, enabled);
+        const channelLabel = document.createElement("label"); channelLabel.className = "form-group";
+        const channelText = document.createElement("span"); channelText.textContent = localize("channel");
+        const channel = document.createElement("input"); channel.type = "text";
+        const channelPath = `flags.${MODULE_ID}.sensoryChannel`; channel.pattern = ".*\\S.*";
+        channel.value = resolveSensorySoundChannel(app.document) ?? "";
+        // Exactly one channel field participates in native form submission; the unchecked value explicitly clears privacy.
+        const cleared = document.createElement("input"); cleared.type = "hidden"; cleared.value = "";
+        const update = () => {
+            channel.name = enabled.checked ? channelPath : "";
+            cleared.name = enabled.checked ? "" : channelPath;
+            channel.disabled = !enabled.checked; channel.required = enabled.checked; cleared.disabled = enabled.checked;
+        };
+        enabled.addEventListener("change", update); update();
+        channelLabel.append(channelText, channel, cleared);
+        const hint = document.createElement("p"); hint.className = "hint"; hint.textContent = localize("soundHint");
+        section.append(toggleLabel, channelLabel, hint);
+        (root.querySelector("form") ?? root).append(section);
     });
 }

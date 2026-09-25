@@ -1,14 +1,11 @@
 import type { DefinitionLookup, SensoryNativeSoundSource, SensoryObserver, SensoryPlayback, SensoryPlaybackConfig, SensorySoundDocument } from "./types.js";
-import { sensoryFlag } from "./definition.js";
+import { resolveSensorySoundChannel } from "./sound-channel.js";
 export function buildSensoryAudioFrame(documents: Iterable<SensorySoundDocument>, observers: readonly SensoryObserver[], lookup: DefinitionLookup,
     sources: ReadonlyMap<string, SensoryNativeSoundSource>, configurePlayback: (config: SensoryPlaybackConfig) => void,
     preview?: { x: number; y: number; elevation: number }): Map<string, SensoryPlayback> {
     const winners = new Map<string, SensoryPlaybackConfig>();
     for (const document of [...documents].sort((a, b) => a.uuid.localeCompare(b.uuid))) {
-        const reference = sensoryFlag(document.flags, "sensoryEffect");
-        const definition = typeof reference === "string" ? lookup(reference) : null;
-        const channels = new Set(definition?.rules.map(rule => rule.channel));
-        const channel = channels.size === 1 ? [...channels][0] : null;
+        const channel = resolveSensorySoundChannel(document, lookup);
         const source = sources.get(document.uuid);
         if (!channel || !source?.active || source.data.disabled || document.hidden || !document.path || document.radius <= 0) continue;
         const listeners = preview ? [preview] : observers.filter(viewer => viewer.applications.some(app =>

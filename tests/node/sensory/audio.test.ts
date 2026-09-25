@@ -37,3 +37,22 @@ it("aggregates identical channel/file gates and isolates another channel on the 
     expect(buildSensoryAudioFrame(docs, [], lookup, sources, () => {}, { x: 10, y: 0, elevation: 20 }).size).toBe(2);
 });
 
+
+it("hears direct broadcasts on multiple channels from one Effect, independent of the sound's Effect identity", () => {
+    const listener = { rules: [
+        { key: "CodexHearSignal" as const, channel: "gold", minRank: 1 },
+        { key: "CodexHearSignal" as const, channel: "voice", minRank: 3 },
+    ] };
+    const viewer = token("viewer", { rank: 2 });
+    const gold = sound("Sound.gold"), voice = sound("Sound.voice");
+    gold.flags = { "codex-foundry": { sensoryChannel: "gold" } } as any;
+    voice.flags = { "codex-foundry": { sensoryChannel: "voice" } } as any;
+    const sources = new Map([gold, voice].map(doc => [doc.uuid, nativeSource(() => 0.5)]));
+    const output = () => [...buildSensoryAudioFrame([gold, voice], selectedObservers([viewer], owner, () => listener),
+        () => null, sources, () => {}).keys()].map(key => JSON.parse(key)[1]).sort();
+    expect(output()).toEqual(["gold"]);
+    viewer.actor.items[0].badge.value = 3;
+    expect(output()).toEqual(["gold", "voice"]);
+    listener.rules[1].channel = "changed";
+    expect(output()).toEqual(["gold"]);
+});
