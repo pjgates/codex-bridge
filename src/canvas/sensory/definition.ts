@@ -49,3 +49,11 @@ export function lookupWorldDefinition(uuid: string): SensoryDefinition | null {
     if (!item || item.uuid !== uuid || item.isEmbedded || item.pack || String(item.type) !== "effect") return null;
     return readDefinition(sensoryFlag(item.flags, "sensory"));
 }
+export function readTileBindings(raw: unknown): { effectUuid: string; rank: number }[] {
+    if (!Array.isArray(raw)) return [];
+    return raw.flatMap(value => {
+        const { effectUuid, rank } = record(value);
+        return typeof effectUuid === "string" && /^Item\.[^.]+$/.test(effectUuid)
+            && finite(rank) && Number.isInteger(rank) && rank >= 0 ? [{ effectUuid, rank }] : [];
+    });
+}
