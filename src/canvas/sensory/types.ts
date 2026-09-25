@@ -45,3 +45,13 @@ export interface SensoryPlaybackSource {
 }
 export interface SensoryPlayback { source: SensoryPlaybackSource; volume: number; muffled: boolean }
 export interface SensoryVoice { sync(playback: SensoryPlayback | null): Promise<void>; destroy(): Promise<void> }
+export interface SensoryNativeSoundSource extends SensoryPlaybackSource {
+    sourceId: string; data: { disabled: boolean; effects: object }; active: boolean;
+    origin: { x: number; y: number; elevation: number }; x: number; y: number; elevation: number;
+    getVolumeMultiplier(listener: { x: number; y: number; elevation: number }, options: { easing: boolean }): number;
+    initialize(data: object): void; add(): void; destroy(): void; resetEffects(): void;
+}
+export interface SensoryPlaybackConfig {
+    source: SensoryNativeSoundSource; listener?: { x: number; y: number; elevation: number };
+    volume: number; walls: boolean; muffled: boolean;
+}
