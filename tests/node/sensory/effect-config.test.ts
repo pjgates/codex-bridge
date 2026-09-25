@@ -1,14 +1,12 @@
 // @vitest-environment happy-dom
 import { afterEach, expect, it, vi } from "vitest";
 import { registerSensoryEffectConfig } from "../../../src/canvas/sensory/effect-config.js";
-import { registerSensoryTileConfig } from "../../../src/canvas/sensory/tile-config.js";
-import { registerSensorySoundConfig } from "../../../src/canvas/sensory/sound-config.js";
-import { definition, effect } from "./fixtures.js";
+import { effect } from "./fixtures.js";
 afterEach(() => vi.unstubAllGlobals());
 function setup() {
     const hooks: Record<string, (...args: any[]) => void> = {};
     const world = { uuid: "Item.signal", name: "<Signal>", type: "effect", isEmbedded: false, pack: null,
-        isOwner: true, flags: { "codex-foundry": { sensory: definition() } }, sheet: { render: vi.fn() } };
+        isOwner: true, system: { rules: [] }, flags: {}, sheet: { render: vi.fn() } };
     vi.stubGlobal("Hooks", { on: (name: string, callback: any) => { hooks[name] = callback; } });
     vi.stubGlobal("game", { items: new Map([["signal", world]]), i18n: { localize: (key: string) => key } });
     class Item {
@@ -20,39 +18,21 @@ function setup() {
     registerSensoryEffectConfig();
     return { hooks, world, Item };
 }
-it("submits sensory settings once and retains disabled capability values", () => {
-    const { hooks, world } = setup();
+function sheetForm() {
     const root = document.createElement("form");
+    root.innerHTML = '<section class="tab" data-tab="details"><input name="system.badge.value" value="3"></section>'
+        + '<section class="tab" data-tab="rules"><input name="system.rules.0.channel" value="alpha"></section>';
+    return root;
+}
+it("leaves world Effect editing to native rule forms without adding Details controls", () => {
+    const { hooks, world } = setup();
+    const root = sheetForm();
     const app = { item: world, isEditable: true };
     hooks.renderItemSheet?.(app, root);
-    const channel = root.querySelector<HTMLInputElement>('[name="flags.codex-foundry.sensory.channel"]');
-    expect(channel).not.toBeNull();
-    channel!.value = "beta";
-    const enabled = root.querySelector<HTMLInputElement>('[name="flags.codex-foundry.sensory.glow.enabled"]')!;
-    enabled.checked = false;
-    enabled.dispatchEvent(new Event("change", { bubbles: true }));
-    const submitted = Object.fromEntries(new FormData(root));
-    expect(submitted["flags.codex-foundry.sensory.channel"]).toBe("beta");
-    expect(submitted["flags.codex-foundry.sensory.glow.range"]).toBe("25");
-    expect(submitted).not.toHaveProperty("system.badge");
     hooks.renderItemSheet(app, root);
-    expect(root.querySelectorAll('[data-codex-sensory="effect"]')).toHaveLength(1);
-});
-it("submits both enabled and disabled capabilities as native checkbox booleans", () => {
-    const { hooks, world } = setup();
-    const root = document.createElement("form");
-    hooks.renderItemSheet({ item: world, isEditable: true }, root);
-    // Native FormDataExtended treats a checkbox with a value attribute as a valued
-    // checkbox, unless Boolean is requested. Model that engine boundary here.
-    const submitted = Object.fromEntries([...root.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')].map(input => [
-        input.name, input.hasAttribute("value") && input.dataset.dtype !== "Boolean"
-            ? (input.checked ? input.value : null) : input.checked,
-    ]));
-    expect(submitted).toEqual({
-        "flags.codex-foundry.sensory.emission.enabled": true,
-        "flags.codex-foundry.sensory.glow.enabled": true,
-        "flags.codex-foundry.sensory.glow.walls": false,
-        "flags.codex-foundry.sensory.hearing.enabled": true,
+    expect(root.querySelector('[data-codex-sensory="effect"]')).toBeNull();
+    expect(Object.fromEntries(new FormData(root))).toEqual({
+        "system.badge.value": "3", "system.rules.0.channel": "alpha",
     });
 });
 it("captures the chosen world identity through native serialization regardless of older provenance", () => {
@@ -62,7 +42,7 @@ it("captures the chosen world identity through native serialization regardless o
         ["Item.imported", "Compendium.pack.Item.original", undefined],
         ["Item.duplicate", "Item.signal", "Item.signal"],
     ]) {
-        const flags = { "codex-foundry": { sensory: definition(), ...(reference ? { sensoryDefinition: reference } : {}) } };
+        const flags = { "codex-foundry": { ...(reference ? { sensoryDefinition: reference } : {}) } };
         const chosen = new Item(uuid!, flags, sourceId);
         game.items!.set(uuid!.slice(5), { ...world, uuid, flags } as any);
         // PF2e serializes the world item, then constructs/clones data without addSource.
@@ -76,26 +56,34 @@ it("captures the chosen world identity through native serialization regardless o
     applied.isEmbedded = true;
     expect(applied.toObject().flags).toMatchObject({ "codex-foundry": { sensoryDefinition: "Item.signal" } });
 });
-it("links embedded applications to the definition and stamps native provenance without changing rank", () => {
-    const { hooks } = setup();
+it("links the canonical definition once in Rules while preserving native form controls and rank", () => {
+    const { hooks, world } = setup();
     const updateSource = vi.fn();
     const item = { ...effect(3), flags: {}, actor: {}, isEmbedded: true, updateSource };
     hooks.preCreateItem?.(item);
     expect(updateSource).toHaveBeenCalledWith({ "flags.codex-foundry.sensoryDefinition": "Item.signal" });
-    const root = document.createElement("form");
+    const root = sheetForm();
+    hooks.renderItemSheet({ item, isEditable: true }, root);
     hooks.renderItemSheet({ item, isEditable: true }, root);
     expect(root.querySelector('input[name*="sensory."]')).toBeNull();
-    expect(root.querySelector('[data-uuid="Item.signal"]')?.textContent).toContain("<Signal>");
+    const link = root.querySelector<HTMLAnchorElement>('.tab[data-tab="rules"] [data-uuid="Item.signal"]');
+    expect(link?.textContent).toContain("<Signal>");
+    link!.click();
+    expect(world.sheet.render).toHaveBeenCalledWith(true);
+    expect(root.querySelectorAll('[data-codex-sensory="effect"]')).toHaveLength(1);
+    expect(root.querySelector('.tab[data-tab="details"] [data-codex-sensory]')).toBeNull();
+    expect(root.querySelector('.tab[data-tab="rules"]')?.textContent).toContain("sensory.sharedRuleHint");
+    expect(Object.fromEntries(new FormData(root))).toEqual({
+        "system.badge.value": "3", "system.rules.0.channel": "alpha",
+    });
     expect(item.badge.value).toBe(3);
 });
 it("registers native configuration hooks once and rejects non-world application links", () => {
     const { hooks } = setup();
     const on = vi.spyOn(Hooks, "on");
     registerSensoryEffectConfig();
-    registerSensoryTileConfig(); registerSensoryTileConfig();
-    registerSensorySoundConfig(); registerSensorySoundConfig();
-    expect(on.mock.calls.map(([name]) => name)).toEqual(["renderTileConfig", "renderAmbientSoundConfig"]);
-    const root = document.createElement("form");
+    expect(on).not.toHaveBeenCalled();
+    const root = sheetForm();
     const item = { ...effect(3), flags: {}, sourceId: "Actor.signal", isEmbedded: true };
     hooks.renderItemSheet({ item, isEditable: true }, root);
     expect(root.querySelector("a")?.textContent).toContain("sensory.missing");
