@@ -126,3 +126,23 @@ Native pointer drag automation was intercepted or produced no application;
 the real system sheet drop handler was verified instead. PF2e-specific runtime
 acceptance remains outside the available SF2e test environment. Neither limit
 is presented as a successful PF2e pointer-drag test.
+
+## Execution decisions retained from the ledger
+
+These decisions are listed in execution order. No review finding or minor
+was deferred.
+
+| Decision | Cost if wrong |
+|---|---|
+| Extract leaf-task briefs into one master ledger because the index has no task headings. | Bookkeeping repair. |
+| Use the user-authorized SF2e Testing Scene for shared native contracts and disclose the actual system. | PF2e-specific integration still needs validation. |
+| Batch configuration/glow acceptance after the complete overlay was available, retaining pending status until observed. | Integration defects discovered later in the same implementation run. |
+| Respect native lazy audio routing: destination, then environment gain node, then environment destination. | Native audio routing mismatch. |
+| Split the spatial audio frame from playback orchestration to keep implementation slices small. | One extra internal import. |
+| Supply elevated preview position only from the explicit native GM preview wrapper. | Authoring preview could diverge from gameplay eligibility. |
+| Prepare the SSH dry run and review before requesting the deployment authorization excluded by the plan. | Delayed runtime testing. Authorization was subsequently granted. |
+| Regrade the clipped directional cue as Important because cross-floor signals require it. | One extra renderer container and boundary regression. |
+| Run the unchanged full suite serially after parallel CPU contention failed the existing timing benchmark. | Serial scheduling can miss test-file contention; feature concurrency assertions still execute. |
+| Resolve unseen source floors from stored levels instead of native visible-level inference. | Overlapping-level ties could differ from native placement. Native source/wall checks passed. |
+| Exercise the real sheet Effect drop handler when pointer automation was intercepted or ineffective. | Pointer integration with other installed modules remains unproved. |
+| Use the latest complete 672-test gate for delayed task completion rather than repeat identical tests for ledger formatting. | No repeated per-task completion logs; test execution and native acceptance evidence remain recorded. |
