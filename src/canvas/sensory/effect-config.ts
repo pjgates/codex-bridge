@@ -7,7 +7,10 @@ interface EffectSheetItem extends SensoryItem {
     actor?: unknown; isEmbedded: boolean; pack?: string | null;
     updateSource(changes: Record<string, unknown>): unknown;
 }
+let registered: typeof Hooks | null = null;
 export function registerSensoryEffectConfig(): void {
+    if (registered === Hooks) return;
+    registered = Hooks;
     Hooks.on("preCreateItem", (item: EffectSheetItem) => {
         if (!item.actor || item.type !== "effect") return;
         const explicit = sensoryFlag(item.flags, "sensoryDefinition");
@@ -29,7 +32,7 @@ export function registerSensoryEffectConfig(): void {
         if (item.isEmbedded) {
             const explicit = sensoryFlag(item.flags, "sensoryDefinition");
             const uuid = explicit === undefined ? item.sourceId : explicit;
-            const source = typeof uuid === "string" ? game.items?.get(uuid.slice(5)) : null;
+            const source = typeof uuid === "string" && lookupWorldDefinition(uuid) ? game.items?.get(uuid.slice(5)) : null;
             const link = document.createElement("a");
             link.dataset.uuid = typeof uuid === "string" ? uuid : "";
             link.textContent = source?.name ?? game.i18n!.localize(`${MODULE_ID}.sensory.missing`);

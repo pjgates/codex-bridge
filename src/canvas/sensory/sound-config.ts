@@ -7,7 +7,10 @@ export function hasSensorySoundAssignment(document: Pick<SensorySoundDocument, "
     const value = sensoryFlag(document.flags, "sensoryEffect");
     return value !== undefined && value !== "";
 }
+let registered: typeof Hooks | null = null;
 export function registerSensorySoundConfig(): void {
+    if (registered === Hooks) return;
+    registered = Hooks;
     Hooks.on("renderAmbientSoundConfig", (app, html) => {
         const root = resolveHtmlRoot(html);
         if (!root || root.querySelector('[data-codex-sensory="sound"]')) return;

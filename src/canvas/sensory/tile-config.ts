@@ -8,7 +8,10 @@ interface TileSheet {
     _processFormData(...args: unknown[]): { flags?: Record<string, Record<string, unknown>> };
 }
 const wrapped = new WeakSet<TileSheet>();
+let registered: typeof Hooks | null = null;
 export function registerSensoryTileConfig(): void {
+    if (registered === Hooks) return;
+    registered = Hooks;
     Hooks.on("renderTileConfig", (application, html) => {
         const app = application as unknown as TileSheet;
         const root = resolveHtmlRoot(html);

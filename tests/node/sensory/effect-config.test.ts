@@ -1,6 +1,8 @@
 // @vitest-environment happy-dom
 import { afterEach, expect, it, vi } from "vitest";
 import { registerSensoryEffectConfig } from "../../../src/canvas/sensory/effect-config.js";
+import { registerSensoryTileConfig } from "../../../src/canvas/sensory/tile-config.js";
+import { registerSensorySoundConfig } from "../../../src/canvas/sensory/sound-config.js";
 import { definition, effect } from "./fixtures.js";
 afterEach(() => vi.unstubAllGlobals());
 function setup() {
@@ -41,4 +43,16 @@ it("links embedded applications to the definition and stamps native provenance w
     expect(root.querySelector('input[name*="sensory."]')).toBeNull();
     expect(root.querySelector('[data-uuid="Item.signal"]')?.textContent).toContain("<Signal>");
     expect(item.badge.value).toBe(3);
+});
+it("registers native configuration hooks once and rejects non-world application links", () => {
+    const { hooks } = setup();
+    const on = vi.spyOn(Hooks, "on");
+    registerSensoryEffectConfig();
+    registerSensoryTileConfig(); registerSensoryTileConfig();
+    registerSensorySoundConfig(); registerSensorySoundConfig();
+    expect(on.mock.calls.map(([name]) => name)).toEqual(["renderTileConfig", "renderAmbientSoundConfig"]);
+    const root = document.createElement("form");
+    const item = { ...effect(3), flags: {}, sourceId: "Actor.signal", isEmbedded: true };
+    hooks.renderItemSheet({ item, isEditable: true }, root);
+    expect(root.querySelector("a")?.textContent).toContain("sensory.missing");
 });
