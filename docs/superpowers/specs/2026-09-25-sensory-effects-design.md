@@ -1,6 +1,6 @@
 # Generic sensory effects
 
-Status: proposed for written-spec review. The user confirmed the shared definition model and selection rules on 2026-09-25. Implementation has not started.
+Status: approved by the user on 2026-09-25, including cross-floor perception. Implementation has not started. The [implementation plan](../plans/2026-09-25-sensory-effects.md) awaits review and execution-method selection.
 
 ## Goal and confirmed decisions
 
@@ -94,7 +94,7 @@ Project a detected off-level emitter at its scene x/y position on the current ma
 
 Wall-ignoring perception passes through walls, ceilings, and floors. Do not treat a level boundary or background image as an additional barrier. When wall blocking is enabled, use Foundry's cross-level collision semantics; do not invent material thickness or change ordinary sight. The cross-floor overlay does not grant level navigation access or alter Foundry's level visibility configuration.
 
-GM-hidden token and tile documents remain excluded from player-visible glows as a proposed boundary for spec review. This is separate from PF2e Hidden or Undetected conditions; the module does not globally change those conditions. Ordinary blinded/deafened conditions do not automatically suppress a custom channel: its rules are defined by the configured Effect, and existing rule elements can control that Effect. This feature visualises an imprecise signal; per-observer Hidden flat-check and targeting automation are outside its scope.
+GM-hidden token and tile documents remain excluded from player-visible glows. This is separate from PF2e Hidden or Undetected conditions; the module does not globally change those conditions. Ordinary blinded/deafened conditions do not automatically suppress a custom channel: its rules are defined by the configured Effect, and existing rule elements can control that Effect. This feature visualises an imprecise signal; per-observer Hidden flat-check and targeting automation are outside its scope.
 
 ## Audio contract
 
