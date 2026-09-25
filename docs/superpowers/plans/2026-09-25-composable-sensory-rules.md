@@ -45,3 +45,16 @@ Each executable slice observes RED before GREEN and records actual checks. Split
 Local PF2e source: src/scripts/set-game-pf2e.ts, src/module/rules/index.ts, src/module/item/base/sheet/rule-element-form/base.ts. The public registry is game.pf2e.RuleElements.custom; autogenForms uses native schema fields. Canonical rules are reconstructed with the applied Effect as parent before native predicate evaluation.
 
 Foundry14.368 core reference: Tile._refreshMesh sets unoccludedAlpha/occludedAlpha; its color shader consumes both. The depth shader does not. refreshTile occurs after native render flags. Native mesh visibility and level filtering remain untouched. Public API: https://foundryvtt.com/api/classes/foundry.canvas.placeables.Tile.html
+
+## Execution evidence
+
+- Slices 1–5 implemented in focused commits. Behavioral RED/GREEN covered rule defaults,
+  canonical edits, native Forms assignment, safe migration, and immediate tile denial.
+- Full serial suite: 706 tests in 65 files passed before the final migration regression;
+  all 64 sensory tests/18 files passed after review fixes.
+- All three typechecks and both builds passed; lint has only the existing gridless
+  `clearance` warning. No movement changes or relaxed assertions.
+- Independent GPT-6 Astra review found two native-boundary issues: duplicate named
+  controls in FormDataExtended and loss of disabled legacy definitions' broadcast
+  channels during migration. Both were reproduced, fixed, and reviewed closed.
+- Primary personally read production changes. Build deployed at `0ebcd97`; local and remote hashes match. GM reloaded; manual player acceptance remains user-owned.

@@ -1,12 +1,62 @@
 # Sensory Effects verification
 
-## Status
+## Current revision: composable native rules
 
-The implementation is deployed from `peterg-sensory-effects`, through commit
-`4b0f7a4`. Configuration, ownership, cross-floor rendering, and private audio
-checks passed on real clients. Player-facing Unidentified visibility and the
-fog texture comparison also passed. Native acceptance is complete for the
-authorized SF2e environment described below.
+The original single-definition implementation passed native acceptance below.
+The replacement uses repeatable **Codex: Emit Signal**, **Codex: Perceive Signal**,
+and **Codex: Hear Signal** entries in the native Effect Rules tab. Ordinary rules
+can coexist. Canonical sensory edits remain shared; application counters remain individual.
+Ambient Sounds now broadcast an explicit channel. Tile Appearance also offers
+**Conditional artwork**, separate from sensory emission.
+
+Nakondis Particles remains `Item.ZLDzhzq0WaeeAreG`: channel `nakondis-particles`,
+gold `#ffd700` emission scaled by rank, hearing at rank 1, perception at rank 2
+with range 30 scene units and walls disabled. On the campaign's feet-based scene
+this is 30 feet. Native Unidentified, unlimited duration, counter, and GM-only
+world ownership are preserved. Migration reuses the existing world item.
+
+The user owns manual player acceptance for this revision. Earlier native results
+below establish the original implementation, not new artwork or Rule Element UI behavior.
+
+### Revision delivery checks
+
+- Full serial suite: 706 tests/65 files passed. After the final native form and
+  migration fixes, all 64 sensory tests/18 files passed, including the added regression.
+- All three typechecks, lint, Foundry build and dashboard build passed (the existing
+  gridless unused-`clearance` lint warning remains).
+- Independent Astra review closed both findings; the primary reviewed production changes.
+- Deployed commit `0ebcd97`; backup
+  `/home/ubuntu/codex-composable-sensory-backup-20260925-NTSXAn/dist/`.
+  Root manifest preserved. Local/remote module.js, module.css and en.json hashes match.
+  JavaScript SHA-256: `b90c3b35e120970f279e657a2f4ab5682f58cf171e786a532b4ef94dcbb54afb`.
+- GM client reloaded to run migration. Browser controls then timed out, so migration
+  persistence and the revised native UI are not yet visually confirmed. Player acceptance remains manual.
+
+### Manual acceptance
+
+1. Reload the GM and player clients. Open Nakondis Particles → Rules: confirm the
+   three Codex rules, gold colour, hearing threshold 1, perception threshold 2/range 30.
+2. In Testing Scene, apply the Effect to a PC and set its native counter to 1,
+   then 2. As its owner, select it: rank 1 hears matching private ambient broadcasts;
+   rank 2 also perceives matching glows. Deselect it: both stop. Selecting multiple
+   owned eligible tokens combines their capabilities. Selecting non-owned tokens grants nothing.
+3. Edit the world rules and confirm existing applications follow the edit without
+   changing their counters. Keep Unidentified checked to hide the application in native player UI.
+4. On a crystal tile, add Nakondis Particles plus its rank under Sensory Effects.
+   Test the glow across walls/floors within 30 feet, with an existing clipping region/hole.
+5. Separately set tile Conditional artwork to an Effect and minimum rank. Any selected
+   owned PC with that active Effect qualifies; an NPC, expired application, insufficient
+   rank, or deselection does not. Losing the last qualifier hides art immediately.
+   Qualification must not reveal art through ordinary walls/fog or another floor;
+   native hidden state, clipping, and light/weather restrictions stay effective.
+6. On an Ambient Sound, check Private sensory sound and enter `nakondis-particles`.
+   Retain its native file/radius/walls/volume. Verify owner-only hearing and same-file
+   ordinary sound independence. Uncheck to restore ordinary ambient behavior.
+
+## Original implementation acceptance (before this revision)
+
+Deployed through `4b0f7a4`. Configuration, ownership, cross-floor rendering,
+private audio, Unidentified visibility, and fog comparison passed on real clients.
 
 ## Environment and deployment
 
