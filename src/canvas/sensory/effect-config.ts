@@ -8,9 +8,27 @@ interface EffectSheetItem extends SensoryItem {
     updateSource(changes: Record<string, unknown>): unknown;
 }
 let registered: typeof Hooks | null = null;
+interface WorldCopyItem {
+    uuid: string; isEmbedded: boolean; pack: string | null;
+    toObject(...args: unknown[]): { flags: Record<string, Record<string, unknown>> };
+}
+const copyBoundaries = new WeakSet<object>();
 export function registerSensoryEffectConfig(): void {
     if (registered === Hooks) return;
     registered = Hooks;
+    const itemClass = CONFIG.Item.documentClass.prototype as unknown as WorldCopyItem;
+    if (!copyBoundaries.has(itemClass)) {
+        const serialize = itemClass.toObject;
+        itemClass.toObject = function (...args) {
+            const data = serialize.apply(this, args);
+            // PF2e world drops clone serialized data without addSource; capture identity before that clone.
+            if (!this.isEmbedded && !this.pack && lookupWorldDefinition(this.uuid)) {
+                (data.flags[MODULE_ID] ??= {}).sensoryDefinition = this.uuid;
+            }
+            return data;
+        };
+        copyBoundaries.add(itemClass);
+    }
     Hooks.on("preCreateItem", (item: EffectSheetItem) => {
         if (!item.actor || item.type !== "effect") return;
         const explicit = sensoryFlag(item.flags, "sensoryDefinition");

@@ -11,8 +11,14 @@ function setup() {
         isOwner: true, flags: { "codex-foundry": { sensory: definition() } }, sheet: { render: vi.fn() } };
     vi.stubGlobal("Hooks", { on: (name: string, callback: any) => { hooks[name] = callback; } });
     vi.stubGlobal("game", { items: new Map([["signal", world]]), i18n: { localize: (key: string) => key } });
+    class Item {
+        type = "effect"; isEmbedded = false; pack = null;
+        constructor(public uuid: string, public flags: object, public sourceId?: string) {}
+        toObject() { return { flags: structuredClone(this.flags) }; }
+    }
+    vi.stubGlobal("CONFIG", { Item: { documentClass: Item } });
     registerSensoryEffectConfig();
-    return { hooks, world };
+    return { hooks, world, Item };
 }
 it("submits sensory settings once and retains disabled capability values", () => {
     const { hooks, world } = setup();
@@ -31,6 +37,27 @@ it("submits sensory settings once and retains disabled capability values", () =>
     expect(submitted).not.toHaveProperty("system.badge");
     hooks.renderItemSheet(app, root);
     expect(root.querySelectorAll('[data-codex-sensory="effect"]')).toHaveLength(1);
+});
+it("captures the chosen world identity through native serialization regardless of older provenance", () => {
+    const { hooks, world, Item } = setup();
+    for (const [uuid, sourceId, reference] of [
+        ["Item.fresh", undefined, undefined],
+        ["Item.imported", "Compendium.pack.Item.original", undefined],
+        ["Item.duplicate", "Item.signal", "Item.signal"],
+    ]) {
+        const flags = { "codex-foundry": { sensory: definition(), ...(reference ? { sensoryDefinition: reference } : {}) } };
+        const chosen = new Item(uuid!, flags, sourceId);
+        game.items!.set(uuid!.slice(5), { ...world, uuid, flags } as any);
+        // PF2e serializes the world item, then constructs/clones data without addSource.
+        const copied = new Item("Item.unsaved", chosen.toObject().flags, sourceId).toObject();
+        expect(copied.flags).toMatchObject({ "codex-foundry": { sensoryDefinition: uuid } });
+        const updateSource = vi.fn();
+        hooks.preCreateItem({ ...effect(3), flags: copied.flags, sourceId, actor: {}, updateSource });
+        expect(updateSource).toHaveBeenCalledWith({ "flags.codex-foundry.sensoryDefinition": uuid });
+    }
+    const applied = new Item("Actor.a.Item.copy", { "codex-foundry": { sensoryDefinition: "Item.signal" } });
+    applied.isEmbedded = true;
+    expect(applied.toObject().flags).toMatchObject({ "codex-foundry": { sensoryDefinition: "Item.signal" } });
 });
 it("links embedded applications to the definition and stamps native provenance without changing rank", () => {
     const { hooks } = setup();
