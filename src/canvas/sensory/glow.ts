@@ -19,13 +19,14 @@ export function renderSensoryGlows(glows: readonly SensoryGlow[]): void {
     overlay = canvas!.interface!.addChild(new PIXI.Container()); overlay.eventMode = "none";
     for (const { emitter, direction } of glows) {
         const group = overlay.addChild(new PIXI.Container());
-        const graphics = group.addChild(new PIXI.Graphics());
+        const signal = group.addChild(new PIXI.Container());
+        const graphics = signal.addChild(new PIXI.Graphics());
         const colour = Number.parseInt(emitter.colour.slice(1), 16);
         graphics.beginFill(colour, 0.8 * emitter.strength / (1 + emitter.strength));
         drawRings(graphics, emitter.rings);
         const blur = new PIXI.filters.BlurFilter(3, 2); filters.push(blur); graphics.filters = [blur];
-        const mask = group.addChild(new PIXI.Graphics()); mask.beginFill(0xffffff);
-        drawRings(mask, emitter.rings); group.mask = mask;
+        const mask = signal.addChild(new PIXI.Graphics()); mask.beginFill(0xffffff);
+        drawRings(mask, emitter.rings); signal.mask = mask;
         if (direction) {
             const cue = group.addChild(new PIXI.Graphics());
             const { x, y } = emitter.position;
