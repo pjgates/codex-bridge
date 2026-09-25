@@ -1,9 +1,10 @@
-export interface SensoryDefinition {
+export interface LegacySensoryDefinition {
     channel: string;
     emission: { enabled: boolean; strength: "rank" | "fixed"; fixed: number; colour: string };
     glow: { enabled: boolean; minRank: number; range: number; walls: boolean };
     hearing: { enabled: boolean; minRank: number };
 }
+export interface SensoryDefinition { rules: SensoryRule[] }
 export interface SensoryApplication { definitionUuid: string; rank: number; definition: SensoryDefinition }
 export interface SensoryPosition { x: number; y: number; elevation: number; levelId: string }
 export interface SensoryRing { points: readonly { x: number; y: number }[]; hole: boolean }

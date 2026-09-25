@@ -14,7 +14,7 @@ it("measures full diagonal and vertical distance on unrendered floors", () => {
         expect(detectGlows(views, [{ ...above, position: { ...above.position, x, elevation } }], 10, () => false)
             .map(glow => glow.direction)).toEqual(expected);
     }
-    views[0].applications[0].definition.glow.walls = true;
+    Object.assign(views[0].applications[0].definition.rules[1], { walls: true });
     expect(detectGlows(views, [above], 10, () => true)).toEqual([]);
 });
 it("uses capabilities and position from the same viewer and stabilizes cue selection", () => {
@@ -32,7 +32,7 @@ it("uses capabilities and position from the same viewer and stabilizes cue selec
 it("extracts stored off-level geometry, strongest emission and clipped holes without placeables", () => {
     const source = token("Token.upper", { rank: 3, x: 100, elevation: 20, levelId: "upper" });
     source.actor.items.push(effect(1, "Item.fixed"));
-    const fixed = definition(); fixed.emission = { ...fixed.emission, strength: "fixed", fixed: 5, colour: "#abcdef" };
+    const fixed = definition(); Object.assign(fixed.rules[0], { strength: "fixed", fixed: 5, colour: "#abcdef" });
     const lookup = (uuid: string) => uuid === "Item.fixed" ? fixed : definition();
     const tree = { polygon: null, isHole: false, children: [
         { polygon: { points: [0, 0, 100, 0, 100, 100, 0, 100] }, isHole: false, children: [
@@ -54,4 +54,18 @@ it("extracts stored off-level geometry, strongest emission and clipped holes wit
     expect(collectEmitters(scene, lookup)[0].strength).toBe(5);
     source.hidden = true; scene.regions.clear();
     expect(collectEmitters(scene, lookup)).toEqual([]);
+});
+
+it("keeps channel rank, range and wall rules independent within one Effect", () => {
+    const shared = { rules: [
+        { key: "CodexPerceiveSignal" as const, channel: "alpha", minRank: 1, range: 5, walls: false },
+        { key: "CodexPerceiveSignal" as const, channel: "beta", minRank: 3, range: 100, walls: true },
+    ] };
+    const viewer = token("viewer", { rank: 2 });
+    const targets = [above, { ...above, channel: "beta" }];
+    expect(detectGlows(selectedObservers([viewer], owner, () => shared), targets, 10, () => false)).toEqual([]);
+    viewer.actor.items[0].badge.value = 3;
+    expect(detectGlows(selectedObservers([viewer], owner, () => shared), targets, 10, () => false)
+        .map(glow => glow.emitter.channel)).toEqual(["beta"]);
+    expect(detectGlows(selectedObservers([viewer], owner, () => shared), targets, 10, () => true)).toEqual([]);
 });

@@ -1,5 +1,7 @@
+import { readSensoryRules, sensoryRuleKeys } from "./rules.js";
+import { testSensoryRule } from "./rule-elements.js";
 import { MODULE_ID } from "../../constants.js";
-import type { DefinitionLookup, SensoryApplication, SensoryDefinition, SensoryItem } from "./types.js";
+import type { DefinitionLookup, SensoryApplication, SensoryDefinition, LegacySensoryDefinition, SensoryRule, SensoryItem } from "./types.js";
 
 function record(value: unknown): Record<string, unknown> {
     return value !== null && typeof value === "object" && !Array.isArray(value)
@@ -12,7 +14,7 @@ function finite(value: unknown): value is number { return typeof value === "numb
 function threshold(value: unknown): value is number { return finite(value) && Number.isInteger(value) && value > 0; }
 
 /** Decode persisted configuration once, at the document boundary. */
-export function readDefinition(raw: unknown): SensoryDefinition | null {
+export function readDefinition(raw: unknown): LegacySensoryDefinition | null {
     const { channel, emission: rawEmission, glow: rawGlow, hearing: rawHearing } = record(raw);
     const e = record(rawEmission), g = record(rawGlow), h = record(rawHearing);
     if (typeof channel !== "string" || !channel.trim()
@@ -37,7 +39,9 @@ export function resolveApplications(items: Iterable<SensoryItem>, lookup: Defini
         const definition = lookup(reference);
         if (!definition) continue;
         const rank = item.badge?.type === "counter" ? item.badge.value : 1;
-        if (threshold(rank)) applications.push({ definitionUuid: reference, rank, definition });
+        if (threshold(rank)) applications.push({ definitionUuid: reference, rank, definition: {
+            rules: definition.rules.filter(rule => !rule.predicate?.length || testSensoryRule(rule, item)),
+        } });
     }
     return applications;
 }
@@ -47,7 +51,20 @@ export function lookupWorldDefinition(uuid: string): SensoryDefinition | null {
     if (!match) return null;
     const item = game.items?.get(match[1]);
     if (!item || item.uuid !== uuid || item.isEmbedded || item.pack || String(item.type) !== "effect") return null;
-    return readDefinition(sensoryFlag(item.flags, "sensory"));
+    const raw = (item.system as unknown as { rules?: unknown } | undefined)?.rules;
+    const hasRules = Array.isArray(raw) && raw.some(rule => sensoryRuleKeys.includes(rule?.key));
+    return { rules: hasRules ? readSensoryRules(raw) : legacySensoryRules(sensoryFlag(item.flags, "sensory")) };
+}
+export function legacySensoryRules(raw: unknown): SensoryRule[] {
+    const value = readDefinition(raw);
+    if (!value) return [];
+    const { channel, emission, glow, hearing } = value;
+    const rules: SensoryRule[] = [];
+    if (emission.enabled) rules.push({ key: "CodexEmitSignal", channel,
+        strength: emission.strength, fixed: emission.fixed, colour: emission.colour });
+    if (glow.enabled) rules.push({ key: "CodexPerceiveSignal", channel, minRank: glow.minRank, range: glow.range, walls: glow.walls });
+    if (hearing.enabled) rules.push({ key: "CodexHearSignal", channel, minRank: hearing.minRank });
+    return rules;
 }
 export function readTileBindings(raw: unknown): { effectUuid: string; rank: number }[] {
     if (!Array.isArray(raw)) return [];

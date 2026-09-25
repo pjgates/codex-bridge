@@ -7,9 +7,9 @@ export function detectGlows(observers: readonly SensoryObserver[], emitters: rea
             if (viewer.tokenUuid === emitter.documentUuid) return [];
             const distance = Math.hypot((emitter.position.x - viewer.position.x) / distancePixels,
                 (emitter.position.y - viewer.position.y) / distancePixels, emitter.position.elevation - viewer.position.elevation);
-            const eligible = viewer.applications.some(({ definition, rank }) => definition.channel === emitter.channel
-                && definition.glow.enabled && rank >= definition.glow.minRank && distance <= definition.glow.range
-                && (!definition.glow.walls || !wallBlocks(viewer, emitter)));
+            const eligible = viewer.applications.some(({ definition, rank }) => definition.rules.some(rule =>
+                rule.key === "CodexPerceiveSignal" && rule.channel === emitter.channel
+                && rank >= rule.minRank && distance <= rule.range && (!rule.walls || !wallBlocks(viewer, emitter))));
             return eligible ? [{ viewer, distance }] : [];
         }).sort((a, b) => a.distance - b.distance || a.viewer.tokenUuid.localeCompare(b.viewer.tokenUuid));
         if (!candidates.length) continue;

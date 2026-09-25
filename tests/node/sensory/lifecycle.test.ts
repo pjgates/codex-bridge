@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from "vitest";
 import { activateSensoryCanvas } from "../../../src/canvas/sensory/lifecycle.js";
-import { definition, token } from "./fixtures.js";
+import { legacyDefinition as definition, token } from "./fixtures.js";
 afterEach(() => vi.unstubAllGlobals());
 it("removes actual overlay output on deselection, ownership loss and teardown without reviving queued work", () => {
     class Container {

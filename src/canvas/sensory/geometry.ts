@@ -16,11 +16,13 @@ export interface SensoryScene {
 function emissions(uuid: string, position: SensoryPosition, rings: SensoryRing[], applications: SensoryApplication[]): SensoryEmitter[] {
     const channels = new Map<string, SensoryEmitter>();
     for (const app of applications.sort((a, b) => a.definitionUuid.localeCompare(b.definitionUuid))) {
-        const { channel, emission } = app.definition;
-        if (!emission.enabled || app.rank <= 0) continue;
-        const strength = emission.strength === "rank" ? app.rank : emission.fixed;
-        if ((channels.get(channel)?.strength ?? 0) >= strength) continue;
-        channels.set(channel, { documentUuid: uuid, channel, position, rings, strength, colour: emission.colour });
+        if (app.rank <= 0) continue;
+        for (const rule of app.definition.rules) {
+            if (rule.key !== "CodexEmitSignal") continue;
+            const strength = rule.strength === "rank" ? app.rank : rule.fixed;
+            if ((channels.get(rule.channel)?.strength ?? 0) >= strength) continue;
+            channels.set(rule.channel, { documentUuid: uuid, channel: rule.channel, position, rings, strength, colour: rule.colour });
+        }
     }
     return [...channels.values()];
 }
@@ -40,7 +42,8 @@ export function collectEmitters(scene: SensoryScene, lookup: DefinitionLookup): 
         const bindings = readTileBindings(sensoryFlag(tile.flags, "sensoryEffects"));
         const applications = bindings.flatMap(binding => {
             const definition = lookup(binding.effectUuid);
-            return definition ? [{ definitionUuid: binding.effectUuid, rank: binding.rank, definition }] : [];
+            return definition ? [{ definitionUuid: binding.effectUuid, rank: binding.rank,
+                definition: { rules: definition.rules.filter(rule => !rule.predicate?.length) } }] : [];
         });
         if (!applications.length || !tile.shape.polygonTree.polygons.length) continue;
         const clip = clipRegionId(tile, MODULE_ID);

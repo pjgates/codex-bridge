@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from "vitest";
 import { activateSensoryCanvas } from "../../../src/canvas/sensory/lifecycle.js";
-import { definition, token } from "./fixtures.js";
+import { legacyDefinition as definition, token } from "./fixtures.js";
 afterEach(() => vi.unstubAllGlobals());
 it("closes audible output synchronously when real selection callbacks revoke the listener", async () => {
     const hooks: Record<string, (...args: any[]) => void> = {};

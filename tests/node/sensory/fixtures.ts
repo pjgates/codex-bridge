@@ -1,10 +1,17 @@
-import type { SensoryDefinition } from "../../../src/canvas/sensory/types.js";
+import type { SensoryDefinition, LegacySensoryDefinition } from "../../../src/canvas/sensory/types.js";
 export const owner = { id: "viewer" };
-export function definition(): SensoryDefinition {
+export function legacyDefinition(): LegacySensoryDefinition {
     return { channel: "alpha",
         emission: { enabled: true, strength: "rank", fixed: 1, colour: "#aabbcc" },
         glow: { enabled: true, minRank: 2, range: 25, walls: false },
         hearing: { enabled: true, minRank: 1 } };
+}
+export function definition(channel = "alpha"): SensoryDefinition {
+    return { rules: [
+        { key: "CodexEmitSignal", channel, strength: "rank", fixed: 1, colour: "#aabbcc" },
+        { key: "CodexPerceiveSignal", channel, minRank: 2, range: 25, walls: false },
+        { key: "CodexHearSignal", channel, minRank: 1 },
+    ] };
 }
 export function effect(rank: number, uuid = "Item.signal") {
     return { type: "effect", sourceId: uuid, isExpired: false,
