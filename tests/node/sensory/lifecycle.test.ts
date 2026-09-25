@@ -27,7 +27,7 @@ it("removes actual overlay output on deselection, ownership loss and teardown wi
     vi.stubGlobal("PIXI", { Container, Graphics, filters: { BlurFilter: class { destroy() {} } } });
     vi.stubGlobal("Hooks", { on: (name: string, fn: any) => { hooks[name] = fn; } });
     vi.stubGlobal("game", { user: { id: "viewer" }, items: new Map([["signal", world]]), audio: { locked: true } });
-    vi.stubGlobal("canvas", { ready: true, tiles: { placeables: [tile] }, interface: layer, tokens: { controlled: selected }, dimensions: { distancePixels: 10 },
+    vi.stubGlobal("canvas", { ready: true, tiles: { placeables: [tile] }, rendered: layer, tokens: { controlled: selected }, dimensions: { distancePixels: 10 },
         scene: { tokens: [viewer, target], tiles: [], regions: new Map() } });
     vi.stubGlobal("requestAnimationFrame", (fn: () => void) => { queued = fn; return 1; });
     vi.stubGlobal("cancelAnimationFrame", () => { queued = undefined; });

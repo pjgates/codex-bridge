@@ -19,7 +19,8 @@ export function clearSensoryGlows(): void {
 export function renderSensoryGlows(glows: readonly SensoryGlow[]): void {
     clearSensoryGlows();
     if (!glows.length) return;
-    overlay = canvas!.interface!.addChild(new PIXI.Container()); overlay.eventMode = "none";
+    // The interface's VoidFilter would flatten SCREEN lighting into a normal-blended black disc.
+    overlay = canvas!.rendered!.addChild(new PIXI.Container()); overlay.eventMode = "none";
     for (const { emitter, direction } of glows) {
         const group = overlay.addChild(new PIXI.Container());
         const signal = group.addChild(new PIXI.Container());

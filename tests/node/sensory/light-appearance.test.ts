@@ -6,6 +6,7 @@ afterEach(() => { clearSensoryGlows(); vi.unstubAllGlobals(); });
 function setup() {
     class Container {
         children: any[] = []; parent: Container | null = null; alpha = 1; visible = true;
+        filters: { blendMode: number }[] = [];
         addChild<T extends Container>(child: T): T { child.parent?.removeChild(child); this.children.push(child); child.parent = this; return child; }
         removeChild(child: Container) { this.children = this.children.filter(c => c !== child); child.parent = null; }
         destroy() { this.parent?.removeChild(this); for (const child of [...this.children]) child.destroy(); }
@@ -41,6 +42,9 @@ function setup() {
         destroy() { this.effectsCollection.delete(this.sourceId); for (const layer of Object.values(this.layers)) layer.mesh.destroy(); this._geometry?.destroy(); }
     }
     const ticker = { add: vi.fn(), remove: vi.fn() }, layer = new Container();
+    const interfaceLayer = layer.addChild(new Container());
+    // Foundry composites the interface through a normal-blended VoidFilter.
+    interfaceLayer.filters = [{ blendMode: 0 }];
     const white = {}, black = {}, neutral = { destroy: vi.fn() };
     vi.stubGlobal("PIXI", { Container, Graphics, Texture: { WHITE: white, EMPTY: black, fromBuffer: vi.fn(() => neutral) },
         Geometry: class { destroy = vi.fn(); }, Polygon: class { constructor(public points: number[]) {} getBounds() { return {}; } },
@@ -59,9 +63,9 @@ function setup() {
                 return geometry ?? { initialized: true, destroy() {} };
             }
         } } } });
-    vi.stubGlobal("canvas", { interface: layer, dimensions: { distancePixels: 10 }, app: { ticker },
+    vi.stubGlobal("canvas", { rendered: layer, interface: interfaceLayer, dimensions: { distancePixels: 10 }, app: { ticker },
         effects: { lightSources: ordinarySources }, primary: { renderTexture: sceneTexture } });
-    return { layer, sources, ordinarySources, ticker, white, neutral };
+    return { layer, interfaceLayer, sources, ordinarySources, ticker, white, neutral };
 }
 const glow = (light: Record<string, unknown>): SensoryGlow => ({ viewerUuid: "Token.pc", direction: 0,
     emitter: { documentUuid: "Token.crystal", channel: "gold", strength: 3, colour: "#ffd700", light,
@@ -79,6 +83,10 @@ it("renders animated colour alone with native radii and no access to scenery or 
     expect((source.layers.coloration.mesh as any).filters[0].blendMode).toBe(3);
     expect(source.layers.coloration.mesh.scale.set).toHaveBeenCalledWith(100);
     expect(source.layers.coloration.mesh.parent).not.toBeNull();
+    // SCREEN must reach the scene: normal-composited ancestor textures produce a black disc.
+    for (let parent = source.layers.coloration.mesh.parent; parent; parent = parent.parent) {
+        expect(parent.filters.some(filter => filter.blendMode === 0)).toBe(false);
+    }
     expect(source.layers.illumination.mesh.parent).toBeNull();
     expect(source.layers.background.mesh.parent).toBeNull();
     expect(source.layers.coloration.shader.uniforms).toMatchObject({ primaryTexture: f.neutral, computeIllumination: false, globalLight: true });
@@ -87,7 +95,7 @@ it("renders animated colour alone with native radii and no access to scenery or 
     clearSensoryGlows();
     expect(f.ticker.remove).toHaveBeenCalledWith(animate);
     expect(source.layers.coloration.mesh.destroyed).toBe(true);
-    expect(f.layer.children).toHaveLength(0);
+    expect(f.layer.children).toEqual([f.interfaceLayer]);
     expect(f.neutral.destroy).toHaveBeenCalledWith(true);
     expect(f.ordinarySources.size).toBe(0);
 });

@@ -252,3 +252,30 @@ was deferred.
 | Resolve unseen source floors from stored levels instead of native visible-level inference. | Overlapping-level ties could differ from native placement. Native source/wall checks passed. |
 | Exercise the real sheet Effect drop handler when pointer automation was intercepted or ineffective. | Pointer integration with other installed modules remains unproved. |
 | Use the latest complete 672-test gate for delayed task completion rather than repeat identical tests for ledger formatting. | No repeated per-task completion logs; test execution and native acceptance evidence remain recorded. |
+
+
+## Light blending correction — 2026-09-25
+
+Foundry 14.368's InterfaceCanvasGroup renders through a normal-blended
+VoidFilter. Nesting the sensory light there flattened its SCREEN blend into
+that intermediate texture, producing a dark disc over the map. The sensory
+overlay now attaches to RenderedCanvasGroup alongside the interface, allowing
+its existing native coloration shader and opacity filter to blend over the
+scene. No light configuration, source registration, or vision logic changed.
+
+The regression fixture models the native filtered interface and rejects a
+normal-filtered ancestor of the light mesh. It failed before the correction
+and passed afterward. All 711 tests across 66 files passed serially; runtime
+TypeScript, lint, and production build passed (lint retains the existing
+unused `clearance` warning in gridless routing).
+
+Backed up the installed dist to
+`/home/ubuntu/codex-light-blend-fix-20260925-s0ramO/dist/`, then synced dist
+without the manifest. Local and deployed module.js SHA-256 matched:
+`059da89eda831461f9ce9408e2fd0ec2670a3c47f8b4c05f77218b38bb7878ac`.
+
+Captured the dark rim in the user's open GM browser before deployment. After
+reload and selecting Boots again, the same affected emitter's gold halo faded
+into the map without the dark circular edge. The signal beyond ordinary sight
+also remained visible. Only local token selection and sidebar navigation were
+used; no scene documents or Effect settings were edited during this check.

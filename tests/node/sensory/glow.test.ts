@@ -20,7 +20,7 @@ it("keeps the floor-direction cue visible when the clipped footprint has a hole 
         }
     }
     const layer = new Container();
-    vi.stubGlobal("canvas", { interface: layer });
+    vi.stubGlobal("canvas", { rendered: layer });
     vi.stubGlobal("PIXI", { Container, Graphics, filters: { BlurFilter: class { destroy() {} } } });
     const ring = (left: number, right: number, hole: boolean) => ({ hole, points: [
         { x: left, y: left }, { x: right, y: left }, { x: right, y: right }, { x: left, y: right } ] });
