@@ -17,11 +17,12 @@ import {
     SETTING_ENABLE_SYNC,
 } from "../sync/index.js";
 import { resolveHtmlRoot } from "../shared/html.js";
-import { registerSensoryEffectConfig, registerSensoryTileConfig } from "../canvas/sensory/index.js";
+import { registerSensoryEffectConfig, registerSensoryTileConfig, registerSensorySoundConfig } from "../canvas/sensory/index.js";
 
 export function onInit(): void {
     registerSensoryEffectConfig();
     registerSensoryTileConfig();
+    registerSensorySoundConfig();
     // Register module settings (order matters for the settings UI)
     registerSettings();
 

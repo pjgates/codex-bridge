@@ -29,3 +29,8 @@ export interface SensoryTokenDocument {
     getListenerPosition(): { x: number; y: number; elevation: number };
     getSize(): { width: number; height: number };
 }
+export interface SensorySoundDocument {
+    uuid: string; flags: unknown; path: string | null; x: number; y: number; elevation: number; levels: Set<string>;
+    radius: number; shape: { radius: number }; volume: number; walls: boolean; easing: boolean; hidden: boolean;
+    darkness: { min: number; max: number }; effects: object;
+}

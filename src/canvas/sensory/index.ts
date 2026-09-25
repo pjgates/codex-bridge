@@ -6,3 +6,4 @@ export { registerSensoryTileConfig } from "./tile-config.js";
 export { collectEmitters } from "./geometry.js";
 export { detectGlows, nativeSensoryWallBlocks } from "./frame.js";
 export { activateSensoryCanvas, refreshSensoryGlows } from "./lifecycle.js";
+export { registerSensorySoundConfig, hasSensorySoundAssignment } from "./sound-config.js";

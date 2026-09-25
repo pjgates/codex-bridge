@@ -2,6 +2,7 @@
     "codex-foundry": { "sensory": {
         "title": "Sensory", "channel": "Channel", "none": "None", "missing": "Missing sensory definition",
         "tileTitle": "Sensory Effects", "definition": "Effect definition", "rankLabel": "Rank", "remove": "Remove", "add": "Add sensory Effect",
+        "soundTitle": "Sensory Effect", "soundHint": "Only selected tokens owned by the current user with matching hearing capability hear this sound.",
         "rank": "Application rank", "fixed": "Fixed strength",
         "emission": { "enabled": "Emit signal", "strength": "Signal strength", "fixed": "Fixed strength", "colour": "Glow colour" },
         "glow": { "enabled": "Perceive glows", "minRank": "Minimum rank to perceive glows", "range": "Glow range (scene units)", "walls": "Walls block glow perception" },
