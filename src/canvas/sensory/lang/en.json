@@ -1,0 +1,9 @@
+{
+    "codex-foundry": { "sensory": {
+        "title": "Sensory", "channel": "Channel", "none": "None", "missing": "Missing sensory definition",
+        "rank": "Application rank", "fixed": "Fixed strength",
+        "emission": { "enabled": "Emit signal", "strength": "Signal strength", "fixed": "Fixed strength", "colour": "Glow colour" },
+        "glow": { "enabled": "Perceive glows", "minRank": "Minimum rank to perceive glows", "range": "Glow range (scene units)", "walls": "Walls block glow perception" },
+        "hearing": { "enabled": "Hear channel sounds", "minRank": "Minimum rank to hear sounds" }
+    } }
+}

@@ -17,8 +17,10 @@ import {
     SETTING_ENABLE_SYNC,
 } from "../sync/index.js";
 import { resolveHtmlRoot } from "../shared/html.js";
+import { registerSensoryEffectConfig } from "../canvas/sensory/index.js";
 
 export function onInit(): void {
+    registerSensoryEffectConfig();
     // Register module settings (order matters for the settings UI)
     registerSettings();
 
