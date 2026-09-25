@@ -216,6 +216,12 @@ native counter supplies that application’s rank; a non-counter Effect has rank
 follow edits to the world definition while keeping their individual ranks.
 Edit sensory settings on the world Effect; an applied copy links to it.
 
+To conceal an affliction, enable the Effect's native **Unidentified** option
+before applying it. For existing applications, set that option on each applied
+Effect. Players cannot see it in their effect list, effects panel, token icons,
+or application messages; its rank still drives sensory perception. Keep the
+world template's ownership GM-only to hide it from the Items directory.
+
 A viewpoint requires both a **selected token** and **OWNER permission on its
 actor**. Several selected owned tokens combine their eligible senses, each
 using its own rank and position. Unselected characters provide no viewpoint.

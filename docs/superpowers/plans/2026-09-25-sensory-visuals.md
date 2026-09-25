@@ -1,5 +1,7 @@
 # Scene-wide Sensory Geometry and Glows
 
+Status: completed under the [master plan](2026-09-25-sensory-effects.md). Native acceptance used the authorized SF2e environment; the [test record](../../testing/sensory-effects.md) documents the native drop-handler substitution and runtime limits.
+
 Read the [plan index](2026-09-25-sensory-effects.md), [definitions plan](2026-09-25-sensory-definitions.md), and [approved spec](../specs/2026-09-25-sensory-effects-design.md). Their exact types, constraints and checks apply. These tasks consume production definitions and viewers; they do not grant ordinary sight.
 
 ## Task 5: Emission and three-dimensional detection
@@ -18,9 +20,9 @@ function nativeSensoryWallBlocks(viewer: SensoryObserver, emitter: SensoryEmitte
 
 `SensoryScene` supplies `tokens`, `tiles`, `regions`, and its distance scale. `SensoryTokenDocument` supplies document geometry from task 2, `getSize()`, `hidden`, and actor items. `SensoryTileDocument` supplies `uuid`, `hidden`, `elevation`, `levels`, `flags`, and prepared `shape.center`/`shape.polygonTree`. `SensoryRing` is structurally compatible with the existing clipping rings. Export `clipRings`, `clipRegionId`, and their `Ring`/`TreeNode` types through the clipping barrel; do not move the clipping implementation.
 
-- [ ] Add an off-level source extraction regression. Build a scene fixture with a rank-3 actor token on `upper`, `object: null`, and an empty rendered-placeables collection. Its native center is `(100, 0, 20)`. Supply a tile on `lower` with no rendered object and a valid Effect binding. Assert `collectEmitters` returns both UUIDs with their stored absolute elevations. Hide the token and assert it is omitted. The fixture only supplies geometry; it does not pre-filter emissions. This protects document extraction that the later range test cannot reach.
+- [x] Add an off-level source extraction regression. Build a scene fixture with a rank-3 actor token on `upper`, `object: null`, and an empty rendered-placeables collection. Its native center is `(100, 0, 20)`. Supply a tile on `lower` with no rendered object and a valid Effect binding. Assert `collectEmitters` returns both UUIDs with their stored absolute elevations. Hide the token and assert it is omitted. The fixture only supplies geometry; it does not pre-filter emissions. This protects document extraction that the later range test cannot reach.
 
-- [ ] Add the combined-viewer range contract with independently written expected results:
+- [x] Add the combined-viewer range contract with independently written expected results:
 
 ```ts
 it("uses a qualifying viewer's complete 3D range, including unrendered floors", () => {
@@ -54,8 +56,8 @@ expect(detectGlows(blockedViews, [above], 10, () => true)).toEqual([]);
 
 Place this assertion in the range test where `views` and `above` are defined. It tests receiver policy; the actual cross-level native ray remains a runtime check.
 
-- [ ] Run `npm test -- tests/node/sensory/frame.test.ts`; confirm extraction and positive-range assertions fail before implementation.
-- [ ] Implement `collectEmitters` from scene document collections. Ignore hidden or empty footprints and inactive applications; tiles emit only. Convert definition strength from rank or fixed strength. Select the greatest strength for each document/channel, breaking ties by definition UUID. Do not merge channels or add strengths.
+- [x] Run `npm test -- tests/node/sensory/frame.test.ts`; confirm extraction and positive-range assertions fail before implementation.
+- [x] Implement `collectEmitters` from scene document collections. Ignore hidden or empty footprints and inactive applications; tiles emit only. Convert definition strength from rank or fixed strength. Select the greatest strength for each document/channel, breaking ties by definition UUID. Do not merge channels or add strengths.
 
 ```ts
 const rankStrength = application.definition.emission.strength === "rank";
@@ -85,9 +87,9 @@ const footprint = region
 const rings = clipRings(footprint);
 ```
 
-Skip an empty native tile shape before accessing its polygon. A missing selected clip region suppresses that tile's sensory footprint and is shown as unresolved configuration; do not reveal the full unclipped rectangle. Retain the tile's own absolute elevation and infer its source level with `canvas.inferLevelFromElevation(tile.elevation, { levels: tile.levels })` in the runtime adapter. Source position is the native shape center, not a mesh or a level-base offset.
+Skip an empty native tile shape before accessing its polygon. A missing selected clip region suppresses that tile's sensory footprint and is shown as unresolved configuration; do not reveal the full unclipped rectangle. Retain the tile's own absolute elevation and resolve its source level with `sensoryLevelAtElevation` over stored levels. Native `canvas.inferLevelFromElevation` excludes unseen floors; this runtime correction is recorded in the test evidence. Source position is the native shape center, not a mesh or a level-base offset.
 
-- [ ] Implement detector eligibility and nearest qualifying cue selection:
+- [x] Implement detector eligibility and nearest qualifying cue selection:
 
 ```ts
 const distance = Math.hypot((emitter.position.x - viewer.position.x) / distancePixels,
@@ -103,8 +105,8 @@ const capable = viewer.applications.some(application => {
 
 Exclude a viewer's own token for that viewer only. Sort qualifying viewers by distance then token UUID, choose the first, and set direction from the sign of emitter elevation minus that viewer's elevation. Return each emitter once. Do not round distances to grid steps or use PF2e attack reach.
 
-- [ ] Implement the native wall adapter with `foundry.canvas.perception.DetectionMode._testCollision`, verified in the inspected v14 bundle. Supply a position-only ray source with `origin`, resolved origin `level`, and priority; pass the emitter point and resolved destination `level`, plus `{ type: "sight", angle: 360 }`. This bypasses the ordinary detection-mode eligibility checks while retaining the native cross-level ray/surface calculation. Verify the structural source contract in the installed runtime before using it; if the backend requires an additional real source field, adapt this local boundary rather than constructing a fake world token or copying collision code. The wall-ignoring branch never invokes this adapter.
-- [ ] Run green tests and common checks. In disposable Foundry test the native ray adapter with wall blocking both enabled and disabled and with a source on another level. Commit `feat: detect sensory emissions across scene levels`.
+- [x] Implement the native wall adapter with `foundry.canvas.perception.DetectionMode._testCollision`, verified in the inspected v14 bundle. Supply a position-only ray source with `origin`, resolved origin `level`, and priority; pass the emitter point and resolved destination `level`, plus `{ type: "sight", angle: 360 }`. This bypasses the ordinary detection-mode eligibility checks while retaining the native cross-level ray/surface calculation. Verify the structural source contract in the installed runtime before using it; if the backend requires an additional real source field, adapt this local boundary rather than constructing a fake world token or copying collision code. The wall-ignoring branch never invokes this adapter.
+- [x] Run green tests and common checks. In disposable Foundry test the native ray adapter with wall blocking both enabled and disabled and with a source on another level. Commit `feat: detect sensory emissions across scene levels`.
 
 ## Task 6: Private glow rendering and event cleanup
 
@@ -112,7 +114,7 @@ Exclude a viewer's own token for that viewer only. Sort qualifying viewers by di
 
 **Interfaces:** produce `renderSensoryGlows(glows: readonly SensoryGlow[]): void`, `clearSensoryGlows(): void`, `activateSensoryCanvas(): void`, and `refreshSensoryGlows(): void`. `activateSensoryCanvas` registers event callbacks once, schedules a fresh frame from current documents, and clears the overlay on canvas teardown. Task 10 extends the same lifecycle with audio callbacks.
 
-- [ ] Add a lifecycle test that registers the real feature callbacks and drives selection, ownership, definition deletion, and canvas teardown through them. Inject only the external canvas render boundary and document fixtures via Foundry globals; do not export a test-only renderer. The owned selected state produces an upper-floor marker. The non-owner or deselected state renders an empty frame; after teardown a queued frame cannot restore the former marker.
+- [x] Add a lifecycle test that registers the real feature callbacks and drives selection, ownership, definition deletion, and canvas teardown through them. Inject only the external canvas render boundary and document fixtures via Foundry globals; do not export a test-only renderer. The owned selected state produces an upper-floor marker. The non-owner or deselected state renders an empty frame; after teardown a queued frame cannot restore the former marker.
 
 ```ts
 hooks.controlToken();
@@ -129,8 +131,8 @@ expect(rendered).toEqual([]);
 
 `hooks` captures registrations and `rendered` records frame values, rather than computing sensory eligibility in the fixture. Test the queued-teardown order because it is a lifecycle risk not owned by the detector tests. Inspect the native hooks used by the installed runtime; register through the feature's actual activation function.
 
-- [ ] Run `npm test -- tests/node/sensory/lifecycle.test.ts` and confirm the initial visible marker and teardown regression fail before wiring.
-- [ ] Draw private PIXI Graphics in a dedicated non-interactive container under `canvas.interface`, following the existing flanking overlay's canvas integration. Use frame polygons/holes rather than token textures. Apply a small blur to the fill, with a footprint mask after blur so a clipped tile stays within its shape. Map strength monotonically to bounded intensity, for example `0.8 * strength / (1 + strength)`. Draw a small vector up/down cue for nonzero direction; never add names, numeric heights, hover handlers, or targeting handlers.
+- [x] Run `npm test -- tests/node/sensory/lifecycle.test.ts` and confirm the initial visible marker and teardown regression fail before wiring.
+- [x] Draw private PIXI Graphics in a dedicated non-interactive container under `canvas.interface`, following the existing flanking overlay's canvas integration. Use frame polygons/holes rather than token textures. Apply a small blur to the fill, with a footprint mask after blur so a clipped tile stays within its shape. Map strength monotonically to bounded intensity, for example `0.8 * strength / (1 + strength)`. Draw a small vector up/down cue for nonzero direction; never add names, numeric heights, hover handlers, or targeting handlers.
 
 ```ts
 const container = canvas.interface.addChild(new PIXI.Container());
@@ -148,6 +150,6 @@ graphics.endFill();
 
 Reuse/rebuild only this feature's containers; do not attach filters to native meshes. Destroy graphics, masks and queued animation frames on teardown. The runtime supplies real rings; the detector range fixture's empty rings are not a production geometry shortcut.
 
-- [ ] Refresh on `controlToken`, relevant token/item/actor/tile/region/level updates and deletions, `updateUser`, `updateWorldTime`, `updateCombat`, canvas ready/level change, and teardown. Expiry can change through world time/combat without an Item update, so resolve prepared expiry each frame. Use `refreshToken` position/elevation flags during movement animations; subscribe only to flags that affect the output. Schedule at most one animation frame and always read the newest selection/ownership state when it runs.
-- [ ] Activate before `onReady` returns for disabled house rules. Register configuration in `onInit`; world data is not ready there. Keep feature init/ready idempotent and protect against a not-yet-ready canvas at this lifecycle boundary.
-- [ ] Run green tests and common checks. In Foundry verify owner versus non-owner, two selected owners, rank changes and shared edits, unexplored fog, a wall, off-level token/tile signals, both vertical cue directions, clipped water holes, scene changes, and reloading. Capture screenshots for low/high ranks and confirm other-floor artwork and fog exploration remain unchanged. Commit `feat: render private sensory glows with lifecycle cleanup`.
+- [x] Refresh on `controlToken`, relevant token/item/actor/tile/region/level updates and deletions, `updateUser`, `updateWorldTime`, `updateCombat`, canvas ready/level change, and teardown. Expiry can change through world time/combat without an Item update, so resolve prepared expiry each frame. Use `refreshToken` position/elevation flags during movement animations; subscribe only to flags that affect the output. Schedule at most one animation frame and always read the newest selection/ownership state when it runs.
+- [x] Activate before `onReady` returns for disabled house rules. Register configuration in `onInit`; world data is not ready there. Keep feature init/ready idempotent and protect against a not-yet-ready canvas at this lifecycle boundary.
+- [x] Run green tests and common checks. In Foundry verify owner versus non-owner, two selected owners, rank changes and shared edits, unexplored fog, a wall, off-level token/tile signals, both vertical cue directions, clipped water holes, scene changes, and reloading. Capture screenshots for low/high ranks and confirm other-floor artwork and fog exploration remain unchanged. Commit `feat: render private sensory glows with lifecycle cleanup`.

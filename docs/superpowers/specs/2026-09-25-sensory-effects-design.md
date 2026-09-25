@@ -1,6 +1,6 @@
 # Generic sensory effects
 
-Status: approved by the user on 2026-09-25, including cross-floor perception and Native execution of the [implementation plan](../plans/2026-09-25-sensory-effects.md). Local implementation is available; [native acceptance](../../testing/sensory-effects.md) remains pending.
+Status: implemented and deployed on 2026-09-25 under the approved [implementation plan](../plans/2026-09-25-sensory-effects.md). [Native acceptance](../../testing/sensory-effects.md) passed in the authorized Foundry v14 / SF2e environment, including cross-floor perception and hidden applications.
 
 ## Goal and confirmed decisions
 
@@ -13,6 +13,7 @@ Codex Foundry supplies generic sensory channels, selective glow rendering, and s
 - Signals can be configured to remain perceptible through walls; material thickness is not modelled.
 - Cross-floor perception is required. Read emitters across all levels of the current scene, including levels that are not rendered, and include vertical separation in range.
 - The initial visual representation is an indistinct glow. Greater signal strength produces a brighter glow, rather than revealing token or tile artwork.
+- The affliction can be invisible in player-facing effect lists and token icons while continuing to drive the senses. Use native Unidentified Effects and GM-only template ownership; native visibility remains an application property outside shared sensory settings.
 
 ## Approach
 

@@ -123,6 +123,6 @@ Runtime access is not a substitute for local tests and local tests are not proof
 
 ## Plan review and execution
 
-Status: approved for Native execution. Local slices 1–10 are implemented and tested; native acceptance for configuration, canvas and audio remains pending. See [the test record](../../testing/sensory-effects.md). The approved spec remains authoritative.
+Status: Native execution complete. All slices are implemented, tested and deployed; native configuration, canvas, audio and Unidentified acceptance passed in the authorized Foundry v14 / SF2e environment. See [the test record](../../testing/sensory-effects.md) for evidence, cleanup and the PF2e runtime / automated pointer-drag limits. The approved spec remains authoritative.
 
 Recommend **Native**: one implementer keeps the closely coupled canvas/audio interfaces consistent, followed by one fresh GPT-6 Astra review of the complete branch. **Subagent-driven** instead uses a fresh GPT-6 Astra implementer and reviewer for each slice, followed by a final branch review. Both methods require the primary agent's own full diff review and all requested slices and verification before the final completion report.
