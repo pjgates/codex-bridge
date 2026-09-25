@@ -10,3 +10,8 @@ export { registerSensorySoundConfig, hasSensorySoundAssignment } from "./sound-c
 export { installSensoryAudioGuard } from "./audio-guard.js";
 export { createSensoryVoice } from "./audio-voice.js";
 export { refreshSensoryAudio, clearSensoryAudio, installSensoryAudioPreview } from "./audio.js";
+export { registerSensoryRuleElements } from "./rule-elements.js";
+export { migrateSensoryEffects } from "./migration.js";
+export { migrateSensorySounds } from "./sound-channel.js";
+export { installSensoryTileVisibility } from "./tile-visibility.js";
+export { registerSensoryTileVisibilityConfig } from "./tile-visibility-config.js";

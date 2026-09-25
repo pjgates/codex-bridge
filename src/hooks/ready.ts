@@ -11,13 +11,17 @@ import { checkForVaultUpdates } from "../sync/index.js";
 import { activateElevationTooltip, activateFloorElevation, activateFloorProbe, activateGridlessCombat, activateMovementChecks } from "../rulesets/sf2e/gridless/index.js";
 import { activateClipTileConfig, activateClipTiles } from "../canvas/clip-tiles/index.js";
 import { activateFlying } from "../rulesets/sf2e/flying/index.js";
-import { activateSensoryCanvas } from "../canvas/sensory/index.js";
+import { activateSensoryCanvas, migrateSensoryEffects, migrateSensorySounds } from "../canvas/sensory/index.js";
 
 export function onReady(): void {
     // Tile clipping is a canvas feature, not a house rule, so it ignores the master switch.
     activateClipTiles();
     activateClipTileConfig();
     activateSensoryCanvas();
+    void migrateSensorySounds().then(migrateSensoryEffects).catch(error => {
+        console.error(`${MODULE_ID} | Sensory migration failed`, error);
+        ui.notifications!.error(game.i18n!.localize(`${MODULE_ID}.sensory.migrationFailed`));
+    });
 
     const isEnabled = game.settings!.get(MODULE_ID, "enableCustomRules");
 

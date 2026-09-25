@@ -24,3 +24,15 @@ it("migrates legacy broadcasts once, preserving broken-reference privacy and exp
     expect(resolveSensorySoundChannel(sounds[1])).toBeNull();
     for (const sound of sounds) { expect(sound.update).toHaveBeenCalledTimes(1); expect(sound.path).toBe("same.ogg"); }
 });
+it("preserves the legacy broadcast channel even without enabled capabilities or with newly authored rules", async () => {
+    const legacy = { channel: "old-channel", emission: { enabled: false, strength: "rank", fixed: 1, colour: "#ffffff" },
+        glow: { enabled: false, minRank: 1, range: 0, walls: false }, hearing: { enabled: false, minRank: 1 } };
+    const world = { uuid: "Item.signal", type: "effect", flags: { "codex-foundry": { sensory: legacy } }, system: { rules: [] as object[] } };
+    const sound = { flags: { "codex-foundry": { sensoryEffect: "Item.signal" } }, update: vi.fn() };
+    vi.stubGlobal("game", { user: { isGM: true }, scenes: [{ sounds: [sound] }], items: new Map([["signal", world]]) });
+    await migrateSensorySounds();
+    expect(sound.update).toHaveBeenLastCalledWith({ "flags.codex-foundry.sensoryChannel": "old-channel", "flags.codex-foundry.-=sensoryEffect": null });
+    world.system.rules = definition("new-channel").rules;
+    await migrateSensorySounds();
+    expect(sound.update).toHaveBeenLastCalledWith({ "flags.codex-foundry.sensoryChannel": "old-channel", "flags.codex-foundry.-=sensoryEffect": null });
+});

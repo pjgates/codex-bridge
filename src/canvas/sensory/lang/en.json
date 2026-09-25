@@ -2,10 +2,17 @@
     "codex-foundry": { "sensory": {
         "title": "Sensory", "channel": "Channel", "none": "None", "missing": "Missing sensory definition",
         "tileTitle": "Sensory Effects", "definition": "Effect definition", "rankLabel": "Rank", "remove": "Remove", "add": "Add sensory Effect",
-        "soundTitle": "Sensory Effect", "soundHint": "Only selected tokens owned by the current user with matching hearing capability hear this sound.",
+        "soundTitle": "Private sensory sound", "soundHint": "Broadcast on this channel. Only selected owned tokens with matching hearing can hear it. Uncheck to restore ordinary ambient audio.",
+        "sharedRuleHint": "Sensory rules follow the world Effect; this application's counter remains individual.",
+        "tileVisibilityTitle": "Conditional artwork", "tileVisibilityMinRank": "Minimum Effect rank",
+        "tileVisibilityHint": "None shows ordinary artwork. Otherwise, any selected owned PC with this Effect at the minimum rank qualifies. Native sight, fog, walls, and floors still apply.",
+        "migrationFailed": "Sensory settings could not be migrated. Check the console before editing legacy sensory settings.",
         "rank": "Application rank", "fixed": "Fixed strength",
         "emission": { "enabled": "Emit signal", "strength": "Signal strength", "fixed": "Fixed strength", "colour": "Glow colour" },
         "glow": { "enabled": "Perceive glows", "minRank": "Minimum rank to perceive glows", "range": "Glow range (scene units)", "walls": "Walls block glow perception" },
         "hearing": { "enabled": "Hear channel sounds", "minRank": "Minimum rank to hear sounds" }
+    } },
+    "PF2E": { "RuleElement": {
+        "CodexEmitSignal": "Codex: Emit Signal", "CodexPerceiveSignal": "Codex: Perceive Signal", "CodexHearSignal": "Codex: Hear Signal"
     } }
 }

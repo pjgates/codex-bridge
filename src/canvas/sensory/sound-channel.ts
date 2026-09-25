@@ -1,4 +1,4 @@
-import { lookupWorldDefinition, sensoryFlag } from "./definition.js";
+import { lookupWorldDefinition, readDefinition, sensoryFlag } from "./definition.js";
 import type { DefinitionLookup, SensorySoundDocument } from "./types.js";
 
 type SoundFlags = Pick<SensorySoundDocument, "flags">;
@@ -24,8 +24,11 @@ export async function migrateSensorySounds(): Promise<void> {
             const legacy = sensoryFlag(sound.flags, "sensoryEffect");
             if (legacy === undefined) continue;
             const channel = sensoryFlag(sound.flags, "sensoryChannel");
+            const source = typeof legacy === "string" && lookupWorldDefinition(legacy) ? game.items?.get(legacy.slice(5)) : null;
+            const oldChannel = readDefinition(sensoryFlag(source?.flags, "sensory"))?.channel;
+            const broadcast = oldChannel ?? resolveSensorySoundChannel(sound);
             const changes: Record<string, unknown> = {
-                ...(channel === undefined ? { "flags.codex-foundry.sensoryChannel": legacy === "" ? "" : resolveSensorySoundChannel(sound) } : {}),
+                ...(channel === undefined ? { "flags.codex-foundry.sensoryChannel": legacy === "" ? "" : broadcast } : {}),
                 "flags.codex-foundry.-=sensoryEffect": null,
             };
             await sound.update(changes);

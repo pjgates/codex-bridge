@@ -17,9 +17,12 @@ import {
     SETTING_ENABLE_SYNC,
 } from "../sync/index.js";
 import { resolveHtmlRoot } from "../shared/html.js";
-import { registerSensoryEffectConfig, registerSensoryTileConfig, registerSensorySoundConfig, installSensoryAudioGuard, installSensoryAudioPreview } from "../canvas/sensory/index.js";
+import { registerSensoryRuleElements, installSensoryTileVisibility, registerSensoryTileVisibilityConfig, registerSensoryEffectConfig, registerSensoryTileConfig, registerSensorySoundConfig, installSensoryAudioGuard, installSensoryAudioPreview } from "../canvas/sensory/index.js";
 
 export function onInit(): void {
+    registerSensoryRuleElements();
+    installSensoryTileVisibility();
+    registerSensoryTileVisibilityConfig();
     registerSensoryEffectConfig();
     registerSensoryTileConfig();
     registerSensorySoundConfig();
