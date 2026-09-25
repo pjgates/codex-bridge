@@ -55,3 +55,11 @@ export interface SensoryPlaybackConfig {
     source: SensoryNativeSoundSource; listener?: { x: number; y: number; elevation: number };
     volume: number; walls: boolean; muffled: boolean;
 }
+
+interface SignalRuleBase {
+    channel: string; predicate?: unknown[]; ignored?: boolean; spinoff?: unknown;
+}
+export type SensoryRule =
+    | (SignalRuleBase & { key: "CodexEmitSignal"; strength: "rank" | "fixed"; fixed: number; colour: string })
+    | (SignalRuleBase & { key: "CodexPerceiveSignal"; minRank: number; range: number; walls: boolean })
+    | (SignalRuleBase & { key: "CodexHearSignal"; minRank: number });
