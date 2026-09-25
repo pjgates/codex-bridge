@@ -14,6 +14,7 @@ export interface SensoryObserver {
 }
 export interface SensoryEmitter {
     documentUuid: string; channel: string; position: SensoryPosition;
+    light?: Record<string, unknown>; rotation?: number; tile?: boolean;
     strength: number; colour: string; rings: readonly SensoryRing[];
 }
 export interface SensoryGlow { emitter: SensoryEmitter; viewerUuid: string; direction: -1 | 0 | 1 }
@@ -24,7 +25,7 @@ export interface SensoryItem {
 }
 export interface SensoryUser { id: string }
 export interface SensoryTokenDocument {
-    uuid: string; level: string; hidden: boolean;
+    uuid: string; level: string; hidden: boolean; rotation?: number;
     actor: { items: Iterable<SensoryItem>; testUserPermission(user: SensoryUser, permission: "OWNER"): boolean } | null;
     getCenterPoint(): { x: number; y: number; elevation: number };
     getListenerPosition(): { x: number; y: number; elevation: number };
@@ -61,6 +62,7 @@ interface SignalRuleBase {
     channel: string; predicate?: unknown[]; ignored?: boolean; spinoff?: unknown;
 }
 export type SensoryRule =
-    | (SignalRuleBase & { key: "CodexEmitSignal"; strength: "rank" | "fixed"; fixed: number; colour: string })
+    | (SignalRuleBase & { key: "CodexEmitSignal"; strength: "rank" | "fixed"; fixed: number; colour: string;
+        appearance?: "glow" | "light"; light?: Record<string, unknown> })
     | (SignalRuleBase & { key: "CodexPerceiveSignal"; minRank: number; range: number; walls: boolean })
     | (SignalRuleBase & { key: "CodexHearSignal"; minRank: number });

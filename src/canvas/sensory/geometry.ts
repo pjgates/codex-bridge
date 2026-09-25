@@ -5,7 +5,7 @@ import { readTileBindings, resolveApplications, sensoryFlag } from "./definition
 import type { DefinitionLookup, SensoryApplication, SensoryEmitter, SensoryPosition, SensoryRing, SensoryTokenDocument } from "./types.js";
 interface PolygonTree extends TreeNode { polygons: readonly unknown[]; intersectPolygon(polygon: unknown): PolygonTree }
 interface SensoryTileDocument {
-    uuid: string; hidden: boolean; elevation: number; levels: Set<string>; flags: Record<string, unknown>;
+    uuid: string; hidden: boolean; rotation?: number; elevation: number; levels: Set<string>; flags: Record<string, unknown>;
     shape: { center: { x: number; y: number }; polygonTree: PolygonTree };
 }
 export interface SensoryScene {
@@ -13,7 +13,7 @@ export interface SensoryScene {
     levels: { values(): IterableIterator<SensoryLevel> };
     regions: { get(id: string): { polygonTree: PolygonTree } | undefined };
 }
-function emissions(uuid: string, position: SensoryPosition, rings: SensoryRing[], applications: SensoryApplication[]): SensoryEmitter[] {
+function emissions(uuid: string, position: SensoryPosition, rings: SensoryRing[], applications: SensoryApplication[], rotation = 0, tile = false): SensoryEmitter[] {
     const channels = new Map<string, SensoryEmitter>();
     for (const app of applications.sort((a, b) => a.definitionUuid.localeCompare(b.definitionUuid))) {
         if (app.rank <= 0) continue;
@@ -21,7 +21,8 @@ function emissions(uuid: string, position: SensoryPosition, rings: SensoryRing[]
             if (rule.key !== "CodexEmitSignal") continue;
             const strength = rule.strength === "rank" ? app.rank : rule.fixed;
             if ((channels.get(rule.channel)?.strength ?? 0) >= strength) continue;
-            channels.set(rule.channel, { documentUuid: uuid, channel: rule.channel, position, rings, strength, colour: rule.colour });
+            channels.set(rule.channel, { documentUuid: uuid, channel: rule.channel, position, rings, strength, colour: rule.colour,
+                ...(rule.appearance === "light" ? { light: rule.light ?? {}, rotation, tile } : {}) });
         }
     }
     return [...channels.values()];
@@ -35,7 +36,7 @@ export function collectEmitters(scene: SensoryScene, lookup: DefinitionLookup): 
         const points = Array.from({ length: 16 }, (_, index) => ({
             x: position.x + Math.cos(index * Math.PI / 8) * width / 2,
             y: position.y + Math.sin(index * Math.PI / 8) * height / 2 }));
-        result.push(...emissions(token.uuid, position, [{ points, hole: false }], resolveApplications(token.actor.items, lookup)));
+        result.push(...emissions(token.uuid, position, [{ points, hole: false }], resolveApplications(token.actor.items, lookup), token.rotation));
     }
     for (const tile of scene.tiles) {
         if (tile.hidden) continue;
@@ -55,7 +56,7 @@ export function collectEmitters(scene: SensoryScene, lookup: DefinitionLookup): 
         const native = canvas as unknown as { level: { id: string } };
         const levelId = sensoryLevelAtElevation(scene.levels.values(), tile.elevation, tile.levels, native.level.id);
         const position = { ...tile.shape.center, elevation: tile.elevation, levelId };
-        result.push(...emissions(tile.uuid, position, rings, applications));
+        result.push(...emissions(tile.uuid, position, rings, applications, tile.rotation, true));
     }
     return result;
 }

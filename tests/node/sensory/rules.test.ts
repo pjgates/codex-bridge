@@ -35,3 +35,14 @@ it("disables malformed, unfinished and ignored rules without losing a valid sibl
     ]);
     expect(readSensoryRules(null)).toEqual([]);
 });
+
+it("retains light appearance settings and rejects invalid appearance selectors", () => {
+    const light = { dim: 10, bright: 3, alpha: 0.6, animation: { type: "torch", speed: 2 } };
+    const rules = readSensoryRules([
+        { key: "CodexEmitSignal", channel: "gold", appearance: "light", light },
+        { key: "CodexEmitSignal", channel: "gold", appearance: "unknown" },
+        { key: "CodexEmitSignal", channel: "gold", appearance: "light", light: [] },
+    ]);
+    expect(rules).toEqual([{ key: "CodexEmitSignal", channel: "gold", strength: "rank", fixed: 1,
+        colour: "#ffffff", appearance: "light", light }]);
+});

@@ -12,6 +12,8 @@ export function readSensoryRules(source: unknown): SensoryRule[] {
             || (raw.predicate !== undefined && !Array.isArray(raw.predicate))) return [];
         const base = { ...raw, channel: raw.channel };
         if (raw.key === "CodexEmitSignal") {
+            if (raw.appearance !== undefined && raw.appearance !== "glow" && raw.appearance !== "light") return [];
+            if (raw.light !== undefined && (!raw.light || typeof raw.light !== "object" || Array.isArray(raw.light))) return [];
             const { strength = "rank", fixed = 1, colour = "#ffffff" } = raw;
             return (strength === "rank" || strength === "fixed") && finite(fixed) && (strength !== "fixed" || fixed > 0)
                 && typeof colour === "string" && /^#[\da-f]{6}$/i.test(colour)

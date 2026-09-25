@@ -32,7 +32,7 @@ it("uses capabilities and position from the same viewer and stabilizes cue selec
 it("extracts stored off-level geometry, strongest emission and clipped holes without placeables", () => {
     const source = token("Token.upper", { rank: 3, x: 100, elevation: 20, levelId: "upper" });
     source.actor.items.push(effect(1, "Item.fixed"));
-    const fixed = definition(); Object.assign(fixed.rules[0], { strength: "fixed", fixed: 5, colour: "#abcdef" });
+    const fixed = definition(); Object.assign(fixed.rules[0], { strength: "fixed", fixed: 5, colour: "#abcdef", appearance: "light", light: { dim: 10 } });
     const lookup = (uuid: string) => uuid === "Item.fixed" ? fixed : definition();
     const tree = { polygon: null, isHole: false, children: [
         { polygon: { points: [0, 0, 100, 0, 100, 100, 0, 100] }, isHole: false, children: [
@@ -48,6 +48,7 @@ it("extracts stored off-level geometry, strongest emission and clipped holes wit
     expect(emissions.map(emitter => [emitter.documentUuid, emitter.position.elevation, emitter.strength]))
         .toEqual([["Token.upper", 20, 5], ["Tile.pool", -10, 2]]);
     expect(emissions[0].colour).toBe("#abcdef");
+    expect(emissions[0].light).toEqual({ dim: 10 });
     expect(emissions[1].rings.map(ring => ring.hole)).toEqual([false, true]);
     expect(emissions[1].position.levelId).toBe("lower");
     source.actor.items.reverse();
