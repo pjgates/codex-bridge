@@ -1,6 +1,6 @@
 # Generic sensory effects
 
-Status: approved by the user on 2026-09-25, including cross-floor perception. Implementation has not started. The [implementation plan](../plans/2026-09-25-sensory-effects.md) awaits review and execution-method selection.
+Status: approved by the user on 2026-09-25, including cross-floor perception and Native execution of the [implementation plan](../plans/2026-09-25-sensory-effects.md). Local implementation is available; [native acceptance](../../testing/sensory-effects.md) remains pending.
 
 ## Goal and confirmed decisions
 

@@ -202,6 +202,50 @@ npm run build
 npm run watch
 ```
 
+### Sensory Effects
+
+World PF2e and SF2e **Effect** items have a **Sensory** section. Choose a channel
+identifier, then independently enable emission, glow perception, and hearing.
+For example, an illustrative `resonance` channel could emit using the applied
+Effect's rank, allow glow perception from rank 2 within 30 scene units, and
+allow hearing from rank 1. These values are configured in game.
+
+Apply the world Effect to an actor using the system's normal workflow. Its
+native counter supplies that application’s rank; a non-counter Effect has rank
+1. Rank 0, expiration, and removal stop its contribution. Existing applications
+follow edits to the world definition while keeping their individual ranks.
+Edit sensory settings on the world Effect; an applied copy links to it.
+
+A viewpoint requires both a **selected token** and **OWNER permission on its
+actor**. Several selected owned tokens combine their eligible senses, each
+using its own rank and position. Unselected characters provide no viewpoint.
+Glows show indistinct signals, with stronger signals brighter. They include
+sources above and below the current floor, use three-dimensional distance,
+and show a directional cue. They grant no normal sight, targeting, fog
+exploration, or access to another floor. GM-hidden emitters are excluded.
+
+In a tile’s appearance configuration, add **Sensory Effects** and choose a
+world Effect and rank for each entry. Tiles emit using that definition and do
+not supply viewpoints. Existing **Clip to region** settings also clip the glow,
+including holes. An unresolved clipping region suppresses the signal.
+
+In an Ambient Sound’s configuration, choose a **Sensory Effect** to associate
+it with that definition’s channel. Only eligible selected owned listeners hear
+it. The native file, radius, volume, easing, walls, elevation, and darkness
+settings still control playback, including across floors. Tiles do not
+automatically create sounds. The GM’s explicit native sound preview remains
+available; normal gameplay obeys the selection rule.
+
+Missing or invalid definitions contribute nothing. Repair them by restoring
+the world Effect or choosing a valid definition on the tile or sound; an
+applied Effect should be reapplied from the intended world definition. A
+sound with a broken sensory assignment stays private and silent. Choose
+**None** to deliberately restore ordinary ambient playback.
+
+Sensory configuration and playback are independent of the custom-rules master
+switch. No campaign Effects or presets are created automatically. Runtime
+acceptance evidence is tracked in [the sensory test record](docs/testing/sensory-effects.md).
+
 ### Vault sync (codex-sync)
 
 The push pipeline lives in `sync/` and reads markdown from an external Obsidian vault.

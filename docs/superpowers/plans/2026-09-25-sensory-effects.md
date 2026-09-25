@@ -1,6 +1,6 @@
 # Generic Sensory Effects Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. Execution method awaits user selection.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. The user approved Native execution on 2026-09-25. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Configure shared sensory Effects in Foundry that selectively reveal signals across floors and play ambient sounds only through selected, owned tokens.
 
@@ -123,6 +123,6 @@ Runtime access is not a substitute for local tests and local tests are not proof
 
 ## Plan review and execution
 
-Status: complete draft awaiting user review and execution-method selection. No executable implementation has started. The approved spec remains authoritative.
+Status: approved for Native execution. Local slices 1–10 are implemented and tested; native acceptance for configuration, canvas and audio remains pending. See [the test record](../../testing/sensory-effects.md). The approved spec remains authoritative.
 
 Recommend **Native**: one implementer keeps the closely coupled canvas/audio interfaces consistent, followed by one fresh GPT-6 Astra review of the complete branch. **Subagent-driven** instead uses a fresh GPT-6 Astra implementer and reviewer for each slice, followed by a final branch review. Both methods require the primary agent's own full diff review and all requested slices and verification before the final completion report.
