@@ -53,3 +53,44 @@ it("detaches a newly private shared node before native path changes and preserve
     expect(tagged.source.sound).toBeNull();
     expect(tagged.sound).not.toBe(singleton);
 });
+it.each(["PLAYING", "STOPPING"])("closes a newly private shared node already %s without a native fade tail", state => {
+    const { Ambient, layer, singleton } = setup();
+    const tagged = new Ambient(), ordinary = new Ambient();
+    let audible = true;
+    singleton.stop.mockImplementation(({ fade = 250 } = {}) => {
+        if (state !== "PLAYING") return;
+        state = "STOPPING";
+        if (fade === 0) audible = false;
+    });
+    const fade = vi.fn((_volume: number, { duration }: { duration: number }) => { if (duration === 0) audible = false; });
+    Object.assign(singleton, { fade });
+    layer.sources.set("tagged", tagged.source); layer.sources.set("ordinary", ordinary.source);
+    const native = Object.getPrototypeOf(layer)._syncPositions;
+    // Native sync(false) clears its manager before stopping; STOPPING excludes Sound.playing.
+    Object.getPrototypeOf(layer)._syncPositions = function (listeners: unknown[], options: { fade?: number }) {
+        native.call(this, listeners, options);
+        singleton._manager = null; singleton.stop(options);
+    };
+    tagged.document.flags = { "codex-foundry": { sensoryEffect: "Item.signal" } };
+    tagged._onUpdate({});
+    expect(audible).toBe(false);
+});
+it("restores an ordinary destination path without stopping its existing singleton", () => {
+    const { Ambient, singleton } = setup();
+    const tagged = new Ambient();
+    tagged.document.flags = { "codex-foundry": { sensoryEffect: "Item.signal" } };
+    tagged.sound = tagged._createSound();
+    tagged.document.flags = { "codex-foundry": { sensoryEffect: "" } };
+    tagged.document.path = "destination.ogg";
+    tagged._onUpdate({ path: "destination.ogg" });
+    expect(tagged.sound).toBe(singleton);
+    expect(singleton.stop).not.toHaveBeenCalled();
+});
+it("retains native silence for an assigned sound with no file", () => {
+    const { Ambient } = setup();
+    const tagged = new Ambient();
+    tagged.document.flags = { "codex-foundry": { sensoryEffect: "Item.signal" } };
+    tagged.document.path = null as any;
+    expect(tagged._createSound()).toBeNull();
+    expect(game.audio!.create).not.toHaveBeenCalled();
+});

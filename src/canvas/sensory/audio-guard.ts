@@ -1,5 +1,9 @@
 import { hasSensorySoundAssignment } from "./sound-config.js";
-interface GuardSound { _manager?: unknown; stop(options: { volume: number; fade: number }): unknown }
+interface GuardSound {
+    _manager?: unknown;
+    fade(volume: number, options: { duration: number }): unknown;
+    stop(options: { volume: number; fade: number }): unknown;
+}
 interface GuardSource { sourceId: string; sound?: GuardSound | null; object?: GuardAmbient | null }
 interface GuardAmbient {
     document: { flags: unknown; path: string | null }; sound: GuardSound | null;
@@ -39,6 +43,7 @@ export function installSensoryAudioGuard(): void {
     ambient._createSound = function () {
         if (!hasSensorySoundAssignment(this.document)) return create.call(this);
         privateObjects.add(this);
+        if (!this.document.path) return null;
         return game.audio!.create({ src: this.document.path!, context: game.audio!.environment, singleton: false }) as unknown as GuardSound;
     };
     ambient._onUpdate = function (...args) {
@@ -47,14 +52,17 @@ export function installSensoryAudioGuard(): void {
             const former = this.sound;
             const source = this.source;
             this.sound = null; if (source) source.sound = null;
-            this.layer._syncPositions(this.layer.getListenerPositions(), {});
-            if (former && (!former._manager || former._manager === source)) former.stop({ volume: 0, fade: 0 });
+            this.layer._syncPositions(this.layer.getListenerPositions(), { fade: 0 });
+            if (former && (!former._manager || former._manager === source)) {
+                former._manager = null;
+                // stop() ignores STOPPING sounds; cancel their existing gain ramp directly.
+                former.fade(0, { duration: 0 }); former.stop({ volume: 0, fade: 0 });
+            }
             privateObjects.add(this);
         } else if (!assigned && privateObjects.has(this)) {
             this.sound?.stop({ volume: 0, fade: 0 });
             this.sound = null; if (this.source) this.source.sound = null;
             privateObjects.delete(this);
-            this.sound = create.call(this);
         }
         return update.apply(this, args);
     };
