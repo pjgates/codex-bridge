@@ -26,10 +26,15 @@ record does not claim that player glows, audio, or persistence have passed.
 ## Local evidence
 
 - Baseline: 643 tests passed; focused Flying and tile-clipping tests: 22 passed.
-- Current `npm run verify`: typechecks, lint, all **665 tests**, and Foundry
-  build passed. Its dashboard build initially failed because its automatic
-  copy into the local vault was sandboxed; `npm run plugin:build` subsequently
-  passed with the normal permission mechanism.
+- After review fixes, all typechecks, lint, the **671-test suite**, the Foundry
+  build, and the dashboard build passed. The suite used
+  `npm test -- --no-file-parallelism`, with every assertion and timing
+  threshold unchanged.
+- `npm run verify` was also executed. Parallel runs hit the existing 150 ms
+  clearance benchmark at 281.7–304.9 ms; the unchanged isolated test and full
+  serial suite passed. The initial dashboard build was blocked by its
+  automatic vault copy; it subsequently passed through the normal permission
+  mechanism. No movement test or implementation was changed for this feature.
 - Lint retains one existing warning in `src/rulesets/sf2e/gridless/routing.ts`
   for unused `clearance`.
 - New tests were observed failing before implementation. They cover shared
@@ -40,6 +45,28 @@ record does not claim that player glows, audio, or persistence have passed.
   and immediate output closure from registered selection callbacks.
 - These tests mock external engine boundaries; they are not evidence of real
   fog, PIXI output, browser audio, native persistence, or multiple clients.
+
+## Independent review and fixes
+
+A fresh GPT-6 Astra reviewer inspected the branch and native source contracts.
+The primary implementer also read every changed line. Each material finding
+was reproduced by a failing regression, fixed, and included in the passing
+671-test serial suite:
+
+- Native PF2e world drops clone data without `addSource`. World serialization
+  now captures the chosen definition UUID before cloning, including fresh,
+  imported and duplicated world Effects; embedded copies retain their link.
+- Tagging a playing source now reconciles ordinary sources without a fade
+  tail and cancels a former node’s gain transition even when already stopping.
+  Eligible ordinary same-file playback retains its manager.
+- Removing an assignment while changing file now leaves acquisition to the
+  native handler, preserving an ordinary singleton on the destination path.
+- A tile’s clipped fill keeps its mask; its above/below cue remains visible
+  even when the original center lies in a clipping hole.
+- A related source-factory check preserves native silence when no file is set.
+
+These fixes establish local regression coverage; native acceptance below is
+still required. No reviewer findings were deferred.
 
 ## Native acceptance still required
 
