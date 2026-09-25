@@ -85,7 +85,9 @@ export function registerSensoryEffectConfig(): void {
                         const option = document.createElement("option"); option.value = strength;
                         option.textContent = game.i18n!.localize(`${MODULE_ID}.sensory.${strength}`); input.append(option);
                     }
-                    else { input.type = type; if (type === "checkbox") input.checked = Boolean(value); }
+                    else { input.type = type; if (type === "checkbox") {
+                        input.checked = Boolean(value); input.dataset.dtype = "Boolean";
+                    } }
                     input.value = String(value);
                     group.append(text, input); section.append(group);
                 }

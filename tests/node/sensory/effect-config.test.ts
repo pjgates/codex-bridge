@@ -38,6 +38,23 @@ it("submits sensory settings once and retains disabled capability values", () =>
     hooks.renderItemSheet(app, root);
     expect(root.querySelectorAll('[data-codex-sensory="effect"]')).toHaveLength(1);
 });
+it("submits both enabled and disabled capabilities as native checkbox booleans", () => {
+    const { hooks, world } = setup();
+    const root = document.createElement("form");
+    hooks.renderItemSheet({ item: world, isEditable: true }, root);
+    // Native FormDataExtended treats a checkbox with a value attribute as a valued
+    // checkbox, unless Boolean is requested. Model that engine boundary here.
+    const submitted = Object.fromEntries([...root.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')].map(input => [
+        input.name, input.hasAttribute("value") && input.dataset.dtype !== "Boolean"
+            ? (input.checked ? input.value : null) : input.checked,
+    ]));
+    expect(submitted).toEqual({
+        "flags.codex-foundry.sensory.emission.enabled": true,
+        "flags.codex-foundry.sensory.glow.enabled": true,
+        "flags.codex-foundry.sensory.glow.walls": false,
+        "flags.codex-foundry.sensory.hearing.enabled": true,
+    });
+});
 it("captures the chosen world identity through native serialization regardless of older provenance", () => {
     const { hooks, world, Item } = setup();
     for (const [uuid, sourceId, reference] of [
