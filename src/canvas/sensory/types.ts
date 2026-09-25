@@ -34,3 +34,14 @@ export interface SensorySoundDocument {
     radius: number; shape: { radius: number }; volume: number; walls: boolean; easing: boolean; hidden: boolean;
     darkness: { min: number; max: number }; effects: object;
 }
+export interface SensoryManagedSound {
+    src: string; context: AudioContext & { gainNode?: GainNode }; destination?: AudioNode;
+    load(options: { autoplay: boolean }): Promise<unknown>;
+    stop(options: { volume: number; fade: number }): Promise<unknown>;
+}
+export interface SensoryPlaybackSource {
+    sound: SensoryManagedSound | null;
+    sync(audible: boolean, volume: number, options: { muffled: boolean }): Promise<unknown>;
+}
+export interface SensoryPlayback { source: SensoryPlaybackSource; volume: number; muffled: boolean }
+export interface SensoryVoice { sync(playback: SensoryPlayback | null): Promise<void>; destroy(): Promise<void> }

@@ -8,3 +8,4 @@ export { detectGlows, nativeSensoryWallBlocks } from "./frame.js";
 export { activateSensoryCanvas, refreshSensoryGlows } from "./lifecycle.js";
 export { registerSensorySoundConfig, hasSensorySoundAssignment } from "./sound-config.js";
 export { installSensoryAudioGuard } from "./audio-guard.js";
+export { createSensoryVoice } from "./audio-voice.js";
