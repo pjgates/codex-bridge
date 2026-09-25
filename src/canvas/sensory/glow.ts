@@ -1,4 +1,6 @@
 import type { SensoryGlow, SensoryRing } from "./types.js";
+import { createLightAppearance } from "./light-appearance.js";
+const appearances: { destroy(): void }[] = [];
 let overlay: PIXI.Container | null = null;
 const filters: PIXI.Filter[] = [];
 function drawRings(graphics: PIXI.Graphics, rings: readonly SensoryRing[]): void {
@@ -10,6 +12,7 @@ function drawRings(graphics: PIXI.Graphics, rings: readonly SensoryRing[]): void
     graphics.endFill();
 }
 export function clearSensoryGlows(): void {
+    for (const appearance of appearances.splice(0)) appearance.destroy();
     for (const filter of filters.splice(0)) filter.destroy();
     overlay?.destroy({ children: true }); overlay = null;
 }
@@ -20,13 +23,21 @@ export function renderSensoryGlows(glows: readonly SensoryGlow[]): void {
     for (const { emitter, direction } of glows) {
         const group = overlay.addChild(new PIXI.Container());
         const signal = group.addChild(new PIXI.Container());
-        const graphics = signal.addChild(new PIXI.Graphics());
         const colour = Number.parseInt(emitter.colour.slice(1), 16);
-        graphics.beginFill(colour, 0.8 * emitter.strength / (1 + emitter.strength));
-        drawRings(graphics, emitter.rings);
-        const blur = new PIXI.filters.BlurFilter(3, 2); filters.push(blur); graphics.filters = [blur];
-        const mask = signal.addChild(new PIXI.Graphics()); mask.beginFill(0xffffff);
-        drawRings(mask, emitter.rings); signal.mask = mask;
+        if (emitter.light) {
+            const appearance = createLightAppearance(emitter);
+            if (!appearance) continue;
+            appearances.push(appearance); signal.addChild(appearance.mesh);
+        } else {
+            const graphics = signal.addChild(new PIXI.Graphics());
+            graphics.beginFill(colour, 0.8 * emitter.strength / (1 + emitter.strength));
+            drawRings(graphics, emitter.rings);
+            const blur = new PIXI.filters.BlurFilter(3, 2); filters.push(blur); graphics.filters = [blur];
+        }
+        if (!emitter.light || emitter.tile) {
+            const mask = signal.addChild(new PIXI.Graphics()); mask.beginFill(0xffffff);
+            drawRings(mask, emitter.rings); signal.mask = mask;
+        }
         if (direction) {
             const cue = group.addChild(new PIXI.Graphics());
             const { x, y } = emitter.position;

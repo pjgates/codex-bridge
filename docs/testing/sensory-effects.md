@@ -1,5 +1,44 @@
 # Sensory Effects verification
 
+## Light appearance: local code, manual testing pending
+
+Emit Signal now offers **Appearance → Light appearance (visual only)**. Existing
+rules default to Soft glow, so enabling the new renderer is explicit. In the
+Effect's Rules tab, set a nonzero **Bright** or **Dim** radius under Light appearance.
+Configure opacity (Alpha), emission Angle, Attenuation, Saturation, Colour technique,
+and Animation with Speed, Intensity and Reverse. The rule's existing Colour and
+Strength fields apply; strength scales final opacity, including animations that
+ignore native light alpha. Radius stays independent of rank and perception range.
+
+The renderer uses Foundry's native colour shaders and animations against a neutral
+grey texture. Scene-adaptive colour techniques therefore differ from lighting a
+textured room. Illumination-only controls (darkness sources, vision, environmental
+brightness/contrast/shadows, light priority) are not exposed. No native background
+or illumination mesh is added to the canvas, and no source enters ordinary light
+or vision collections. Tile appearances retain their footprint/clipping mask;
+token appearances extend to their configured radius and follow token rotation.
+
+User requested code changes only and will perform in-game testing; this addition
+has not been SSH-deployed or tested in a player browser. Verification: all three
+TypeScript checks passed; final runtime typecheck, lint (one existing unused
+`clearance` warning), 711 tests in 66 files, and Foundry build passed. Independent
+Astra review found and closed native geometry allocation, nested form rendering,
+and animation-opacity issues; primary reviewed every production change.
+
+Manual checks after deploying the build:
+
+1. On Nakondis Particles → Rules → Emit Signal, choose Light appearance, Dim 5,
+   Bright 2 and a Torch or Pulse animation. Keep the existing gold Colour/channel.
+2. As an owner with a selected rank-2 PC, check the visual around another emitter.
+   Deselect or reduce receiver rank: it disappears. Check across floors/walls at
+   the existing 30-foot perception boundary without revealing scenery or fog.
+3. Change emitter rank and Alpha, including Alpha 0; check Torch, Radial Rainbow,
+   Color Burn, and Invert Absorption. Brightness must follow rank for every animation.
+4. Check a rotated cone and a clipped tile with a central hole. Ordinary lighting,
+   fog exploration, and conditional tile artwork must retain their prior behavior.
+5. Change scene/reload and toggle Soft glow/Light appearance; verify no lingering
+   animation, error, or stale appearance. Existing Soft glow rules should look unchanged.
+
 ## Current revision: composable native rules
 
 The original single-definition implementation passed native acceptance below.
