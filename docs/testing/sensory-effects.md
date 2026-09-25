@@ -1,6 +1,6 @@
 # Sensory Effects verification
 
-## Light appearance: local code, manual testing pending
+## Light appearance: deployed, manual testing pending
 
 Emit Signal now offers **Appearance → Light appearance (visual only)**. Existing
 rules default to Soft glow, so enabling the new renderer is explicit. In the
@@ -18,14 +18,20 @@ or illumination mesh is added to the canvas, and no source enters ordinary light
 or vision collections. Tile appearances retain their footprint/clipping mask;
 token appearances extend to their configured radius and follow token rotation.
 
-User requested code changes only and will perform in-game testing; this addition
-has not been SSH-deployed or tested in a player browser. Verification: all three
+User will perform in-game testing. Subsequently authorized deployment completed for
+commit `5c5ac24`; player-browser testing remains pending. Verification: all three
 TypeScript checks passed; final runtime typecheck, lint (one existing unused
 `clearance` warning), 711 tests in 66 files, and Foundry build passed. Independent
 Astra review found and closed native geometry allocation, nested form rendering,
 and animation-opacity issues; primary reviewed every production change.
 
-Manual checks after deploying the build:
+Deployment backup: `/home/ubuntu/codex-light-appearance-backup-20260925-WB38rJ/dist/`.
+The installed root manifest was preserved. Local and remote JavaScript, CSS and
+English locale hashes matched. JavaScript SHA-256:
+`04446670b809cf26db8edb2c0b778c9f60af24cfbba8d1a3f7ad8571174c8ede`.
+Reload clients to load the new build.
+
+Manual checks after reloading:
 
 1. On Nakondis Particles → Rules → Emit Signal, choose Light appearance, Dim 5,
    Bright 2 and a Torch or Pulse animation. Keep the existing gold Colour/channel.
