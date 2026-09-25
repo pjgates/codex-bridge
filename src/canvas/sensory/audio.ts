@@ -1,3 +1,4 @@
+import { sensoryLevelAtElevation, type SensoryLevel } from "./levels.js";
 import { createSensoryVoice } from "./audio-voice.js";
 import { buildSensoryAudioFrame } from "./audio-frame.js";
 import { lookupWorldDefinition } from "./definition.js";
@@ -5,10 +6,9 @@ import { selectedObservers } from "./observers.js";
 import { hasSensorySoundAssignment } from "./sound-config.js";
 import type { SensoryNativeSoundSource, SensoryPlaybackConfig, SensorySoundDocument, SensoryTokenDocument, SensoryUser, SensoryVoice } from "./types.js";
 interface NativeAudioCanvas {
-    ready: boolean; scene: { sounds: Iterable<SensorySoundDocument> } | null; darknessLevel: number;
-    tokens: { controlled: { document: SensoryTokenDocument }[] }; level: { elevation: { base: number } };
+    ready: boolean; scene: { sounds: Iterable<SensorySoundDocument>; levels: { values(): IterableIterator<SensoryLevel> } } | null; darknessLevel: number;
+    tokens: { controlled: { document: SensoryTokenDocument }[] }; level: { id: string; elevation: { base: number } };
     sounds: { _configurePlayback(config: SensoryPlaybackConfig): void; previewSound(position: { x: number; y: number; elevation?: number }): unknown };
-    inferLevelFromElevation(elevation: number, options: { levels: Set<string> }): { id: string };
 }
 const sources = new Map<string, SensoryNativeSoundSource>();
 const voices = new Map<string, SensoryVoice>();
@@ -26,9 +26,9 @@ function refreshAt(preview?: { x: number; y: number; elevation: number }): void 
     for (const document of documents) {
         let source = sources.get(document.uuid);
         if (!source) { source = new configuration.soundSourceClass({ sourceId: `codex-foundry.sensory:${document.uuid}` }); sources.set(document.uuid, source); }
-        const level = native.inferLevelFromElevation(document.elevation, { levels: document.levels });
+        const levelId = sensoryLevelAtElevation(native.scene.levels.values(), document.elevation, document.levels, native.level.id);
         if (JSON.stringify(source.data.effects) !== JSON.stringify(document.effects)) source.resetEffects();
-        source.initialize({ x: document.x, y: document.y, elevation: document.elevation, level: level.id,
+        source.initialize({ x: document.x, y: document.y, elevation: document.elevation, level: levelId,
             radius: document.shape.radius, walls: document.walls, path: document.path,
             volume: document.volume, easing: document.easing, effects: foundry.utils.deepClone(document.effects), preview: false,
             disabled: document.hidden || !document.path || document.radius <= 0

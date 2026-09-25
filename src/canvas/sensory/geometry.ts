@@ -1,3 +1,4 @@
+import { sensoryLevelAtElevation, type SensoryLevel } from "./levels.js";
 import { MODULE_ID } from "../../constants.js";
 import { clipRegionId, clipRings, type TreeNode } from "../clip-tiles/index.js";
 import { readTileBindings, resolveApplications, sensoryFlag } from "./definition.js";
@@ -9,6 +10,7 @@ interface SensoryTileDocument {
 }
 export interface SensoryScene {
     tokens: Iterable<SensoryTokenDocument>; tiles: Iterable<SensoryTileDocument>;
+    levels: { values(): IterableIterator<SensoryLevel> };
     regions: { get(id: string): { polygonTree: PolygonTree } | undefined };
 }
 function emissions(uuid: string, position: SensoryPosition, rings: SensoryRing[], applications: SensoryApplication[]): SensoryEmitter[] {
@@ -47,9 +49,9 @@ export function collectEmitters(scene: SensoryScene, lookup: DefinitionLookup): 
         const tree = region ? region.polygonTree.intersectPolygon(tile.shape.polygonTree.polygons[0]) : tile.shape.polygonTree;
         const rings = clipRings(tree);
         if (!rings.length) continue;
-        const native = canvas as unknown as { inferLevelFromElevation(elevation: number, options: { levels: Set<string> }): { id: string } };
-        const level = native.inferLevelFromElevation(tile.elevation, { levels: tile.levels });
-        const position = { ...tile.shape.center, elevation: tile.elevation, levelId: level.id };
+        const native = canvas as unknown as { level: { id: string } };
+        const levelId = sensoryLevelAtElevation(scene.levels.values(), tile.elevation, tile.levels, native.level.id);
+        const position = { ...tile.shape.center, elevation: tile.elevation, levelId };
         result.push(...emissions(tile.uuid, position, rings, applications));
     }
     return result;

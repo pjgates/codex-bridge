@@ -41,13 +41,15 @@ it("extracts stored off-level geometry, strongest emission and clipped holes wit
     const tile = { uuid: "Tile.pool", hidden: false, elevation: -10, levels: new Set(["lower"]),
         flags: { "codex-foundry": { clipRegion: "pool", sensoryEffects: [{ effectUuid: "Item.signal", rank: 2 }] } },
         shape: { center: { x: 50, y: 50 }, polygonTree: tree } };
-    vi.stubGlobal("canvas", { inferLevelFromElevation: () => ({ id: "lower" }) });
-    const scene = { tokens: [source], tiles: [tile], regions: new Map([["pool", { polygonTree: tree }]]) };
+    vi.stubGlobal("canvas", { level: { id: "middle" }, inferLevelFromElevation: () => ({ id: "middle" }) });
+    const scene = { tokens: [source], tiles: [tile], regions: new Map([["pool", { polygonTree: tree }]]),
+        levels: new Map([["lower", { id: "lower", elevation: { bottom: -20, top: 0 } }]]) };
     const emissions = collectEmitters(scene, lookup);
     expect(emissions.map(emitter => [emitter.documentUuid, emitter.position.elevation, emitter.strength]))
         .toEqual([["Token.upper", 20, 5], ["Tile.pool", -10, 2]]);
     expect(emissions[0].colour).toBe("#abcdef");
     expect(emissions[1].rings.map(ring => ring.hole)).toEqual([false, true]);
+    expect(emissions[1].position.levelId).toBe("lower");
     source.actor.items.reverse();
     expect(collectEmitters(scene, lookup)[0].strength).toBe(5);
     source.hidden = true; scene.regions.clear();
