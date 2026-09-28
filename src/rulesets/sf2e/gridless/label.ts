@@ -20,6 +20,7 @@ interface RulerWaypoint extends ElevationWaypoint {
 interface LabelContext {
     cssClass: string;
     units: string;
+    distance: { total: string; delta?: string };
     cost: { total: string; units: string; delta?: string; additional?: { total: number; delta: number } };
     elevation?: { total: string; icon: string; hidden: boolean; delta?: string };
     actionCost?: { actions: number; overage: boolean };
@@ -77,10 +78,23 @@ function squeezedUpTo(ruler: RulerLike, waypoint: RulerWaypoint, state: LabelSta
 
 export function decorateWaypointLabel(ruler: RulerLike, waypoint: RulerWaypoint, state: LabelState, context: LabelContext): void {
     if(waypoint.stage && waypoint.stage!=="planned")return;
-    const { distance, cost } = waypoint.measurement;
+    const { cost } = waypoint.measurement;
+    let { distance } = waypoint.measurement;
+    let segmentDistance = waypoint.measurement.backward?.distance ?? 0;
+    if (!canvas!.grid!.isGridless) {
+        const trail: RulerWaypoint[] = [];
+        for (let point: RulerWaypoint | undefined = waypoint; point; point = point.previous) trail.unshift(point);
+        // Default document cost counts grid steps without terrain/action multipliers.
+        // Keep the complete trail so square diagonal parity includes turn history.
+        const grid = ruler.token.document.measureMovementPath(trail.map(({cost: _cost, ...point}) => point) as never);
+        distance = grid.waypoints.at(-1)!.cost;
+        segmentDistance = distance - (grid.waypoints.at(-2)?.cost ?? 0);
+        context.distance = { total: round(distance, 2).toLocaleString(game.i18n!.lang),
+            ...(context.distance.delta ? { delta: signed(round(segmentDistance, 2)) } : {}) };
+    }
     const surcharge = cost - distance;
     if (Number.isFinite(surcharge) && surcharge > 0.005) {
-        context.cost.additional = { total: round(surcharge, 2), delta: round(Math.max(0, waypoint.cost - (waypoint.measurement.backward?.distance ?? 0)), 2) };
+        context.cost.additional = { total: round(surcharge, 2), delta: round(Math.max(0, waypoint.cost - segmentDistance), 2) };
     }
     // Intermediate waypoints carry no label, so a squeeze anywhere up to this point marks this label.
     if (isGridlessActive() && Number.isFinite(cost) && squeezedUpTo(ruler, waypoint, state)) context.squeezed = true;
@@ -121,13 +135,16 @@ export function decorateWaypointLabel(ruler: RulerLike, waypoint: RulerWaypoint,
     const recorded=history.map(p=>{if(!["climb","crawl"].includes(p.action))return p;const point={...p} as typeof p&{cost?:number};delete point.cost;return point;});
     const points=[...recorded,...expanded.map((p,i)=>i===0?{...p,action:"displace",cost:0}:p)];
     const measured=ruler.token.document.measureMovementPath(points as never,{cost:movementBudgetCost(ruler.token.document)} as never) as unknown as {waypoints:{cost:number;distance:number}[]};
+    const distances=canvas!.grid!.isGridless ? measured.waypoints.map(p=>p.distance) :
+        ruler.token.document.measureMovementPath(points.map(point=>{const plain={...point} as typeof point&{cost?:number};
+            delete plain.cost;return plain;}) as never).waypoints.map(p=>p.cost);
     const legs:BudgetLeg[]=points.slice(1).map((p,i)=>({action:p.action,cost:Math.max(0,measured.waypoints[i+1].cost-measured.waypoints[i].cost),
         check:i+1>=history.length && !!plan?.transition && ["climb","swim"].includes(p.action)}));
     const segments:{action:string;distance:number;estimated:boolean}[]=[];
     // Only the current planned path supplies the displayed segments; turn history
     // still contributes to the action budget below. Distances exclude terrain cost.
     for(let i=history.length+1;i<points.length;i++) {
-        const distance=measured.waypoints[i].distance-measured.waypoints[i-1].distance;
+        const distance=distances[i]-distances[i-1];
         if(distance<=0)continue;
         const action=points[i].action==="travel"?"walk":points[i].action;
         const checks=action!=="climb" && action!=="swim" || terrainChecksRequired(ruler.token.document as never,action==="climb"?"climbing":"swimming");
@@ -143,8 +160,8 @@ export function decorateWaypointLabel(ruler: RulerLike, waypoint: RulerWaypoint,
     if(context.distanceSegments || (!plan?.transition && segments.some(p=>["climb","crawl"].includes(p.action)))) {
         const end=measured.waypoints.at(-1)!,previous=measured.waypoints.at(-2)!;
         const start=measured.waypoints[history.length];
-        const additional=Math.max(0,end.cost-end.distance-(context.distanceSegments?start.cost-start.distance:0));
-        const delta=Math.max(0,(end.cost-previous.cost)-(end.distance-previous.distance));
+        const additional=Math.max(0,end.cost-distances.at(-1)!-(context.distanceSegments?start.cost-distances[history.length]:0));
+        const delta=Math.max(0,(end.cost-previous.cost)-(distances.at(-1)!-distances.at(-2)!));
         context.cost.additional=additional>0.005?{total:round(additional,2),delta:round(delta,2)}:undefined;
     }
     const terrainModes=segments.filter(s=>s.action==="climb" || s.action==="swim");

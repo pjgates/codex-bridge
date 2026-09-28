@@ -17,6 +17,8 @@ function setup(options: { gridless?: boolean; floors?: boolean; enforceClimb?: b
         _getWaypointLabelContext(waypoint: Waypoint, _state: object): Record<string, any> | undefined {
             if (!waypoint.previous && !waypoint.next) return undefined;
             return { cssClass: "", units: "ft", cost: { total: String(waypoint.measurement.cost), units: "ft" },
+                distance: { total: String(waypoint.measurement.distance), ...(waypoint.previous?.previous
+                    ? { delta: String(waypoint.measurement.distance - waypoint.previous.measurement.distance) } : {}) },
                 elevation: { total: "+0", icon: "fa-solid fa-arrows-up-down", hidden: true } };
         }
     }
@@ -115,6 +117,37 @@ describe("merged ruler label", () => {
         expect(squeezedLeg).toBeUndefined();
         expect(after!.squeezed).toBe(true);
     });
+});
+
+it('shows one hex as its grid distance, with difficult terrain charged separately',()=>{
+ const {ruler,chain,labels}=setup({gridless:false});
+ ruler.token.document.measureMovementPath=(points:any[],options:any={})=>{
+   const waypoints=points.map((_p,i)=>({distance:i*4.76,cost:i*(options.cost?10:5)}));
+   return {waypoints,cost:waypoints.at(-1)!.cost};
+ };
+ const last=labels(chain([{x:0},{x:95,distance:4.76,cost:10}])).at(-1)!;
+ expect(last.distance.total).toBe('5');
+ expect(last.cost.additional).toEqual({total:5,delta:5});
+ expect(last.remaining).toBe('15 ft left');
+ const mixed=labels(chain([{x:0},{x:95,distance:4.76,cost:10},
+   {x:190,distance:9.52,cost:20,action:'swim'}])).at(-1)!;
+ expect(mixed.distanceSegments).toEqual([5,5]);
+ expect(mixed.cost.additional).toEqual({total:10,delta:5});
+});
+
+it('uses native alternating diagonal distances across recorded history',()=>{
+ const {ruler,chain,labels}=setup({gridless:false,history:5});
+ ruler.token.document.measureMovementPath=(points:any[])=>{
+   let cost=0,diagonals=0;
+   const waypoints=points.map((p,i)=>{if(i&&p.action!=='displace'){diagonals++;cost+=diagonals%2?5:10;}
+     return {cost,distance:diagonals*7.14};});
+   return {waypoints,cost};
+ };
+ const path=chain([{x:-100},{x:0,distance:7.14,cost:5},{x:100,distance:14.28,cost:15}]);
+ path.forEach((p,i)=>p.stage=i<2?'passed':'planned');
+ const last=labels(path).at(-1)!;
+ expect(last.distance).toEqual({total:'15',delta:'+10'});
+ expect(last.cost.additional).toBeUndefined();
 });
 
 it('preserves flight altitude in the preview instead of snapping to ground',()=>{
