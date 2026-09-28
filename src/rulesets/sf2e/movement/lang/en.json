@@ -39,6 +39,7 @@
             }
         },
         "movement": {
+            "gridPathfinding": "Pathfinding: prefer walking and avoid falls (turn off for direct movement)",
             "advisory": "Advisory",
             "apply": "Apply after choices",
             "forcedName": "Forced movement modifier",

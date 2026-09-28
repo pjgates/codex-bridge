@@ -12,6 +12,7 @@ export { activateTerrainStatuses, ensureTerrainMacros } from "./status-lifecycle
 export { setTerrainStatus, hasTerrainStatus } from "./status.js";
 
 export {previewSummary, movementCellStatus, routeBudget, type MovementPlan, type PreviewSummary, type BudgetLeg, type MovementCellKind, type MovementCellStatus} from "./preview.js";
+export {findGridMovementPath, findGridMovementStatuses, type GridRoutingToken} from "./grid-routing.js";
 export {activatePauseMarker} from "./pause-marker.js";
 export {activateExplorationNotices} from "./exploration-notices.js";
 export {activateSwimUpkeep} from "./swim-upkeep.js";

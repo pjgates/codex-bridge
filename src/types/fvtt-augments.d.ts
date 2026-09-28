@@ -22,6 +22,7 @@ declare global {
         "codex-foundry.swimOutsideCombat": boolean;
         "codex-foundry.terrainCheckOverride": string;
         "codex-foundry.enableClimbing": boolean;
+        "codex-foundry.gridPathfinding": boolean;
         "codex-foundry.coveredTokenOutlines": boolean;
         "codex-foundry.enableSwimming": boolean;
         "codex-foundry.explorationMovementNotices": boolean;

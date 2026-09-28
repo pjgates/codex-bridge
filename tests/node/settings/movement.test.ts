@@ -4,6 +4,7 @@ afterEach(() => vi.unstubAllGlobals());
 it('defaults to advisory and disables every feature when rules are off', () => {
     const values: Record<string, unknown> = {enableCustomRules:true};
     vi.stubGlobal('game',{settings:{register:(_module:string,key:string,data:{default:unknown})=>{values[key]=data.default;},get:(_module:string,key:string)=>values[key]}});
+    vi.stubGlobal("Hooks", {on() {}});
     registerMovementSettings();
     expect(movementOutcomeMode()).toBe('advisory'); expect(movementFeatureEnabled('flightUpkeep')).toBe(false);
     expect(movementFeatureEnabled('falling')).toBe(true);

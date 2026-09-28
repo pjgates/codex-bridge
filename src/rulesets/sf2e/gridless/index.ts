@@ -7,6 +7,7 @@ import { activateGridlessRouting } from "./routing.js";
 import { activateMovementLabel } from "./label.js";
 
 export { registerGridlessSetting } from "./settings.js";
+export { hexAt, hexCentre, hexCorners, HEX_DIRECTIONS } from "./hex.js";
 export { registerMovementPreviewKeybind } from "./movement.js";
 export { activateFloorElevation, registerFloorSetting } from "./floors.js";
 export { activateMovementChecks, registerMovementCheckSetting } from "./checks.js";

@@ -7,7 +7,7 @@ import { activateGridlessTerrainCosts } from "./terrain.js";
 import { hexAt } from "./hex.js";
 import { blockedFrontier, buildHexField, floodReachable, hexContours, hexPull, hexRoute, modeArrays, type FrontierRim, type HexClearanceMode, type HexField, type HexRegion } from "./hexfield.js";
 import { snapshotMovementDebug, type MovementDebugData, type MovementDebugRegion } from "./debug.js";
-import { forcedMovementHeld } from "../movement/index.js";
+import { forcedMovementHeld, findGridMovementPath, type GridRoutingToken } from "../movement/index.js";
 import type { HexFloor } from "./hexfield.js";
 
 // Foundry 14's terrain/level additions are not yet represented by fvtt-types.
@@ -34,6 +34,10 @@ interface NativeRegion extends MovementDebugRegion {
     })[];
 }
 interface NativeToken {
+    destroyed: boolean;
+    _onDragLeftDrop(event: DragDropEvent): void;
+    _shouldPreventDragLeftDrop(event: { ctrlKey?: boolean; metaKey?: boolean }): boolean;
+    _triggerDragLeftDrop(): void;
     actor: { system: object; size?: string } | null;
     scene: { regions: Iterable<NativeRegion>; levels: Map<string, { edges: Map<string, NativeEdge> }>;
         dimensions: { size: number; distance: number; distancePixels: number; rect: Bounds };
@@ -43,6 +47,11 @@ interface NativeToken {
     measureMovementPath(points: unknown[], options?: object): { cost: number };
     constrainMovementPath(points: Waypoint[], options?: ConstraintOptions): [Waypoint[], boolean];
     findMovementPath(points: Partial<Waypoint>[], options?: PathOptions): Job<Waypoint[]>;
+}
+interface DragDropEvent {
+    ctrlKey?: boolean; metaKey?: boolean; preventDefault(): void;
+    interactionData: { cancelled: boolean; dropped: boolean; released: boolean;
+        contexts: Record<string, { searching: boolean; clonedToken: { destroyed: boolean } }> };
 }
 
 export interface MovementFrontier { size: number; rims: FrontierRim[] }
@@ -466,6 +475,29 @@ export function activateGridlessRouting(): void {
     activatePassageCosts();
     maps = new WeakMap(); areas = new WeakMap(); clearances = new WeakMap(); hexFields = new WeakMap(); revision++;
     const prototype = CONFIG.Token.objectClass.prototype as unknown as NativeToken;
+    const drop = prototype._onDragLeftDrop;
+    prototype._onDragLeftDrop = function (event): void {
+        const data = event.interactionData, contexts = Object.values(data.contexts);
+        if (canvas?.grid?.isGridless || !game.settings!.get("codex-foundry", "enableCustomRules")
+            || !game.settings!.get("codex-foundry", "gridPathfinding") || data.dropped
+            || event.ctrlKey || event.metaKey || !contexts.some(context => context.searching)) {
+            return drop.call(this, event);
+        }
+        // Native rulers delay displaying asynchronous results. Keep the drag alive on
+        // quick release until that presentation finishes, instead of dropping an empty path.
+        event.preventDefault(); data.released = true;
+        const cancelled = () => data.cancelled || data.dropped || this.destroyed
+            || contexts.some(context => context.clonedToken.destroyed);
+        void (async () => {
+            while (contexts.some(context => context.searching)) {
+                await new Promise<void>(resolve => setTimeout(resolve, 16));
+                if (cancelled()) return;
+            }
+            if (!cancelled() && !this._shouldPreventDragLeftDrop({ctrlKey: false, metaKey: false})) {
+                this._triggerDragLeftDrop();
+            }
+        })();
+    };
     const originalConstraint = prototype.constrainMovementPath;
     prototype.constrainMovementPath = function (points, options = {}) {
         const [path, constrained] = originalConstraint.call(this, points, options);
@@ -499,6 +531,11 @@ export function activateGridlessRouting(): void {
         if(forcedMovementHeld() || points.some(point=>point.action==="codex-forced")) {
             return original.call(this,points.map(point=>({...point,action:"codex-forced"})),
                 {...options,constrainOptions:{...options.constrainOptions,ignoreCost:true}});
+        }
+        if (canvas?.ready && !canvas.grid!.isGridless && ["pf2e", "sf2e"].includes(game.system!.id)
+            && game.settings!.get("codex-foundry", "enableCustomRules")) {
+            dragPaths.set(this, points as unknown as Partial<TokenDocument.MeasuredMovementWaypoint>[]);
+            return findGridMovementPath(this as unknown as GridRoutingToken, points, options) as Job<Waypoint[]>;
         }
         if (!isGridlessActive() || options.constrainOptions?.ignoreWalls || options.constrainOptions?.ignoreCost) {
             return original.call(this, points, options);
