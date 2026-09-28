@@ -1,6 +1,6 @@
 import { setTerrainStatus, hasTerrainStatus } from "./rulesets/sf2e/movement/index.js";
 import { movementFeatureEnabled } from "./rulesets/sf2e/movement/index.js";
-import { migrateLegacy,configureSurfaceVisibility } from "./canvas/regions/index.js";
+import { migrateLegacy } from "./canvas/regions/index.js";
 import { MODULE_ID } from "./constants.js";
 import {
     canUpdateMessage,
@@ -71,7 +71,7 @@ export interface ForceMoveRequest {
 }
 export interface CodexFoundryApi {
     readonly movement:{forceMove(request:ForceMoveRequest):Promise<CodexFoundryApiResult>;toggleStatus(request:{status:"climbing"|"swimming";tokenUuids:string[]}):Promise<CodexFoundryApiResult>};
-    readonly regions: { migrateLegacy: typeof migrateLegacy;configureSurfaceVisibility:typeof configureSurfaceVisibility };
+    readonly regions: { migrateLegacy: typeof migrateLegacy };
     readonly flying: {
         /** Add the Flying effect to each token's actor, or remove it from actors that already fly. */
         toggleFlying(request: ToggleFlyingRequest): Promise<CodexFoundryApiResult>;
@@ -279,7 +279,7 @@ async function invokeCreatedMessage(operation: () => Promise<string>): Promise<C
 
 export function createRuntimeApi(): CodexFoundryApi {
     return {
-        regions: { migrateLegacy,configureSurfaceVisibility },
+        regions: { migrateLegacy },
         movement: {
             async toggleStatus(request) {
                 if(!isRecord(request) || !["climbing","swimming"].includes(request.status))return failure("invalid-argument","Choose climbing or swimming.");

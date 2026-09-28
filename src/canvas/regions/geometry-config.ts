@@ -1,7 +1,6 @@
 import { floorTop, geometryPreset, validateGeometry } from './geometry.js';
 import type { SurfaceRegion } from './support.js';
 import { isGeometryType } from './types.js';
-import {openSurfaceVisibility} from './visibility-config.js';
 
 type GeometryDocument = {
     id:string;type:string;disabled:boolean;system:Record<string,unknown>;
@@ -13,10 +12,16 @@ export function activateGeometryConfig(): void {
     Hooks.on('renderRegionBehaviorConfig', (app, element) => {
         const doc = app.document as unknown as GeometryDocument;
         if (!game.user?.isGM || !isGeometryType(doc.type) || element.querySelector('[data-geometry-helper]')) { return; }
+
+        // Retain legacy metadata in the schema, but native Define Surface owns visibility.
+        for (const field of ['blocksSight', 'blocksLight']) {
+            element.querySelector(`[name="system.${field}"]`)?.closest('.form-group')?.remove();
+        }
+
         const top = floorTop(doc.parent);
         const helper = document.createElement('fieldset');
         helper.dataset.geometryHelper = '';
-        helper.innerHTML = `<legend>Surface presets</legend><p class="hint">Floor top: ${top ?? 'missing or ambiguous'} ft. Thickness changes only the underside.</p>
+        helper.innerHTML = `<legend>Surface presets</legend><p class="hint">Floor top: ${top ?? 'missing or ambiguous'} ft. Thickness changes only the underside. Edit sight and light in the region's native Define Surface behavior.</p>
             <div class="form-group"><label>Preset</label><div class="form-fields"><select data-preset>
             <option value="">Custom</option><option value="solid">Solid terrain</option>
             <option value="deck">Solid bridge / balcony</option><option value="catwalk">Grated catwalk</option></select></div></div>
@@ -50,9 +55,6 @@ export function activateGeometryConfig(): void {
         const footer = form?.querySelector('footer');
         if (footer) { footer.before(helper); }
         else { form?.append(helper); }
-        const visibility=document.createElement('button');visibility.type='button';visibility.textContent='Configure native visibility…';
-        visibility.addEventListener('click',()=>void openSurfaceVisibility((doc.parent as SurfaceRegion&{uuid:string}).uuid));
-        helper.append(visibility);
     });
     const validate = (doc:GeometryDocument, change:Record<string,unknown>) => {
         const next = foundry.utils.mergeObject(doc.toObject(), foundry.utils.expandObject(change), {inplace:false});

@@ -34,7 +34,6 @@ export function onInit(): void {
     installSensoryAudioGuard();
     installSensoryAudioPreview();
     registerRegionBehaviors();
-    game.settings!.register(MODULE_ID,'surfaceFading',{name:'Fade suspended surface artwork by default',hint:'Off keeps artwork opaque. Override individual surfaces in Surface Geometry. Sight and light blocking are unchanged.',scope:'world',config:true,type:Boolean,default:false,requiresReload:true});
     game.settings!.register(MODULE_ID,'coveredTokenOutlines',{name:'Outline visible tokens beneath artwork',hint:'Shows a silhouette and elevation only when the current PC vision sources can see a covered token.',scope:'client',config:true,type:Boolean,default:true,requiresReload:true});
     activateGeometryConfig();
     registerSettingsMigration();

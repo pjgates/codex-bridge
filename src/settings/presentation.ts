@@ -5,7 +5,7 @@ const groups: Record<string, string[]> = {
     rules: ["enableCustomRules", "enableTargetHelper", "playersRollAllDice", "pradStrictDCs", "heroicRerolls"],
     movement: ["promptMovementChecks", "enableClimbing", "climbOutsideCombat", "enableSwimming", "swimOutsideCombat", "explorationMovementNotices", "enableFalling", "enableFlightUpkeep", "enableForcedMovement", "movementOutcomeMode"],
     gridless: ["gridlessCombat", "movementPreview", "movementLattice"],
-    utilities: ["surfaceFading", "coveredTokenOutlines", "enableCodexSync", "codexSyncPassphrase", "enableStatblockImporter"],
+    utilities: ["coveredTokenOutlines", "enableCodexSync", "codexSyncPassphrase", "enableStatblockImporter"],
     diagnostics: ["movementDebug"],
 };
 

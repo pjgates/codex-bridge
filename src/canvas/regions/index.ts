@@ -54,4 +54,3 @@ export { readSurfaceGeometry, geometryPreset } from "./geometry.js";
 export { activateGeometryConfig } from "./geometry-config.js";
 export { faceBetween } from "./faces.js";
 export type { FaceResult } from "./faces.js";
-export {configureSurfaceVisibility,activateSurfaceVisibility} from "./visibility.js";

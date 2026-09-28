@@ -52,11 +52,11 @@
                     },
                     "blocksSight": {
                         "label": "Blocks sight",
-                        "hint": "Desired native surface restriction; configure managed visibility to apply."
+                        "hint": "Legacy metadata. Edit sight in the region's native Define Surface behavior."
                     },
                     "blocksLight": {
                         "label": "Blocks light",
-                        "hint": "Desired native surface restriction; sound is edited separately."
+                        "hint": "Legacy metadata. Edit light in the region's native Define Surface behavior."
                     }
                 }
             }

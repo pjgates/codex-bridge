@@ -17,7 +17,6 @@ import { activateSensoryCanvas, migrateSensoryEffects, migrateSensorySounds } fr
 import { activateTerrainStatuses, ensureTerrainMacros, activateMovementTransitions, activateMovementDecisions, openDecision, resolveMovementChoice, movementControls, activateForcedPreview, requestFall, activateFlightUpkeep, clearTerrainOverride } from "../rulesets/sf2e/movement/index.js";
 import { migrateSettings } from "../settings/migration.js";
 import { activateExplorationNotices, activateSwimUpkeep } from "../rulesets/sf2e/movement/index.js";
-import {activateSurfaceVisibility} from '../canvas/regions/index.js';
 
 export async function onReady(): Promise<void> {
     await clearTerrainOverride();
@@ -34,7 +33,6 @@ export async function onReady(): Promise<void> {
         console.error(`${MODULE_ID} | Sensory migration failed`, error);
         ui.notifications!.error(game.i18n!.localize(`${MODULE_ID}.sensory.migrationFailed`));
     });
-    activateSurfaceVisibility();
     activateCoveredTokenOutlines();
 
     void checkForVaultUpdates();

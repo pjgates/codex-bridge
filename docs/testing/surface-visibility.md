@@ -1,6 +1,12 @@
 # Surface geometry and native visibility — 2026-09-22
 
-Status: geometry, format changes, managed visibility and separate artwork implemented. Standalone importer server registration passed after the user-triggered restart. Runtime evidence below is GM-side SF2e on Foundry 14.368, exclusively in Testing Scene. Player verification is pending; PF2e runtime was waived by the user.
+Current status (2026-09-27): managed Surface visibility creation, synchronization, configuration and fading overrides have been removed at Peter's request. Peter deleted the existing companions. Codex makes no visibility migration or replacement writes; native Define Surface settings are edited manually. Workshop exports native restrictions on floor regions without companion regions. Material extent, underside, floor heights and covered-token outlines remain supported.
+
+Removal verification: 862 Codex tests and 271 Workshop tests passed, as did all three TypeScript checks, lint (the existing unused `clearance` warning remains), and the Foundry production build. Independent Astra review found no actionable issues and passed 49 focused export/importer checks. The aggregate verify command stopped at the unrelated dashboard hook's denied Obsidian-vault artifact copy. Server module and language checksums match the tested build; the previous module is backed up at `/home/ubuntu/codex-test-backups/surface-visibility-removal-20260927/module-before.tgz`.
+
+A fresh Foundry browser load reported Codex ready. Mining Site - Depths listed 23 regions and no Surface visibility helpers. No campaign documents were edited during verification. The live geometry-editor check remains unverified because the sidebar's Edit control did not open a form; the existing Workshop browser fixture also stayed at Ready. The native form contract and actual exporter/importer paths passed their automated checks.
+
+The evidence below records the earlier implementation, including its now-retired companion workflow. Standalone importer server registration passed after the user-triggered restart. Runtime evidence below is GM-side SF2e on Foundry 14.368, exclusively in Testing Scene. Player verification was pending; PF2e runtime was waived by the user.
 
 ## Geometry evidence
 

@@ -1,5 +1,7 @@
 # Surface Visibility and Artwork Implementation Plan
 
+Historical plan: managed companion visibility and its fading controls were removed at Peter's request on 2026-09-27. Do not resume those tasks. Geometry and separate artwork remain supported; visibility is edited through native Define Surface.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Allow intended cross-level sight while keeping the viewed level's terrain legible and retaining opaque obstructions.
