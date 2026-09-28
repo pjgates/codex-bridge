@@ -1,10 +1,34 @@
 import {terrainDC} from "../../../canvas/regions/index.js";
 import {climbProgress} from "./climb.js";
 import {swimProgress} from "./swim.js";
-import type {MovementToken, prepareTransition} from "./transitions.js";
+import {prepareTransition, type MovementToken, type MovementIntent, type Waypoint} from "./transitions.js";
 
 export type MovementPlan=ReturnType<typeof prepareTransition>;
 export interface PreviewSummary {label:string;hint:string;reaction:boolean;paused:boolean}
+export type MovementCellKind = "walk" | "climb" | "swim" | "fly" | "fall" | "unknown" | "ruling" | "blocked";
+export interface MovementCellStatus extends PreviewSummary { kind: MovementCellKind }
+
+/** Preview a direct approach using the same surface transitions as executed movement. */
+export function movementCellStatus(token: MovementToken, origin: Waypoint, destination: Waypoint,
+    intent: MovementIntent = { kind: "voluntary" }): MovementCellStatus {
+    const plan = prepareTransition(token, { id: "cell-preview", origin,
+        passed: { waypoints: [destination] }, pending: { waypoints: [] } }, intent);
+    return movementPlanStatus(token, plan);
+}
+
+/** Classify an evaluated path without repeating its surface lookup. */
+export function movementPlanStatus(token: MovementToken, plan: MovementPlan): MovementCellStatus {
+    const summary = previewSummary(token, plan);
+    const transition = plan.transition;
+    if (transition) {
+        return { ...summary, kind: transition.reason === "ruling"
+            ? transition.landing.kind === "none" ? "unknown" : "ruling" : transition.reason };
+    }
+    const modes = plan.waypoints.map(point => point.action);
+    const kind = modes.includes("climb") ? "climb" : modes.includes("swim") ? "swim" : modes.includes("fly") ? "fly" : "walk";
+    return { ...summary, kind };
+}
+
 export function previewSummary(token:MovementToken,plan:MovementPlan):PreviewSummary {
     const t=plan.transition;
     if(!t) {
