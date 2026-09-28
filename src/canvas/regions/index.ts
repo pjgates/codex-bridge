@@ -46,6 +46,7 @@ export { isFloorType, isWaterType } from "./types.js";
 export { supportsAt, selectSupport } from "./support.js";
 export type { Support, SupportSelection, SurfaceScene, SurfaceRegion, PolygonNode, Point } from "./support.js";
 export { traceContacts, segmentParameters } from "./contacts.js";
+export { prepareSurfaceQueries } from "./query.js";
 export type { Contact, ContactWaypoint, OriginToken } from "./contacts.js";
 export { regionDC, terrainDC } from "./config.js";
 export { waterLanding } from "./water.js";

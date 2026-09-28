@@ -1,5 +1,6 @@
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
 import { faceBetween } from '../../../src/canvas/regions/faces.js';
+import { prepareSurfaceQueries } from '../../../src/canvas/regions/query.js';
 import type { SurfaceRegion } from '../../../src/canvas/regions/support.js';
 const box=(left:number,right:number)=>[left,-10,right,-10,right,10,left,10];
 function region(id:string,left:number,right:number,top:number,underside:number|null):SurfaceRegion {
@@ -9,6 +10,15 @@ function region(id:string,left:number,right:number,top:number,underside:number|n
  ],polygonTree:{polygon:{points:box(left,right)},testPoint:p=>p.x>=left&&p.x<=right&&Math.abs(p.y)<=10}};
 }
 const high={x:39,y:0,elevation:20,level:'upper'},low={x:41,y:0,elevation:0,level:'lower'};
+it('reuses indexed membership for repeated face checks without counting other floor boundaries',()=>{
+ const scene={regions:[region('ledge',0,40,20,null),region('ground',40,80,0,null),region('lower',39.5,80,-20,null)]};
+ const lookups=scene.regions.map(r=>vi.spyOn(r.polygonTree,'testPoint'));
+ const indexed=prepareSurfaceQueries(scene,10);
+ expect(faceBetween(indexed,high,low)).toMatchObject({kind:'face',regionId:'ledge'});
+ const counts=lookups.map(s=>s.mock.calls.length);
+ expect(faceBetween(indexed,low,high)).toMatchObject({kind:'face',regionId:'ledge'});
+ expect(lookups.map(s=>s.mock.calls.length)).toEqual(counts);
+});
 it.each([['thin',18,'gap'],['reaching',0,'face'],['solid',null,'face']] as const)('%s material gives the same face facts in both directions',(_name,underside,kind)=>{
  const scene={regions:[region('ledge',0,40,20,underside),region('ground',40,80,0,null)]};
  expect(faceBetween(scene,high,low)).toMatchObject({kind,regionId:'ledge'});

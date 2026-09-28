@@ -13,14 +13,16 @@ export interface SurfaceRegion {
     behaviors: Iterable<{ type: string; disabled: boolean; system: { extent?:string; underside?:number|null; blocksSight?:boolean; blocksLight?:boolean; elevation?: number; climbDC?: number | null; grabEdgeDC?: number | null; climbPreset?:string; swimPreset?:string; swimDC?:number|null } }>;
     polygonTree: PolygonNode;
 }
-export interface SurfaceScene { id?:string; regions: Iterable<SurfaceRegion> }
+export interface SurfaceScene { id?:string; regions: Iterable<SurfaceRegion>;
+    regionsAt?(point: Point): readonly SurfaceRegion[]; segmentParameters?(a: Point, b: Point): readonly number[] }
 export interface Support { regionId: string; elevation: number; levelIds: readonly string[] }
 export type SupportSelection = {kind: "surface"; support: Support; level: string} | {kind: "none"} | {kind: "ambiguous"; candidates: readonly Support[]};
 
 export function supportsAt(scene: SurfaceScene, point: Point): Support[] {
     const supports: Support[] = [];
-    for (const region of scene.regions) {
-        if (!region.polygonTree.testPoint(point)) continue;
+    const candidates = scene.regionsAt?.(point);
+    for (const region of candidates ?? scene.regions) {
+        if (!candidates && !region.polygonTree.testPoint(point)) continue;
         const behavior = [...region.behaviors].find(b => !b.disabled && isFloorType(b.type));
         if (behavior && Number.isFinite(behavior.system.elevation)) {
             supports.push({regionId: region.id, elevation: behavior.system.elevation!, levelIds: [...region.levels]});

@@ -9,7 +9,8 @@ export function swimProgress(speed:number,degree:0|1|2|3,distance:number,swimSpe
 }
 export function waterAtHeight(scene:SurfaceScene,point:Point,elevation:number):SurfaceRegion|undefined {
     if(supportsAt(scene,point).some(s=>Math.abs(s.elevation-elevation)<0.001))return;
-    return [...scene.regions].find(r=>r.polygonTree.testPoint(point) && [...r.behaviors].some(b=>!b.disabled&&isWaterType(b.type)) &&
+    const candidates=scene.regionsAt?.(point);
+    return [...(candidates??scene.regions)].find(r=>(!!candidates || r.polygonTree.testPoint(point)) && [...r.behaviors].some(b=>!b.disabled&&isWaterType(b.type)) &&
         typeof r.elevation?.top==="number" && elevation<=r.elevation.top && (r.elevation.bottom===null || r.elevation.bottom===undefined || elevation>r.elevation.bottom));
 }
 export function movementSupports(scene:SurfaceScene,point:Point,elevation:number):Support[] {
@@ -18,7 +19,8 @@ export function movementSupports(scene:SurfaceScene,point:Point,elevation:number
 }
 /** Include all water boundaries when tracing; occupancy is evaluated at the evolving path height. */
 export function contactSupports(scene:SurfaceScene,point:Point):Support[] {
-    return [...supportsAt(scene,point),...[...scene.regions].filter(r=>r.polygonTree.testPoint(point) && typeof r.elevation?.top==="number" &&
+    const candidates=scene.regionsAt?.(point);
+    return [...supportsAt(scene,point),...[...(candidates??scene.regions)].filter(r=>(!!candidates || r.polygonTree.testPoint(point)) && typeof r.elevation?.top==="number" &&
         [...r.behaviors].some(b=>!b.disabled&&isWaterType(b.type))).map(r=>({regionId:r.id,elevation:r.elevation!.top!,levelIds:[...r.levels]}))];
 }
 /** One Swim action ends inside this water body; a later move resolves the next terrain transition. */

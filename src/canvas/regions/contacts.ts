@@ -30,13 +30,13 @@ export interface Contact { leg: number; t: number; before: Support[]; after: Sup
 export interface OriginToken { getMovementOrigin(position: ContactWaypoint): Point }
 const identity = (supports: Support[]): string => supports.map(s=>`${s.regionId}:${s.elevation}`).sort().join("|");
 export function traceContacts(scene: SurfaceScene, token: OriginToken, waypoints: readonly ContactWaypoint[], query = supportsAt): Contact[] {
-    const polygons=[...scene.regions].filter(r=>[...r.behaviors].some(b=>!b.disabled&&(isFloorType(b.type)||isWaterType(b.type)))).flatMap(r=>rings(r.polygonTree));
+    const polygons=scene.segmentParameters?[]:[...scene.regions].filter(r=>[...r.behaviors].some(b=>!b.disabled&&(isFloorType(b.type)||isWaterType(b.type)))).flatMap(r=>rings(r.polygonTree));
     const contacts: Contact[]=[];
     for(let leg=0;leg<waypoints.length-1;leg++) {
         const start=waypoints[leg],end=waypoints[leg+1];
         const a=token.getMovementOrigin(start),b=token.getMovementOrigin({...start,...end});
         const at=(t:number): Point=>({x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t});
-        const parameters=unique([0,1,...polygons.flatMap(p=>segmentParameters(a,b,p))]);
+        const parameters=unique([0,1,...(scene.segmentParameters?.(a,b)??polygons.flatMap(p=>segmentParameters(a,b,p)))]);
         let before=query(scene,a);
         for(let i=0;i<parameters.length;i++) {
             const t=parameters[i],next=parameters[i+1];
