@@ -1,9 +1,11 @@
 import { Color } from "@pixi/color";
+import { Polygon } from "@pixi/math";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { activateMovementRings, movementBudget, registerMovementPreviewKeybind } from "../../../src/rulesets/sf2e/gridless/movement.js";
 import { dragPaths } from "../../../src/rulesets/sf2e/gridless/routing.js";
 import type { AttackItem, PreparedAttack } from "../../../src/rulesets/sf2e/gridless/reach.js";
 import { registerGridlessSetting } from "../../../src/rulesets/sf2e/gridless/settings.js";
+import { registerMovementSettings } from "../../../src/rulesets/sf2e/movement/settings.js";
 
 interface PreviewBinding { onDown(): boolean; onUp(): boolean }
 let releasePreview: (() => boolean) | undefined;
@@ -43,18 +45,27 @@ function setupMovementCanvas() {
     class Graphics extends Container {
         circles: { radius: number; fillAlpha: number; color: number }[] = [];
         polygons: number[][] = [];
-        paintedPolygons: { points: number[]; stroke: number; fill: number; alpha: number }[] = [];
+        paintedPolygons: { points: number[]; stroke: number; width: number; strokeAlpha: number; fill: number; alpha: number }[] = [];
+        paintedSegments: { from: number[]; to: number[]; stroke: number; width: number; fillAlpha: number }[] = [];
+        pen = [0, 0];
         fillColor = 0;
         fillAlpha = 0;
         color = 0;
+        lineWidth = 0;
+        lineAlpha = 1;
         get radii() {
             const radii = this.circles.map(circle => circle.radius);
             if (this.polygons.length) radii.push(Math.max(...this.polygons.flatMap(points =>
                 points.filter((_point, index) => index % 2 === 0).map((x, index) => Math.hypot(x, points[index * 2 + 1])))));
             return radii;
         }
-        clear() { this.circles = []; this.polygons = []; this.paintedPolygons = []; this.fillAlpha = 0; return this; }
-        lineStyle(_width = 0, color = 0) { this.color = color; return this; }
+        clear() { this.circles = []; this.polygons = []; this.paintedPolygons = []; this.paintedSegments = []; this.fillAlpha = 0; return this; }
+        moveTo(x: number, y: number) { this.pen = [x, y]; return this; }
+        lineTo(x: number, y: number) {
+            this.paintedSegments.push({from: this.pen, to: [x, y], stroke: this.color, width: this.lineWidth, fillAlpha: this.fillAlpha});
+            this.pen = [x, y]; return this;
+        }
+        lineStyle(width = 0, color = 0, alpha = 1) { this.lineWidth = width; this.color = color; this.lineAlpha = alpha; return this; }
         beginFill(color: number, alpha = 1) { this.fillColor = color; this.fillAlpha = alpha; return this; }
         endFill() { this.fillAlpha = 0; return this; }
         drawCircle(_x: number, _y: number, radius: number) {
@@ -62,7 +73,8 @@ function setupMovementCanvas() {
         }
         drawPolygon(points: number[]) {
             this.polygons.push(points);
-            this.paintedPolygons.push({ points, stroke: this.color, fill: this.fillColor, alpha: this.fillAlpha });
+            this.paintedPolygons.push({ points, stroke: this.color, width: this.lineWidth, strokeAlpha: this.lineAlpha,
+                fill: this.fillColor, alpha: this.fillAlpha });
             return this;
         }
     }
@@ -85,22 +97,30 @@ function setupMovementCanvas() {
             id, controlled: false, isDragged: false, center: { x: 100, y: 200 }, w: 100, h: 100, movementAnimationPromise: null as Promise<void> | null,
             scene,
             actor: {
+                uuid: `Actor.${id}`,
+                items: [],
                 system: { actions: [] as PreparedAttack[], movement: { speeds: { land: { value: 25 } } } },
                 getReach: ({ weapon }: { weapon: AttackItem }) => reaches.get(weapon) ?? 5,
             },
             document: {
-                id, parent: { id: "scene" }, movementHistory: [{ x: 0, y: 0, cost: 0 }],
+                id, uuid: id, parent: scene, actor: null as unknown,
+                getMovementOrigin(point: { x: number; y: number }) { return { x: point.x + 50, y: point.y + 50 }; },
+                movementHistory: [{ x: 0, y: 0, cost: 0 }],
                 _source: { x: 100, y: 200, width: 1, height: 1, depth: 1, shape: 4, elevation: 0, level: "floor" },
                 movementAction: "walk",
+                movement: { origin: {x: 100, y: 200, width: 1, height: 1, depth: 1, shape: 4, elevation: 0, level: "floor"}, state: "completed" },
                 getCenterPoint(point: { x: number; y: number }) { return point; },
+                getOccupiedGridSpaceOffsets(_point?: unknown) { return [{ i: 2, j: 1 }]; },
             },
             renderFlags: { set: (_options?: unknown): void => { callbacks.refreshToken?.(token, {}); } },
             createTerrainMovementPath(points: unknown[]) { return points; },
+            constrainMovementPath(points: { x: number; y: number }[]): [typeof points, boolean] { return [points, false]; },
             measureMovementPath(points: { x: number; y: number; cost?: number; terrain?: { difficulty: number } }[]) {
                 return { cost: points.reduce((sum, point, index) => sum + (point.cost
                     ?? (index ? Math.hypot(point.x - points[index - 1].x, point.y - points[index - 1].y) / 20 * (point.terrain?.difficulty ?? 1) : 0)), 0) };
             }
         };
+        token.document.actor = token.actor;
         return token;
     };
     const token = makeToken("token");
@@ -115,7 +135,15 @@ function setupMovementCanvas() {
     const combat = { started: true, combatant };
     const bindings = new Map<string, PreviewBinding>();
     const interfaceLayer = new Container();
-    vi.stubGlobal("PIXI", { Container, Graphics, Text, Sprite, Color });
+    vi.stubGlobal("PIXI", { Container, Graphics, Text, Sprite, Color, Polygon });
+    vi.stubGlobal("foundry", { canvas: { rendering: { filters: { VisionMaskFilter: { create: () => ({}) } } },
+        borders: { drawBorder(graphic: Graphics, shape: Polygon, options: { color: number; clear: boolean }) {
+            if (options.clear !== false) graphic.clear();
+            const width = CONFIG.Canvas.objectBorderThickness * (canvas!.dimensions as unknown as { uiScale: number }).uiScale;
+            graphic.lineStyle(width, 0x000000).drawPolygon(shape.points);
+            graphic.lineStyle(width / 2, options.color).drawPolygon(shape.points);
+        } },
+    } });
     vi.stubGlobal("ClipperLib", {
         PolyType: { ptSubject: 0 }, ClipType: { ctUnion: 1 }, PolyFillType: { pftNonZero: 1 },
         Clipper: class {
@@ -125,8 +153,15 @@ function setupMovementCanvas() {
             Execute(_operation: number, result: unknown[]) { result.push(...this.paths); }
         },
     });
-    vi.stubGlobal("CONFIG", { Token: { rulerClass: Ruler, movement: { actions: { walk: { walls: "move" } } } } });
-    vi.stubGlobal("Hooks", { on(name: string, callback: (...args: unknown[]) => void) { callbacks[name] = callback; } });
+    vi.stubGlobal("CONFIG", { Canvas: { objectBorderThickness: 4 },
+        Token: { rulerClass: Ruler, movement: { actions: { walk: { walls: "move" } } } } });
+    vi.stubGlobal("Hooks", {
+        on(name: string, callback: (...args: unknown[]) => void) {
+            const previous = callbacks[name];
+            callbacks[name] = (...args) => { previous?.(...args); callback(...args); };
+        },
+        callAll(name: string, ...args: unknown[]) { callbacks[name]?.(...args); },
+    });
     const settingValues: Record<string, unknown> = { gridlessCombat: true };
     const registeredSettings = new Map<string, { default: unknown; onChange?: (value: unknown) => void }>();
     vi.stubGlobal("game", { user: { id: "user", isGM: true }, combat, system: { id: "pf2e" },
@@ -139,9 +174,13 @@ function setupMovementCanvas() {
             localize: (key: string) => key.endsWith(".reach") ? "Reach" : "Range",
             format: (_key: string, data: { distance: string; attacks?: string }) => data.attacks ? `${data.attacks}: ${data.distance} ft` : `${data.distance} ft left`,
         } });
-    vi.stubGlobal("canvas", { ready: true, scene: { id: "scene" }, grid: { isGridless: true, units: "ft", size: 100 },
-        dimensions: { distancePixels: 20 }, stage: { scale: { x: 1 } }, interface: interfaceLayer, tokens: { controlled } });
+    vi.stubGlobal("canvas", { ready: true, scene: { id: "scene" }, grid: { isGridless: true, units: "ft", size: 100,
+        measurePath: (points: {x: number; y: number}[]) => ({cost: Math.hypot(points[1].x - points[0].x, points[1].y - points[0].y) / 20}) },
+        dimensions: { distance: 5, distancePixels: 20, uiScale: 1 }, stage: { scale: { x: 1 },
+            on(name: string, callback: (...args: unknown[]) => void) { callbacks[name] = callback; }, off() {} },
+        interface: interfaceLayer, tokens: { controlled } });
     registerGridlessSetting();
+    registerMovementSettings();
     registerMovementPreviewKeybind();
     const binding = bindings.get("previewMovement")!;
     releasePreview = binding.onUp;
@@ -167,6 +206,15 @@ function setupMovementCanvas() {
     };
     return { token, other, callbacks, combat, combatant, binding, radii, attackCircles, reaches,
         polygons: () => visibleGraphics().flatMap(graphic => graphic.polygons),
+        hazards: () => visibleGraphics().filter(graphic => (graphic as Graphics & { name?: string }).name === "codex-movement-hazards")
+            .flatMap(graphic => graphic.paintedPolygons),
+        hazardSegments: () => visibleGraphics().filter(graphic => (graphic as Graphics & { name?: string }).name === "codex-movement-hazards")
+            .flatMap(graphic => graphic.paintedSegments),
+        visibleLabels: () => interfaceLayer.children.flatMap(container => container.children)
+            .filter((child): child is Text => child instanceof Text && child.visible).map(label => label.text),
+        hazardLabels: () => interfaceLayer.children.filter(container => container.children.some(child =>
+            (child as Graphics & { name?: string }).name === "codex-movement-hazards")).flatMap(container => container.children)
+            .filter((child): child is Text => child instanceof Text && child.visible).map(label => label.text),
         debugHexes: () => visibleGraphics().flatMap(graphic => graphic.paintedPolygons).filter(p => p.alpha > 0 && p.points.length === 12),
         frontier: () => {
             const layer = visibleGraphics().find(graphic => (graphic as Graphics & { name?: string }).name === "codex-movement-frontier");
@@ -180,6 +228,258 @@ function setupMovementCanvas() {
             return graphic && { x: graphic.position.x, y: graphic.position.y, polygons: graphic.polygons.map(p => [...p]) };
         }, select, settings: settingValues, ruler: new Ruler(token) };
 }
+
+function setupHazardCanvas(style: "outline" | "plus" = "outline") {
+    const fixture = setupMovementCanvas();
+    if (style === "outline") fixture.setSetting("movementHazardStyle", style);
+    const points = [-1000, -1000, 300, -1000, 300, 1000, -1000, 1000];
+    Object.assign(fixture.token.scene, { regions: [{ id: "floor", levels: new Set(["floor"]),
+        hidden: false, includedInLevel: () => true, testPoint: (point: { x: number }) => point.x < 300,
+        polygons: [{ points }], polygonTree: { polygon: { points }, testPoint: (point: { x: number }) => point.x < 300 },
+        behaviors: [{ type: "codex-foundry.setElevation", disabled: false, system: { elevation: 0, _getTerrainEffects: () => [] } }],
+    }] });
+    return fixture;
+}
+
+it("defaults to centered plus markers, retains whole-cell hover and can switch to outlines", async () => {
+    const {binding, hazards, hazardSegments, callbacks, setSetting, hazardLabels, radii} = setupHazardCanvas("plus");
+    binding.onDown();
+    expect(hazards()).toHaveLength(0);
+    expect(hazardSegments().some(line => line.stroke === 0xffffff)).toBe(true);
+    expect(hazardSegments().some(line => line.stroke === 0xbb88ff)).toBe(true);
+    expect(hazardSegments().every(line => line.fillAlpha === 0)).toBe(true);
+    for (const zoom of [1, 0.5]) {
+        canvas!.stage!.scale.x = zoom; callbacks.canvasPan();
+        const horizontal = hazardSegments().find(line => line.stroke === 0xffffff
+            && line.from[1] === 0 && line.to[1] === 0 && line.from[0] === -line.to[0])!;
+        expect((horizontal.to[0] - horizontal.from[0]) * zoom).toBeCloseTo(12);
+        expect(horizontal.width * zoom).toBe(2);
+    }
+    await radii();
+    Object.assign(canvas!, {mousePosition: {x: 30, y: 20}}); callbacks.pointermove();
+    expect(hazardLabels()).toEqual(["Best route: Walk"]);
+    setSetting("movementHazardStyle", "outline");
+    expect(hazards().length).toBeGreaterThan(0);
+    expect(hazardSegments()).toEqual([]);
+});
+
+it("keeps colors anchored to the starting position through waypoints and movement, then resets", async () => {
+    const {token, binding, ruler, callbacks, hazardLabels, radii} = setupHazardCanvas("plus");
+    const floor = (id: string, left: number, right: number, elevation: number) => {
+        const points = [left, -1000, right, -1000, right, 1000, left, 1000];
+        return {id, levels: new Set(["floor"]), hidden: false, includedInLevel: () => true,
+            polygons: [{points}], polygonTree: {polygon: {points}, testPoint: (p: {x: number}) => p.x >= left && p.x < right},
+            behaviors: [{type: "codex-foundry.setElevation", disabled: false, system: {elevation, _getTerrainEffects: () => []}},
+                {type: "codex-foundry.surfaceGeometry", disabled: false,
+                    system: {extent: "solid", underside: null, blocksSight: true, blocksLight: true, _getTerrainEffects: () => []}}]};
+    };
+    Object.assign(token.scene, {regions: [floor("low", -1000, 300, 0), floor("high", 300, 1000, 20)]});
+    const start = {...token.document._source, action: "walk"};
+    const end = {...start, x: 450, elevation: 20};
+    const hover = () => {Object.assign(canvas!, {mousePosition: {x: 700, y: 0}}); callbacks.pointermove(); return hazardLabels()[0];};
+    binding.onDown();
+    await radii();
+    expect(hover()).toContain("Best route: Climb");
+    token.isDragged = true;
+    dragPaths.set(token as never, [start, end] as never);
+    ruler.refresh({passedWaypoints: [], pendingWaypoints: [], plannedMovement: {user: {foundPath: [start, end]}}});
+    expect(hover()).toContain("Best route: Climb");
+    dragPaths.set(token as never, [start, {...end, x: 350, checkpoint: true}, end] as never);
+    ruler.refresh({passedWaypoints: [], pendingWaypoints: [end], plannedMovement: {}});
+    expect(hover()).toContain("Best route: Climb");
+    token.isDragged = false;
+    Object.assign(token.document._source, end);
+    token.document.movement = {origin: start, state: "pending"};
+    token.movementAnimationPromise = Promise.resolve();
+    ruler.refresh({passedWaypoints: [], pendingWaypoints: [end], plannedMovement: {}});
+    expect(hover()).toContain("Best route: Climb");
+    token.movementAnimationPromise = null;
+    token.document.movement.state = "completed";
+    ruler.refresh({passedWaypoints: [], pendingWaypoints: [], plannedMovement: {}});
+    await radii();
+    expect(hover()).toBe("Best route: Walk");
+});
+
+it("updates markers and hover to the walking route around a gap, and cancels the search on release", async () => {
+    const {token, binding, hazardSegments, hazardLabels, callbacks, radii} = setupHazardCanvas("plus");
+    const rect = (left: number, top: number, right: number, bottom: number) => ({
+        polygon: {points: [left, top, right, top, right, bottom, left, bottom]},
+        testPoint: (p: {x: number; y: number}) => p.x >= left && p.x < right && p.y >= top && p.y < bottom,
+    });
+    const outer = rect(-1000, -1000, 1000, 1000), hole = rect(300, -100, 500, 300);
+    const region = {id: "deck", levels: new Set(["floor"]), hidden: false, includedInLevel: () => true,
+        polygons: [outer.polygon], polygonTree: {...outer, children: [hole],
+            testPoint: (p: {x: number; y: number}) => outer.testPoint(p) && !hole.testPoint(p)},
+        behaviors: [{type: "codex-foundry.setElevation", disabled: false, system: {elevation: 0, _getTerrainEffects: () => []}},
+            {type: "codex-foundry.surfaceGeometry", disabled: false,
+                system: {extent: "finite", underside: -2, blocksSight: true, blocksLight: true, _getTerrainEffects: () => []}}]};
+    Object.assign(token.scene, {regions: [region]});
+    const hover = () => {Object.assign(canvas!, {mousePosition: {x: 700, y: 0}}); callbacks.pointermove(); return hazardLabels()[0];};
+    binding.onDown();
+    await radii();
+    expect(hover()).toBe("Best route: Walk");
+    expect(hazardSegments().some(line => line.stroke === 0xffffff
+        && (line.from[0] + line.to[0]) / 2 === 700 && line.from[1] === 0 && line.to[1] === 0)).toBe(true);
+    binding.onUp(); binding.onDown(); binding.onUp(); await radii();
+    expect(hazardSegments()).toEqual([]);
+});
+
+it("reuses a completed field in the same origin cell and invalidates it for terrain edits", async () => {
+    const { token, other, binding, radii, callbacks, setSetting } = setupHazardCanvas();
+    setSetting("gridlessCombat", false);
+    const measure = vi.spyOn(token, "measureMovementPath");
+    binding.onDown(); await radii();
+    const calls = measure.mock.calls.length;
+    expect(calls).toBeGreaterThan(0);
+    binding.onUp(); binding.onDown(); await radii();
+    expect(measure.mock.calls.length).toBe(calls);
+    callbacks.visibilityRefresh?.(); await radii();
+    expect(measure.mock.calls.length).toBe(calls);
+    token.document._source.x += 1;
+    callbacks.refreshToken?.(); await radii();
+    expect(measure.mock.calls.length).toBe(calls);
+    token.document._source.x += 100;
+    callbacks.refreshToken?.(); await radii();
+    const afterMove = measure.mock.calls.length;
+    expect(afterMove).toBeGreaterThan(calls);
+    callbacks.updateRegion?.(); await radii();
+    expect(measure.mock.calls.length).toBeGreaterThan(afterMove);
+    const beforeActorChange = measure.mock.calls.length;
+    token.actor = other.actor; token.document.actor = other.actor;
+    callbacks.refreshToken?.(); await radii();
+    expect(measure.mock.calls.length).toBeGreaterThan(beforeActorChange);
+    const beforeRuleChange = measure.mock.calls.length;
+    callbacks.updateSetting?.({key: "codex-foundry.climbOutsideCombat"}); await radii();
+    expect(measure.mock.calls.length).toBeGreaterThan(beforeRuleChange);
+    const beforeStyleChange = measure.mock.calls.length;
+    callbacks.updateSetting?.({key: "codex-foundry.movementHazardStyle"}); await radii();
+    expect(measure.mock.calls.length).toBe(beforeStyleChange);
+});
+
+it("shows unknown landings beyond walking reach and clears them after preview or selection ends", async () => {
+    const { token, other, binding, hazards, radii, select, ruler, settings, callbacks, visibleLabels, hazardLabels } = setupHazardCanvas();
+    expect(hazards()).toEqual([]);
+    binding.onDown();
+    await radii();
+    expect(hazardLabels()).toEqual([]);
+    expect(hazards().some(cell => {
+        const xs = cell.points.filter((_value, index) => index % 2 === 0);
+        const ys = cell.points.filter((_value, index) => index % 2 === 1);
+        return Math.abs(xs.reduce((sum, x) => sum + x, 0) / xs.length - 100) < 0.01
+            && Math.abs(ys.reduce((sum, y) => sum + y, 0) / ys.length - 173.205) < 0.01;
+    })).toBe(false);
+    Object.assign(canvas!, { mousePosition: { x: 100, y: 200 } });
+    callbacks.pointermove();
+    expect(hazardLabels()).toEqual([]);
+    expect(hazards().some(cell => cell.stroke === 0xbb88ff && cell.points.some((value, index) => index % 2 === 0 && value > 650))).toBe(true);
+    Object.assign(canvas!, { mousePosition: { x: 400, y: 200 } });
+    callbacks.pointermove();
+    expect(visibleLabels().some(text => text.startsWith("Direct approach: Landing unknown"))).toBe(true);
+    binding.onUp();
+    expect(hazards()).toEqual([]);
+    ruler.refresh({ passedWaypoints: [], pendingWaypoints: [{ x: 180, y: 200 }], plannedMovement: {} });
+    expect(hazards().length).toBeGreaterThan(0);
+    ruler.clear();
+    expect(hazards()).toEqual([]);
+    binding.onDown();
+    select([]);
+    expect(hazards()).toEqual([]);
+    select([token]);
+    expect(hazards().length).toBeGreaterThan(0);
+    callbacks.destroyToken(other);
+    expect(hazards().length).toBeGreaterThan(0);
+    binding.onUp();
+    token.movementAnimationPromise = Promise.resolve();
+    callbacks.refreshToken(token, {});
+    expect(hazards().length).toBeGreaterThan(0);
+    token.movementAnimationPromise = null;
+    callbacks.refreshToken(token, {});
+    expect(hazards()).toEqual([]);
+    binding.onDown();
+    settings.enableCustomRules = false;
+    token.renderFlags.set({ refreshRuler: true });
+    expect(hazards()).toEqual([]);
+});
+
+it.each(["square", "hex"])("uses native %s cells and hides cells the player cannot see", async grid => {
+    const { token, binding, hazards, hazardSegments, setSetting, radii, callbacks, hazardLabels } = setupHazardCanvas();
+    token.document._source.width = 2;
+    token.document.getOccupiedGridSpaceOffsets = () => [{ i: 2, j: 1 }, { i: 2, j: 2 }];
+    Object.assign(canvas!.grid!, { isGridless: false, distance: 5,
+        getOffset: ({x, y}: {x: number; y: number}) => ({i: Math.floor(y / 100), j: Math.floor(x / 100)}),
+        getAdjacentOffsets: ({i, j}: {i: number; j: number}) => [{i, j: j + 1}, {i, j: j - 1}, {i: i + 1, j}, {i: i - 1, j}],
+        getOffsetRange: () => [-1, -1, 4, 7],
+        getCenterPoint: ({ i, j }: { i: number; j: number }) => ({ x: j * 100 + 50, y: i * 100 + 50 }),
+        getVertices: ({ i, j }: { i: number; j: number }) => grid === "hex" ? [
+            { x: j * 100 + 50, y: i * 100 }, { x: j * 100 + 100, y: i * 100 + 25 },
+            { x: j * 100 + 100, y: i * 100 + 75 }, { x: j * 100 + 50, y: i * 100 + 100 },
+            { x: j * 100, y: i * 100 + 75 }, { x: j * 100, y: i * 100 + 25 },
+        ] : [
+            { x: j * 100, y: i * 100 }, { x: j * 100 + 100, y: i * 100 },
+            { x: j * 100 + 100, y: i * 100 + 100 }, { x: j * 100, y: i * 100 + 100 },
+        ],
+    });
+    expect(binding.onDown()).toBe(true);
+    await radii();
+    expect(hazards().length).toBeGreaterThan(0);
+    expect(hazards().every(cell => cell.points.length === (grid === "hex" ? 12 : 8))).toBe(true);
+    expect(hazards().some(cell => cell.stroke === 0xffffff)).toBe(true);
+    expect(hazards().some(cell => cell.stroke === 0xbb88ff)).toBe(true);
+    expect(hazards().every(cell => cell.alpha === 0)).toBe(true);
+    expect(hazardLabels()).toEqual([]);
+    expect(hazards().some(cell => {
+        const xs = cell.points.filter((_value, index) => index % 2 === 0);
+        const ys = cell.points.filter((_value, index) => index % 2 === 1);
+        const x = xs.reduce((sum, value) => sum + value, 0) / xs.length;
+        const y = ys.reduce((sum, value) => sum + value, 0) / ys.length;
+        return Math.abs(y - 250) < 0.01 && [150, 250].some(occupiedX => Math.abs(x - occupiedX) < 0.01);
+    })).toBe(false);
+    for (const zoom of [1, 0.5]) {
+        canvas!.stage!.scale.x = zoom;
+        callbacks.canvasPan();
+        const cell = hazards().find(cell => cell.points.every(value => value >= 0 && value <= 100))!;
+        // The fixture's top edge is y=0 (square) or x-2y=50 (hex).
+        const inset = grid === "square" ? cell.points[1]
+            : Math.abs(cell.points[0] - 2 * cell.points[1] - 50) / Math.sqrt(5);
+        expect((inset - cell.width / 2) * zoom).toBeCloseTo(2);
+        expect(hazards().some(cell => cell.stroke === 0x000000 && cell.width === 4)).toBe(true);
+        expect(hazards().some(cell => cell.stroke === 0xffffff && cell.width === 2 && cell.strokeAlpha === 1)).toBe(true);
+    }
+    setSetting("movementHazardStyle", "plus");
+    expect(hazards()).toHaveLength(0);
+    expect(hazardSegments().some(line => line.stroke === 0xffffff
+        && (line.from[0] + line.to[0]) / 2 === 50 && (line.from[1] + line.to[1]) / 2 === 50)).toBe(true);
+    Object.assign(game.user!, { isGM: false });
+    Object.assign(canvas!, { visibility: { tokenVision: true, testVisibility: () => false }, fog: { isPointExplored: () => false } });
+    token.renderFlags.set({ refreshRuler: true });
+    expect(hazards()).toEqual([]);
+    expect(hazardSegments()).toHaveLength(0);
+});
+
+it("hides wall-blocked cells and explains the block on hover", async () => {
+    const { token, binding, hazards, hazardSegments, setSetting, callbacks, visibleLabels } = setupHazardCanvas();
+    Object.assign(canvas!.grid!, { isGridless: false,
+        getOffset: ({x}: {x: number}) => ({i: 2, j: Math.floor(x / 100)}),
+        getAdjacentOffsets: ({i, j}: {i: number; j: number}) => [{i, j: j + 1}, {i, j: j - 1}],
+        getOffsetRange: () => [0, 0, 1, 5],
+        getCenterPoint: ({ j }: { j: number }) => ({ x: j * 100 + 50, y: 250 }),
+        getVertices: ({ j }: { j: number }) => [
+            { x: j * 100, y: 200 }, { x: j * 100 + 100, y: 200 },
+            { x: j * 100 + 100, y: 300 }, { x: j * 100, y: 300 },
+        ],
+    });
+    token.constrainMovementPath = points => [points, points.at(-1)!.x >= 300];
+    binding.onDown();
+    expect(hazards().some(cell => cell.points.some((x, i) => i % 2 === 0 && x > 300))).toBe(false);
+    Object.assign(canvas!, { mousePosition: { x: 350, y: 250 } });
+    callbacks.pointermove();
+    expect(visibleLabels()).toContain("Direct approach: Blocked");
+    setSetting("movementHazardStyle", "plus");
+    expect(hazardSegments().every(line => [...line.from, ...line.to].filter((_p, i) => i % 2 === 0).every(x => x < 300))).toBe(true);
+    token.constrainMovementPath = points => [points, false];
+    callbacks.deleteWall();
+    expect(hazardSegments().some(line => line.stroke === 0xbb88ff)).toBe(true);
+});
 
 it("retains the movement budget during hold preview, drag cancellation, and turn changes", async () => {
     const { token, callbacks, combat, combatant, binding, radii, ruler, select } = setupMovementCanvas();
@@ -422,6 +722,8 @@ it("paints a red rim with a climb icon along a ledge the token cannot walk up", 
     const { token, settings, radii, frontier, binding } = setupMovementCanvas();
     settings.movementLattice = "hex";
     const floor = (elevation: number, points: number[]) => ({
+        id: String(elevation), levels: new Set(["floor"]),
+        polygonTree: { polygon: { points }, testPoint: (point: { x: number }) => elevation === 0 ? point.x < 300 : point.x >= 300 },
         hidden: false, includedInLevel: () => true, testPoint: () => false, polygons: [{ points }],
         behaviors: [{ type: "map-workshop-importer.setElevation", disabled: false, system: { elevation, _getTerrainEffects: () => [] } }],
     });
