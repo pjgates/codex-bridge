@@ -3,7 +3,7 @@ import { resolveHtmlRoot } from "../shared/html.js";
 
 const groups: Record<string, string[]> = {
     rules: ["enableCustomRules", "enableTargetHelper", "playersRollAllDice", "pradStrictDCs", "heroicRerolls"],
-    movement: ["promptMovementChecks", "enableClimbing", "climbOutsideCombat", "enableSwimming", "swimOutsideCombat", "explorationMovementNotices", "enableFalling", "enableFlightUpkeep", "enableForcedMovement", "movementOutcomeMode"],
+    movement: ["movementHazardStyle", "promptMovementChecks", "enableClimbing", "climbOutsideCombat", "enableSwimming", "swimOutsideCombat", "explorationMovementNotices", "enableFalling", "enableFlightUpkeep", "enableForcedMovement", "movementOutcomeMode"],
     gridless: ["gridlessCombat", "movementPreview", "movementLattice"],
     utilities: ["coveredTokenOutlines", "enableCodexSync", "codexSyncPassphrase", "enableStatblockImporter"],
     diagnostics: ["movementDebug"],
@@ -13,6 +13,7 @@ export function settingDependencies(values: Readonly<Record<string, boolean>>): 
     const off = !values.enableCustomRules;
     return {
         enableTargetHelper: off, heroicRerolls: off,
+        movementHazardStyle: off,
         enableClimbing: off, climbOutsideCombat: off, enableSwimming: off, swimOutsideCombat: off, enableFalling: off, enableForcedMovement: off,
         enableFlightUpkeep: off || !values.enableFalling, movementOutcomeMode: off, explorationMovementNotices: off,
         playersRollAllDice: off || !values.enableTargetHelper,

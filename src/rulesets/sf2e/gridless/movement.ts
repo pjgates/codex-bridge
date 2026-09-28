@@ -6,6 +6,7 @@ import { getAttackRanges, type AttackActor, type AttackRange, type PreparedAttac
 import { dragPaths, getMovementArea, isKnownMovementPoint, measureProposedMovement, mergeMovementArea, type MovementAreaJob } from "./routing.js";
 import { TERRAIN_COLORS, type DebugTerrain } from "./debug.js";
 import type { FrontierReason } from "./hexfield.js";
+import { activateMovementHazards } from "./hazards.js";
 
 /** Font Awesome solid glyph for an icon class, read from the loaded stylesheet so it always matches the ruler's own icons. */
 const glyphCache = new Map<string, string>();
@@ -68,24 +69,31 @@ let movementPreviewHeld = false;
 export function registerMovementPreviewKeybind(): void {
     const refreshControlled = (): void => {
         if (canvas?.ready) for (const token of canvas.tokens!.controlled) token.renderFlags.set({ refreshRuler: true });
+        (Hooks as unknown as { callAll(name: string): void }).callAll("codexMovementPreviewChanged");
+    };
+    const release = (): boolean => {
+        const wasHeld = movementPreviewHeld;
+        movementPreviewHeld = false;
+        if (wasHeld) refreshControlled();
+        return wasHeld;
     };
     game.keybindings!.register(MODULE_ID, "previewMovement", {
         name: "codex-foundry.gridless.previewMovementName",
         hint: "codex-foundry.gridless.previewMovementHint",
         editable: [],
         onDown: () => {
-            if (!isGridlessActive()) return false;
+            if (!canvas?.ready || !["pf2e", "sf2e"].includes(game.system!.id)
+                || !game.settings!.get(MODULE_ID, "enableCustomRules")) return false;
             movementPreviewHeld = true;
             refreshControlled();
             return true;
         },
-        onUp: () => {
-            const wasHeld = movementPreviewHeld;
-            movementPreviewHeld = false;
-            if (wasHeld) refreshControlled();
-            return wasHeld;
-        },
+        onUp: release,
     });
+    if (typeof window !== "undefined") {
+        window.addEventListener("blur", release);
+        window.addEventListener("keydown", event => { if (event.key === "Escape") release(); });
+    }
 }
 
 /** Movement only: other actions do not spend this distance budget. */
@@ -100,6 +108,7 @@ export function ownTurn(token: Token.Implementation): boolean {
 }
 
 export function activateMovementRings(): void {
+    activateMovementHazards(() => movementPreviewHeld);
     let container: PIXI.Container | null = null;
     let fogMask: PIXI.Sprite | null = null;
     const previews = new WeakMap<Token.Implementation, MovementPreview>();

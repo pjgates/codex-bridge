@@ -23,6 +23,7 @@ declare global {
         "codex-foundry.terrainCheckOverride": string;
         "codex-foundry.enableClimbing": boolean;
         "codex-foundry.gridPathfinding": boolean;
+        "codex-foundry.movementHazardStyle": "plus" | "outline";
         "codex-foundry.coveredTokenOutlines": boolean;
         "codex-foundry.enableSwimming": boolean;
         "codex-foundry.explorationMovementNotices": boolean;

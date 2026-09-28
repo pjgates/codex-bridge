@@ -6,6 +6,12 @@ export function registerMovementSettings(): void {
         name: `${MODULE_ID}.movement.gridPathfinding`, scope: "client", config: false, type: Boolean, default: true,
     });
     const hooks = Hooks as unknown as { on(name: string, callback: (...args: never[]) => unknown): void; callAll(name: string): void };
+    game.settings!.register(MODULE_ID, "movementHazardStyle", {
+        name: `${MODULE_ID}.settings.movementHazardStyle.name`, hint: `${MODULE_ID}.settings.movementHazardStyle.hint`,
+        scope: "client", config: true, type: String, default: "plus",
+        choices: { plus: `${MODULE_ID}.settings.movementHazardStyle.plus`, outline: `${MODULE_ID}.settings.movementHazardStyle.outline` },
+        onChange: () => hooks.callAll("codexMovementPreviewChanged"),
+    });
     hooks.on("getSceneControlButtons", (controls: Record<string, { tools: Record<string, unknown> }>) => {
         if (!controls.tokens || canvas?.grid?.isGridless || !game.settings!.get(MODULE_ID, "enableCustomRules")) return;
         controls.tokens.tools.pathfinding = { name: "pathfinding", order: 3,

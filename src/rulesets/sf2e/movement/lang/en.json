@@ -1,6 +1,12 @@
 {
     "codex-foundry": {
         "settings": {
+            "movementHazardStyle": {
+                "name": "Movement cell style",
+                "hint": "Choose how nearby cells show movement status for the selected token. Hover a cell for details.",
+                "plus": "Center + markers",
+                "outline": "Cell outlines"
+            },
             "explorationMovementNotices": {
                 "name": "Announce unchecked exploration movement",
                 "hint": "Post one compact Climb/Swim message after movement when the relevant checks are disabled outside combat."
