@@ -242,10 +242,31 @@ describe("main-world page adapter", () => {
         vi.useRealTimers();
     });
 
+    it("stays active without fallback when no scene is available at startup", () => {
+        vi.useFakeTimers();
+        vi.spyOn(console, "warn").mockImplementation(() => undefined);
+        const fake = globals(true);
+        delete fake.canvas;
+        const { observations } = install(fake);
+        command("activate");
+        vi.advanceTimersByTime(60_000);
+        expect(parsedTypes(observations)).toEqual(["handshake", "target"]);
+        expect(JSON.parse(observations[0] as string)).toMatchObject({ payload: { status: "active" } });
+        fake.canvas = { scene: { id: "scene" } };
+        Object.assign(window, { canvas: fake.canvas });
+        hookCallback(fake, "canvasReady")();
+        expect(parsedTypes(observations)).toEqual(["handshake", "target", "scope", "target"]);
+        vi.useRealTimers();
+    });
+
     it("switches to fallback with the known identity when startup fails after compatibility passed", () => {
         const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
         const fake = globals(true);
-        delete fake.canvas;
+        let nextId = 1;
+        fake.Hooks!.on = vi.fn((name: string) => {
+            if (name === "canvasReady") throw new Error("hooks broken");
+            return nextId++;
+        });
         const { observations } = install(fake);
         command("activate");
         expect(parsedTypes(observations)).toEqual(["handshake", "handshake"]);
@@ -262,7 +283,7 @@ describe("main-world page adapter", () => {
             userId: "me",
             reason: expect.any(String),
         });
-        expect(fake.Hooks?.off).toHaveBeenCalledTimes(fake.Hooks?.on.mock.calls.length ?? -1);
+        expect(fake.Hooks?.off).toHaveBeenCalledTimes((fake.Hooks?.on.mock.calls.length ?? 0) - 1);
         expect(warn).toHaveBeenCalled();
     });
 
@@ -423,14 +444,19 @@ describe("main-world page adapter", () => {
         expect(String(warn.mock.calls[1]?.[0])).toContain("destroy broken");
     });
 
-    it("warns with a bounded message and falls back when startup fails", () => {
+    it("warns with a bounded message and reports unsupported when the identity is unavailable", () => {
+        vi.useFakeTimers();
         const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
         const fake = globals(true);
         fake.game!.system = null;
         const { observations } = install(fake);
         expect(() => command("activate")).not.toThrow();
+        vi.advanceTimersByTime(60_000);
         expect(parsedTypes(observations)).toEqual(["handshake"]);
-        expect(JSON.parse(observations[0] as string)).toMatchObject({ payload: { status: "fallback" } });
+        expect(JSON.parse(observations[0] as string)).toMatchObject({
+            payload: { status: "unsupported", reason: "Foundry identity unavailable." },
+        });
+        expect(fake.Hooks?.on).not.toHaveBeenCalled();
         expect(warn).toHaveBeenCalledOnce();
         const message = String(warn.mock.calls[0]?.[0]);
         expect(message.startsWith("PF2e Combat Notebook:")).toBe(true);

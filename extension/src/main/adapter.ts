@@ -132,7 +132,7 @@ export function installPageAdapter(target: Window): () => void {
         try {
             const dependencies = runtimeDependenciesFromWindow(target);
             const runtime = startRuntime(emit, dependencies);
-            if (runtime.failed) {
+            if (runtime.failed && runtime.supported) {
                 runtime.stop();
                 fallBack(FAILED_REASON);
                 return;

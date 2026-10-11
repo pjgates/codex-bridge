@@ -217,28 +217,45 @@ describe("main-world runtime lifecycle", () => {
         }
     });
 
-    it("reports startup failure separately from support and success", () => {
+    it("reports an unknown identity as unsupported without failing over", () => {
         vi.spyOn(console, "warn").mockImplementation(() => undefined);
-        expect(startRuntime(() => undefined, {
-            hooks: new FakeHooks(),
+        const emitted: Observation[] = [];
+        const hooks = new FakeHooks();
+        expect(startRuntime((observation) => emitted.push(observation), {
+            hooks,
             identity: () => {
                 throw new Error("no game");
             },
             scope: () => ({ sceneId: "s", combatId: null }),
             currentTargets: () => [],
         })).toMatchObject({ supported: false, failed: true });
+        expect(types(emitted)).toEqual(["handshake"]);
+        expect(parseObservation(emitted[0])).toEqual(emitted[0]);
+        expect(emitted[0]!.payload).toMatchObject({
+            status: "unsupported",
+            worldId: "unknown",
+            userId: "unknown",
+            reason: "Foundry identity unavailable.",
+        });
+        expect(hooks.registrations.size).toBe(0);
+    });
+
+    it("reports a failure after compatibility was established as supported and failed", () => {
+        vi.spyOn(console, "warn").mockImplementation(() => undefined);
+        const hooks = new FakeHooks();
+        const on = hooks.on.bind(hooks);
+        hooks.on = (name, callback) => {
+            if (name === "canvasReady") throw new Error("hooks broken");
+            return on(name, callback);
+        };
         expect(startRuntime(() => undefined, {
-            hooks: new FakeHooks(),
+            hooks,
             identity: () => ({
                 foundryGeneration: 14, systemId: "pf2e", systemVersion: "8.5.1", worldId: "w", userId: "u",
             }),
-            scope: () => {
-                throw new Error("no scene");
-            },
+            scope: () => ({ sceneId: "s", combatId: null }),
             currentTargets: () => [],
         })).toMatchObject({ supported: true, failed: true });
-        const harness = start();
-        harness.teardown();
         expect(startRuntime(() => undefined, {
             hooks: new FakeHooks(),
             identity: () => ({
@@ -247,6 +264,32 @@ describe("main-world runtime lifecycle", () => {
             scope: () => ({ sceneId: "s", combatId: null }),
             currentTargets: () => [],
         })).toMatchObject({ supported: false, failed: false });
+    });
+
+    it("stays active without a scene at startup and scopes on a later canvasReady", () => {
+        const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+        const emitted: Observation[] = [];
+        const hooks = new FakeHooks();
+        let scene: string | null = null;
+        const runtime = startRuntime((observation) => emitted.push(observation), {
+            hooks,
+            identity: () => ({
+                foundryGeneration: 14, systemId: "pf2e", systemVersion: "8.5.1", worldId: "w", userId: "u",
+            }),
+            scope: () => {
+                if (scene === null) throw new Error("scene id is unavailable");
+                return { sceneId: scene, combatId: null };
+            },
+            currentTargets: () => [],
+        });
+        expect(runtime).toMatchObject({ supported: true, failed: false });
+        expect(types(emitted)).toEqual(["handshake", "target"]);
+        expect(hooks.names()).toEqual(ALL_HOOKS);
+        expect(warn).toHaveBeenCalledOnce();
+        scene = "later";
+        hooks.fire("canvasReady", {});
+        expect(types(emitted)).toEqual(["handshake", "target", "scope", "target"]);
+        expect(emitted[2]!.payload).toEqual({ sceneId: "later", combatId: null });
     });
 
     it("does not emit after teardown even if a stale hook fires", () => {

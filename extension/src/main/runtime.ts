@@ -14,6 +14,7 @@ export interface RuntimeDependencies {
 const WARNING_PREFIX = "PF2e Combat Notebook:";
 const WARNING_MAX_LENGTH = 200;
 const UNKNOWN = "unknown";
+const IDENTITY_UNAVAILABLE_REASON = "Foundry identity unavailable.";
 const SCOPE_HOOKS = ["combatStart", "updateCombat", "deleteCombat"] as const;
 
 export function warn(context: string, error: unknown): void {
@@ -193,9 +194,27 @@ export function startRuntime(
         }
     };
 
+    let identity: ReturnType<RuntimeDependencies["identity"]>;
     try {
-        const identity = dependencies.identity();
+        identity = dependencies.identity();
+    } catch (error) {
+        warn("identity", error);
+        send(envelope("handshake", {
+            status: "unsupported",
+            foundry: UNKNOWN,
+            system: UNKNOWN,
+            systemVersion: UNKNOWN,
+            worldId: UNKNOWN,
+            userId: UNKNOWN,
+            reason: IDENTITY_UNAVAILABLE_REASON,
+        }));
+        active = false;
+        return { stop: () => undefined, supported: false, failed: true };
+    }
+
+    try {
         const compatibility = compatibilityOf(identity);
+        supported = compatibility.status !== "unsupported";
         send(envelope("handshake", {
             status: compatibility.status,
             foundry: idOrUnknown(String(identity.foundryGeneration)),
@@ -205,11 +224,10 @@ export function startRuntime(
             userId: idOrUnknown(identity.userId),
             ...(compatibility.reason === undefined ? {} : { reason: compatibility.reason }),
         }));
-        if (compatibility.status === "unsupported") {
+        if (!supported) {
             active = false;
             return { stop: () => undefined, supported: false, failed: false };
         }
-        supported = true;
 
         register("createChatMessage", (message) => send(extractCheck(message)));
         register("targetToken", (user, token) => {
@@ -231,7 +249,11 @@ export function startRuntime(
         });
         for (const name of SCOPE_HOOKS) register(name, emitScope);
 
-        emitScope();
+        try {
+            emitScope();
+        } catch (error) {
+            warn("initial scope", error);
+        }
         bootstrapTargets();
     } catch (error) {
         warn("startup", error);
