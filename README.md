@@ -195,6 +195,14 @@ Only the final tooltip is shown; intermediate waypoint markers remain. The toolt
 
 Automatic cover is this module's geometric approximation, not native PF2e/SF2e automation. Region outlines do not clip to walls.
 
+### Chrome extension: PF2e Combat Notebook
+
+`extension/` contains a separate, player-installed Chrome extension that keeps a local,
+session-scoped notebook of what a player's checks reveal about targeted creatures
+(AC, saves, Perception) in PF2e 8.5 on Foundry 14. It is not part of the Foundry module
+described here: nothing is installed in Foundry and it never writes world documents.
+See [`extension/README.md`](extension/README.md) for build, installation, and usage.
+
 ## Compatibility
 
 | Requirement | Version |
