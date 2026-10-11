@@ -87,6 +87,14 @@ describe("PF2e runtime extraction", () => {
         });
     });
 
+    it("skips blind and content-hidden messages", () => {
+        const attackContext = { type: "attack-roll", outcome: "success", target: { token: "Scene.s.Token.t" }, options: [] };
+        expect(extractCheck(message(attackContext))).not.toBeNull();
+        expect(extractCheck(message(attackContext, { blind: true }))).toBeNull();
+        expect(extractCheck(message(attackContext, { isContentVisible: false }))).toBeNull();
+        expect(extractCheck(message(attackContext, { blind: false, isContentVisible: true }))).not.toBeNull();
+    });
+
     it("builds the event envelope from the chat message", () => {
         const observation = expectValid(extractCheck(message({
             type: "attack-roll",

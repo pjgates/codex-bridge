@@ -130,6 +130,7 @@ function rollerTokenUuidOf(message: UnknownObject): string | undefined {
 export function extractCheck(message: unknown): CheckRoll | null {
     const source = asObject(message);
     if (source === null || !isId(source.id)) return null;
+    if (source.blind === true || source.isContentVisible === false) return null;
     const context = asObject(asObject(asObject(source.flags)?.pf2e)?.context);
     if (context === null) return null;
 
