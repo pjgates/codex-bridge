@@ -71,11 +71,83 @@ describe("notebook sidebar", () => {
     });
 
     it("reuses the existing host when mounted twice", () => {
-        mountSidebar(document, vi.fn());
+        const first = mountSidebar(document, vi.fn());
         const second = mountSidebar(document, vi.fn());
         expect(document.querySelectorAll(HOST)).toHaveLength(1);
+        const state = activeState();
+        state.creatures.t = creature("t", "Second Mount Ogre");
+        second.render(state);
+        expect(shadow().textContent).toContain("Second Mount Ogre");
+        const other = activeState();
+        other.creatures.x = creature("x", "Stale Goblin");
+        first.render(other);
+        first.toggle();
+        expect(shadow().textContent).not.toContain("Stale Goblin");
+        expect(shadow().querySelector("[data-action=toggle]")?.getAttribute("aria-expanded")).toBe("true");
+        first.destroy();
+        expect(document.querySelector(HOST)).not.toBeNull();
         second.destroy();
         expect(document.querySelector(HOST)).toBeNull();
+    });
+
+    it("labels the toggle button for assistive technology", () => {
+        mountSidebar(document, vi.fn());
+        expect(shadow().querySelector("[data-action=toggle]")?.getAttribute("aria-label")).toBe("Toggle notebook");
+    });
+
+    it("preserves open state of evidence and disputed lists across renders", () => {
+        const sidebar = mountSidebar(document, vi.fn());
+        const state = activeState();
+        state.creatures.t = creature("t", "Ogre", {
+            evidence: [{ id: "e1", timestamp: 1, summary: "hit" }],
+            contradictions: [{ id: "c1", timestamp: 2, summary: "conflict" }],
+        });
+        state.selectedTokenUuid = "t";
+        state.diagnostics = ["d1"];
+        sidebar.render(state);
+        const evidence = shadow().querySelector(".pcn-evidence") as HTMLDetailsElement;
+        const disputed = shadow().querySelector(".pcn-disputed") as HTMLDetailsElement;
+        const diagnostics = shadow().querySelector(".pcn-diagnostics") as HTMLDetailsElement;
+        expect(evidence.open).toBe(false);
+        expect(disputed.open).toBe(true);
+        expect(diagnostics.open).toBe(false);
+        evidence.open = true;
+        evidence.dispatchEvent(new Event("toggle"));
+        disputed.open = false;
+        disputed.dispatchEvent(new Event("toggle"));
+        diagnostics.open = true;
+        diagnostics.dispatchEvent(new Event("toggle"));
+        sidebar.render(state);
+        expect((shadow().querySelector(".pcn-evidence") as HTMLDetailsElement).open).toBe(true);
+        expect((shadow().querySelector(".pcn-disputed") as HTMLDetailsElement).open).toBe(false);
+        expect((shadow().querySelector(".pcn-diagnostics") as HTMLDetailsElement).open).toBe(true);
+    });
+
+    it("drops the local creature choice when Foundry targeting changes", () => {
+        const sidebar = mountSidebar(document, vi.fn());
+        const state = activeState();
+        state.creatures.a = creature("a", "Alpha");
+        state.creatures.b = creature("b", "Beta");
+        state.creatures.c = creature("c", "Gamma");
+        state.selectedTokenUuid = "b";
+        sidebar.render(state);
+        [...shadow().querySelectorAll<HTMLButtonElement>("[data-action=select]")]
+            .find((button) => button.textContent === "Alpha")!.click();
+        sidebar.render(state);
+        expect(shadow().querySelector(".pcn-creature-name")?.textContent).toBe("Alpha");
+        sidebar.render({ ...state, selectedTokenUuid: "c" });
+        expect(shadow().querySelector(".pcn-creature-name")?.textContent).toBe("Gamma");
+    });
+
+    it("returns focus to the clear request button after confirm or cancel", () => {
+        const sidebar = mountSidebar(document, vi.fn());
+        sidebar.render(activeState());
+        (shadow().querySelector("[data-action=request-clear]") as HTMLButtonElement).click();
+        (shadow().querySelector("[data-action=cancel-clear]") as HTMLButtonElement).click();
+        expect(shadow().activeElement).toBe(shadow().querySelector("[data-action=request-clear]"));
+        (shadow().querySelector("[data-action=request-clear]") as HTMLButtonElement).click();
+        (shadow().querySelector("[data-action=clear]") as HTMLButtonElement).click();
+        expect(shadow().activeElement).toBe(shadow().querySelector("[data-action=request-clear]"));
     });
 
     it("keeps styles inside the shadow root", () => {

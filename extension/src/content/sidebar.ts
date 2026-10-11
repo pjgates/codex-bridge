@@ -11,12 +11,14 @@ export interface Sidebar {
 const HOST_ID = "pf2e-combat-notebook-host";
 const MAX_VISIBLE_EVIDENCE = 20;
 const MAX_VISIBLE_DIAGNOSTICS = 5;
+type ListKey = "evidence" | "disputed" | "diagnostics";
+
 const DEFENSE_ORDER: DefenseKind[] = ["ac", "fortitude", "reflex", "will", "perception"];
 
 const SHELL_HTML = `
 <section class="pcn-panel" aria-label="PF2e Combat Notebook">
     <header class="pcn-header">
-        <button type="button" data-action="toggle" aria-expanded="true" aria-controls="pcn-body" title="Toggle notebook">☰</button>
+        <button type="button" data-action="toggle" aria-expanded="true" aria-controls="pcn-body" aria-label="Toggle notebook" title="Toggle notebook">☰</button>
         <h2 class="pcn-title">Combat Notebook</h2>
     </header>
     <div class="pcn-body" id="pcn-body"></div>
@@ -98,7 +100,13 @@ export function mountSidebar(document: Document, onClear: () => void): Sidebar {
     let collapsed = false;
     let confirmingClear = false;
     let localSelection: string | null = null;
+    let lastSelectedTokenUuid: string | null = null;
     let lastState: NotebookState | null = null;
+    const listOpen: Record<ListKey, boolean> = { evidence: false, disputed: true, diagnostics: false };
+
+    function isStale(): boolean {
+        return !panel.isConnected;
+    }
 
     function element<K extends keyof HTMLElementTagNameMap>(
         tag: K,
@@ -124,6 +132,7 @@ export function mountSidebar(document: Document, onClear: () => void): Sidebar {
     }
 
     function toggle(): void {
+        if (isStale()) return;
         collapsed = !collapsed;
         applyCollapsed();
     }
@@ -132,10 +141,22 @@ export function mountSidebar(document: Document, onClear: () => void): Sidebar {
         if (lastState) render(lastState);
     }
 
-    function evidenceList(title: string, className: string, entries: Evidence[], open: boolean): HTMLElement {
+    function collapsibleList(key: ListKey, className: string, title: string): HTMLDetailsElement {
         const details = element("details", className);
-        details.open = open;
+        details.open = listOpen[key];
+        details.addEventListener("toggle", () => {
+            listOpen[key] = details.open;
+        });
         details.append(element("summary", undefined, title));
+        return details;
+    }
+
+    function focusClearRequest(): void {
+        (root.querySelector("[data-action=request-clear]") as HTMLButtonElement | null)?.focus();
+    }
+
+    function evidenceList(key: ListKey, title: string, className: string, entries: Evidence[]): HTMLElement {
+        const details = collapsibleList(key, className, title);
         const list = element("ul");
         const newestFirst = [...entries].sort((left, right) => right.timestamp - left.timestamp);
         for (const entry of newestFirst.slice(0, MAX_VISIBLE_EVIDENCE)) {
@@ -176,10 +197,15 @@ export function mountSidebar(document: Document, onClear: () => void): Sidebar {
             section.append(element("p", "pcn-empty", "No defenses observed yet."));
         }
         if (record.contradictions.length > 0) {
-            section.append(evidenceList("Disputed", "pcn-disputed", record.contradictions, true));
+            section.append(evidenceList("disputed", "Disputed", "pcn-disputed", record.contradictions));
         }
         if (record.evidence.length > 0) {
-            section.append(evidenceList(`Evidence (${record.evidence.length})`, "pcn-evidence", record.evidence, false));
+            section.append(evidenceList(
+                "evidence",
+                `Evidence (${record.evidence.length})`,
+                "pcn-evidence",
+                record.evidence,
+            ));
         }
         return section;
     }
@@ -218,8 +244,7 @@ export function mountSidebar(document: Document, onClear: () => void): Sidebar {
     }
 
     function diagnosticsSection(diagnostics: string[]): HTMLElement {
-        const details = element("details", "pcn-diagnostics");
-        details.append(element("summary", undefined, "Diagnostics"));
+        const details = collapsibleList("diagnostics", "pcn-diagnostics", "Diagnostics");
         const list = element("ul");
         for (const entry of diagnostics.slice(-MAX_VISIBLE_DIAGNOSTICS).reverse()) {
             list.append(element("li", undefined, entry));
@@ -249,17 +274,24 @@ export function mountSidebar(document: Document, onClear: () => void): Sidebar {
                 // The controller records clear failures; the drawer must stay usable.
             }
             rerender();
+            focusClearRequest();
         });
         const cancel = button("cancel-clear", "Cancel");
         cancel.addEventListener("click", () => {
             confirmingClear = false;
             rerender();
+            focusClearRequest();
         });
         actions.append(element("span", undefined, "Clear all notes?"), confirm, cancel);
         return actions;
     }
 
     function render(state: NotebookState): void {
+        if (isStale()) return;
+        if (state.selectedTokenUuid !== lastSelectedTokenUuid) {
+            localSelection = null;
+            lastSelectedTokenUuid = state.selectedTokenUuid;
+        }
         lastState = state;
         const children: HTMLElement[] = [statusSection(state), ...creaturesSection(state)];
         if (state.diagnostics.length > 0) children.push(diagnosticsSection(state.diagnostics));
@@ -274,6 +306,7 @@ export function mountSidebar(document: Document, onClear: () => void): Sidebar {
         render,
         toggle,
         destroy(): void {
+            if (isStale()) return;
             host.remove();
         },
     };
