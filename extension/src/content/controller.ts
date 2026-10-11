@@ -7,6 +7,7 @@ import {
     withDiagnostic,
 } from "../core/reducer.js";
 import type { NotebookState } from "../core/types.js";
+import { notebookKey } from "../shared/notebook-key.js";
 import { PROTOCOL_VERSION, type Observation, type PageCommand } from "../shared/protocol.js";
 
 export const LOAD_FAILED_DIAGNOSTIC = "Stored encounter data could not be loaded.";
@@ -71,7 +72,12 @@ export async function createNotebookController(
 
     const storageKey = (candidate: NotebookState): string | null => {
         if (!candidate.worldId || !candidate.userId || !candidate.scopeId) return null;
-        return `notebook:${dependencies.origin}:${candidate.worldId}:${candidate.userId}:${candidate.scopeId}`;
+        return notebookKey({
+            origin: dependencies.origin,
+            worldId: candidate.worldId,
+            userId: candidate.userId,
+            scopeId: candidate.scopeId,
+        });
     };
 
     const enqueue = (task: () => Promise<void>): Promise<void> => {

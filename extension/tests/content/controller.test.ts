@@ -15,7 +15,7 @@ import type { NotebookState } from "../../src/core/types.js";
 import type { Observation } from "../../src/shared/protocol.js";
 
 const ORIGIN = "https://foundry.example.test";
-const KEY = `notebook:${ORIGIN}:world:user:scene:combat`;
+const KEY = "notebook:https%3A%2F%2Ffoundry.example.test:world:user:scene%3Acombat";
 const TOKEN = "Scene.s.Token.t";
 
 const handshake: Observation = {
@@ -146,7 +146,7 @@ describe("content controller", () => {
         });
         await controller.flush();
         expect(save).toHaveBeenCalledWith(
-            "notebook:https://foundry.example.test:world:user:scene:combat",
+            KEY,
             expect.anything(),
         );
         expect(renderSidebar).toHaveBeenLastCalledWith(

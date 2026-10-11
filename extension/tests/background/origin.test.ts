@@ -11,6 +11,7 @@ import {
     tabOrigin,
 } from "../../src/background/origin.js";
 import { emptyNotebook } from "../../src/core/reducer.js";
+import { notebookKey } from "../../src/shared/notebook-key.js";
 
 const RUNTIME_ID = "abcdefghijklmnopabcdefghijklmnop";
 const EXTENSION_BASE = `chrome-extension://${RUNTIME_ID}/`;
@@ -74,10 +75,15 @@ describe("origin validation", () => {
 
     it("scopes notebook keys to the exact sender origin", () => {
         const origin = "http://localhost:30000";
-        expect(keyBelongsToOrigin(`notebook:${origin}:w:u:s`, origin)).toBe(true);
-        expect(keyBelongsToOrigin("notebook:http://localhost:30001:w:u:s", origin)).toBe(false);
-        expect(keyBelongsToOrigin("notebook:https://evil.test:w:u:s", origin)).toBe(false);
-        expect(keyBelongsToOrigin(`notebook:${origin}:${"x".repeat(MAX_KEY_LENGTH)}`, origin)).toBe(false);
+        const key = (keyOrigin: string, worldId = "w"): string =>
+            notebookKey({ origin: keyOrigin, worldId, userId: "u", scopeId: "s" });
+        expect(keyBelongsToOrigin(key(origin), origin)).toBe(true);
+        expect(keyBelongsToOrigin(key("http://localhost:30001"), origin)).toBe(false);
+        expect(keyBelongsToOrigin(key("https://evil.test"), origin)).toBe(false);
+        expect(keyBelongsToOrigin(key(origin), "http://localhost")).toBe(false);
+        expect(keyBelongsToOrigin(`notebook:${origin}:w:u:s`, origin)).toBe(false);
+        expect(keyBelongsToOrigin("notebook:http://localhost:30000:w:u:s", "http://localhost")).toBe(false);
+        expect(keyBelongsToOrigin(key(origin, "x".repeat(MAX_KEY_LENGTH)), origin)).toBe(false);
     });
 });
 

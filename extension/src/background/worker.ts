@@ -68,9 +68,8 @@ export function createWorker(api: WorkerApi): ServiceWorker {
 
     const clearOriginSessions = async (origins: string[]): Promise<void> => {
         if (origins.length === 0) return;
-        const prefixes = origins.map((origin) => `notebook:${origin}:`);
         const stored = await api.sessionGet(null);
-        const keys = Object.keys(stored).filter((key) => prefixes.some((prefix) => key.startsWith(prefix)));
+        const keys = Object.keys(stored).filter((key) => origins.some((origin) => keyBelongsToOrigin(key, origin)));
         if (keys.length > 0) await api.sessionRemove(keys);
     };
 

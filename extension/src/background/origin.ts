@@ -1,5 +1,6 @@
 import { parseNotebookState } from "../core/reducer.js";
 import type { ExtensionRequest } from "../shared/extension-messages.js";
+import { parseNotebookKey } from "../shared/notebook-key.js";
 
 export const SCRIPT_IDS = ["pf2e-notebook-content", "pf2e-notebook-main"] as const;
 export const MAX_KEY_LENGTH = 2_048;
@@ -55,7 +56,7 @@ export function scriptRegistrations(
 }
 
 export function keyBelongsToOrigin(key: string, origin: string): boolean {
-    return key.length <= MAX_KEY_LENGTH && key.startsWith(`notebook:${origin}:`);
+    return key.length <= MAX_KEY_LENGTH && parseNotebookKey(key)?.origin === origin;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
