@@ -6,8 +6,9 @@ import {
     parseNotebookState,
     restoreNotebookState,
     STORED_STATE_INVALID_DIAGNOSTIC,
+    withDiagnostic,
 } from "../../src/core/reducer.js";
-import type { NotebookState } from "../../src/core/types.js";
+import { MAX_DIAGNOSTICS, type NotebookState } from "../../src/core/types.js";
 import type { Observation } from "../../src/shared/protocol.js";
 
 const event = (overrides: Partial<Observation>): Observation => ({
@@ -522,5 +523,19 @@ describe("parseNotebookState", () => {
         expect(STORED_STATE_INVALID_DIAGNOSTIC).toBe("Stored encounter data was invalid and was reset.");
         const state = applyObservation(emptyNotebook(), snapshot({ ac: 28 }));
         expect(restoreNotebookState(JSON.parse(JSON.stringify(state)))).toEqual(state);
+    });
+
+    it("appends diagnostics without mutating and keeps only the newest entries", () => {
+        const original = emptyNotebook();
+        const next = withDiagnostic(original, "first");
+        expect(original.diagnostics).toEqual([]);
+        expect(next.diagnostics).toEqual(["first"]);
+        let state = original;
+        for (let index = 0; index < MAX_DIAGNOSTICS + 5; index += 1) {
+            state = withDiagnostic(state, `entry ${index}`);
+        }
+        expect(state.diagnostics).toHaveLength(MAX_DIAGNOSTICS);
+        expect(state.diagnostics[0]).toBe("entry 5");
+        expect(state.diagnostics.at(-1)).toBe(`entry ${MAX_DIAGNOSTICS + 4}`);
     });
 });

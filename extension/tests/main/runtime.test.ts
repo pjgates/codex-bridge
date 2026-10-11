@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { startRuntime, type RuntimeDependencies } from "../../src/main/runtime.js";
+import { runtimeDependenciesFromWindow, startRuntime, type RuntimeDependencies } from "../../src/main/runtime.js";
 import { parseObservation, type Observation } from "../../src/shared/protocol.js";
 
 type Callback = (...args: unknown[]) => void;
@@ -218,5 +218,77 @@ describe("main-world runtime lifecycle", () => {
         harness.emitted.length = 0;
         stale.callback({});
         expect(harness.emitted).toEqual([]);
+    });
+});
+
+function fakeWindow(): {
+    Hooks: { on: ReturnType<typeof vi.fn>; off: ReturnType<typeof vi.fn> };
+    game: Record<string, unknown>;
+    canvas: Record<string, unknown>;
+} {
+    const targets = new Set([token("a"), token("b")]);
+    return {
+        Hooks: { on: vi.fn(() => 7), off: vi.fn() },
+        game: {
+            ready: true,
+            release: { generation: 14 },
+            system: { id: "pf2e", version: "8.5.1" },
+            world: { id: "world" },
+            user: { id: "me", targets },
+            scenes: { viewed: { id: "viewed" } },
+            combat: { id: "combat" },
+        },
+        canvas: { scene: { id: "canvas-scene" } },
+    };
+}
+
+describe("runtimeDependenciesFromWindow", () => {
+    it("adapts Foundry globals into runtime dependencies", () => {
+        const source = fakeWindow();
+        const dependencies = runtimeDependenciesFromWindow(source);
+        const callback = (): void => undefined;
+        expect(dependencies.hooks.on("createChatMessage", callback)).toBe(7);
+        expect(source.Hooks.on).toHaveBeenCalledWith("createChatMessage", callback);
+        dependencies.hooks.off("createChatMessage", 7);
+        expect(source.Hooks.off).toHaveBeenCalledWith("createChatMessage", 7);
+        expect(dependencies.identity()).toEqual({
+            foundryGeneration: 14,
+            systemId: "pf2e",
+            systemVersion: "8.5.1",
+            worldId: "world",
+            userId: "me",
+        });
+        expect(dependencies.scope()).toEqual({ sceneId: "canvas-scene", combatId: "combat" });
+        expect(dependencies.currentTargets()).toHaveLength(2);
+    });
+
+    it("reads globals lazily and falls back to the viewed scene and exploration", () => {
+        const source = fakeWindow();
+        const dependencies = runtimeDependenciesFromWindow(source);
+        source.canvas.scene = null;
+        source.game.combat = null;
+        (source.game.user as Record<string, unknown>).targets = undefined;
+        expect(dependencies.scope()).toEqual({ sceneId: "viewed", combatId: null });
+        expect(dependencies.currentTargets()).toEqual([]);
+    });
+
+    it("throws clear errors when required globals are missing", () => {
+        expect(() => runtimeDependenciesFromWindow({})).toThrow("Foundry Hooks are unavailable");
+        const source = fakeWindow();
+        const dependencies = runtimeDependenciesFromWindow(source);
+        source.game.world = {};
+        expect(() => dependencies.identity()).toThrow("game.world.id is unavailable");
+        source.canvas.scene = undefined;
+        source.game.scenes = undefined;
+        expect(() => dependencies.scope()).toThrow("scene id is unavailable");
+        source.game.user = undefined;
+        expect(() => dependencies.currentTargets()).toThrow("game.user is unavailable");
+    });
+
+    it("drives startRuntime end to end from a fake window", () => {
+        const emitted: Observation[] = [];
+        const teardown = startRuntime((observation) => emitted.push(observation), runtimeDependenciesFromWindow(fakeWindow()));
+        expect(types(emitted)).toEqual(["handshake", "scope", "token-snapshot", "token-snapshot", "target"]);
+        teardown();
     });
 });

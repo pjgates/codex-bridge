@@ -16,9 +16,13 @@ const WARNING_MAX_LENGTH = 200;
 const UNKNOWN = "unknown";
 const SCOPE_HOOKS = ["combatStart", "updateCombat", "deleteCombat"] as const;
 
-function warn(context: string, error: unknown): void {
-    const detail = error instanceof Error ? error.message : String(error);
-    console.warn(`${WARNING_PREFIX} ${context} failed: ${detail}`.slice(0, WARNING_MAX_LENGTH));
+export function warn(context: string, error: unknown): void {
+    try {
+        const detail = error instanceof Error ? error.message : String(error);
+        console.warn(`${WARNING_PREFIX} ${context} failed: ${detail}`.slice(0, WARNING_MAX_LENGTH));
+    } catch {
+        return;
+    }
 }
 
 function idOrUnknown(value: unknown): string {
@@ -35,6 +39,86 @@ function uuidOf(token: unknown): string | null {
 
 function idOf(value: unknown): unknown {
     return typeof value === "object" && value !== null ? (value as Record<string, unknown>).id : undefined;
+}
+
+interface FoundryGlobals {
+    Hooks?: unknown;
+    game?: unknown;
+    canvas?: unknown;
+}
+
+function field(value: unknown, key: string): unknown {
+    return typeof value === "object" && value !== null ? (value as Record<string, unknown>)[key] : undefined;
+}
+
+function requiredString(value: unknown, path: string): string {
+    if (typeof value !== "string" || value.length === 0) throw new Error(`${path} is unavailable`);
+    return value;
+}
+
+function optionalString(value: unknown): string | null {
+    return typeof value === "string" && value.length > 0 ? value : null;
+}
+
+function isIterable(value: unknown): value is Iterable<unknown> {
+    return typeof value === "object" && value !== null
+        && typeof (value as { [Symbol.iterator]?: unknown })[Symbol.iterator] === "function";
+}
+
+export function runtimeDependenciesFromWindow(source: object): RuntimeDependencies {
+    const globals = source as FoundryGlobals;
+    const hooks = globals.Hooks;
+    const on = field(hooks, "on");
+    const off = field(hooks, "off");
+    if (typeof on !== "function" || typeof off !== "function") {
+        throw new Error("Foundry Hooks are unavailable");
+    }
+    const game = (): unknown => {
+        const value = globals.game;
+        if (typeof value !== "object" || value === null) throw new Error("game is unavailable");
+        return value;
+    };
+    const user = (): unknown => {
+        const value = field(game(), "user");
+        if (typeof value !== "object" || value === null) throw new Error("game.user is unavailable");
+        return value;
+    };
+    return {
+        hooks: {
+            on: (name, callback) => {
+                const id: unknown = on.call(hooks, name, callback);
+                if (typeof id !== "number") throw new Error("Hooks.on returned no id");
+                return id;
+            },
+            off: (name, id) => {
+                off.call(hooks, name, id);
+            },
+        },
+        identity: () => {
+            const current = game();
+            const generation = field(field(current, "release"), "generation");
+            if (typeof generation !== "number") throw new Error("game.release.generation is unavailable");
+            const system = field(current, "system");
+            return {
+                foundryGeneration: generation,
+                systemId: requiredString(field(system, "id"), "game.system.id"),
+                systemVersion: requiredString(field(system, "version"), "game.system.version"),
+                worldId: requiredString(field(field(current, "world"), "id"), "game.world.id"),
+                userId: requiredString(field(user(), "id"), "game.user.id"),
+            };
+        },
+        scope: () => {
+            const current = game();
+            const sceneId = optionalString(field(field(globals.canvas, "scene"), "id"))
+                ?? optionalString(field(field(field(current, "scenes"), "viewed"), "id"));
+            if (sceneId === null) throw new Error("scene id is unavailable");
+            return { sceneId, combatId: optionalString(field(field(current, "combat"), "id")) };
+        },
+        currentTargets: () => {
+            const targets = field(user(), "targets");
+            return isIterable(targets) ? Array.from(targets) : [];
+        },
+    };
 }
 
 export function startRuntime(

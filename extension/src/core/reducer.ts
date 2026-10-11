@@ -55,7 +55,7 @@ function appendBounded<T>(list: readonly T[], entry: T, limit: number): T[] {
     return next.length > limit ? next.slice(next.length - limit) : next;
 }
 
-function withDiagnostic(state: NotebookState, message: string): NotebookState {
+export function withDiagnostic(state: NotebookState, message: string): NotebookState {
     return { ...state, diagnostics: appendBounded(state.diagnostics, message, MAX_DIAGNOSTICS) };
 }
 
