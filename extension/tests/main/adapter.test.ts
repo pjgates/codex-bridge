@@ -224,17 +224,30 @@ describe("main-world page adapter", () => {
     });
 
     it("accepts overlay commands without effects when PIXI is unavailable", () => {
+        const warn = vi.spyOn(console, "warn");
         const fake = globals(true);
+        const { layer } = withCanvas(fake);
+        delete fake.PIXI;
+        install(fake);
+        command("activate");
+        expect(() => command("clear-overlay")).not.toThrow();
+        expect(() => renderOverlay()).not.toThrow();
+        expect(layer.children).toHaveLength(0);
+        expect(() => hookCallback(fake, "canvasPan")()).not.toThrow();
+        expect(layer.children).toHaveLength(0);
+        expect(warn).not.toHaveBeenCalled();
+    });
+
+    it("keeps the overlay inert when the handshake is unsupported", () => {
+        const fake = globals(true);
+        (fake.game?.system as { version: string }).version = "8.6.0";
+        const { layer } = withCanvas(fake);
         const { observations } = install(fake);
-        command("clear-overlay");
-        window.dispatchEvent(new CustomEvent(COMMAND_EVENT, {
-            detail: JSON.stringify({
-                protocol: 1,
-                type: "render-overlay",
-                payload: { tokenUuid: "Scene.s.Token.t", name: "Graveknight", ac: "28" },
-            }),
-        }));
-        expect(observations).toEqual([]);
+        command("activate");
+        expect(parsedTypes(observations)).toEqual(["handshake"]);
+        renderOverlay();
+        expect(fake.Hooks?.on).not.toHaveBeenCalled();
+        expect(layer.children).toHaveLength(0);
     });
 
     it("ignores render-overlay before activation", () => {
@@ -270,11 +283,21 @@ describe("main-world page adapter", () => {
         install(fake);
         command("activate");
         renderOverlay();
+        const position = labelOf(layer)?.position.set;
         (token.center as { x: number }).x = 99;
-        hookCallback(fake, "refreshToken")();
-        expect(labelOf(layer)?.position.set).toHaveBeenLastCalledWith(99, -7);
+        hookCallback(fake, "refreshToken")({ document: { uuid: "Scene.s.Token.other" } });
+        hookCallback(fake, "updateToken")({ uuid: "Scene.s.Token.other" });
+        hookCallback(fake, "refreshToken")(null);
+        hookCallback(fake, "updateToken")(undefined);
+        expect(position).toHaveBeenCalledTimes(1);
+        hookCallback(fake, "refreshToken")(token);
+        expect(position).toHaveBeenLastCalledWith(99, -7);
+        (token.center as { x: number }).x = 50;
+        hookCallback(fake, "updateToken")(token.document);
+        expect(position).toHaveBeenLastCalledWith(50, -7);
+        (token.center as { x: number }).x = 60;
         hookCallback(fake, "canvasPan")();
-        hookCallback(fake, "updateToken")();
+        expect(position).toHaveBeenLastCalledWith(60, -7);
         hookCallback(fake, "canvasTearDown")();
         expect((layer.children[0] as FakeContainer).children).toHaveLength(0);
         const overlayHookNames = ["canvasPan", "updateToken", "refreshToken", "canvasTearDown"];
@@ -299,6 +322,26 @@ describe("main-world page adapter", () => {
         expect(() => hookCallback(fake, "canvasPan")()).not.toThrow();
         expect(warn).toHaveBeenCalledOnce();
         expect(label?.destroy).toHaveBeenCalledOnce();
+    });
+
+    it("warns when the fallback clear also fails", () => {
+        const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+        const fake = globals(true);
+        const { layer } = withCanvas(fake);
+        install(fake);
+        command("activate");
+        renderOverlay();
+        labelOf(layer)?.destroy.mockImplementation(() => {
+            throw new Error("destroy broken");
+        });
+        (fake.canvas as Record<string, unknown>).stage = {
+            get scale(): never {
+                throw new Error("stage broken");
+            },
+        };
+        expect(() => hookCallback(fake, "canvasPan")()).not.toThrow();
+        expect(warn).toHaveBeenCalledTimes(2);
+        expect(String(warn.mock.calls[1]?.[0])).toContain("destroy broken");
     });
 
     it("warns with a bounded message and stays inert when startup fails", () => {

@@ -42,6 +42,7 @@ export interface Overlay {
     clear(): void;
     refresh(): void;
     destroy(): void;
+    currentTokenUuid(): string | null;
 }
 
 const LABEL_OFFSET = 12;
@@ -121,6 +122,7 @@ export function createOverlay(dependencies: OverlayDependencies): Overlay {
             root = null;
             if (existing !== null && !existing.destroyed) existing.destroy({ children: true });
         },
+        currentTokenUuid: () => current?.tokenUuid ?? null,
     };
 }
 
@@ -131,7 +133,7 @@ interface PixiGlobals {
 
 type Constructor = new (...args: unknown[]) => unknown;
 
-function field(value: unknown, key: string): unknown {
+export function field(value: unknown, key: string): unknown {
     return typeof value === "object" && value !== null ? (value as Record<string, unknown>)[key] : undefined;
 }
 

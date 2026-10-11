@@ -121,11 +121,17 @@ export function runtimeDependenciesFromWindow(source: object): RuntimeDependenci
     };
 }
 
+export interface RuntimeHandle {
+    stop(): void;
+    supported: boolean;
+}
+
 export function startRuntime(
     emit: (observation: Observation) => void,
     dependencies: RuntimeDependencies,
-): () => void {
+): RuntimeHandle {
     let active = true;
+    let supported = false;
     let currentTarget: string | null = null;
     const registrations: { name: string; id: number }[] = [];
 
@@ -200,8 +206,9 @@ export function startRuntime(
         }));
         if (compatibility.status === "unsupported") {
             active = false;
-            return () => undefined;
+            return { stop: () => undefined, supported: false };
         }
+        supported = true;
 
         register("createChatMessage", (message) => send(extractCheck(message)));
         register("targetToken", (user, token) => {
@@ -228,5 +235,5 @@ export function startRuntime(
     } catch (error) {
         warn("startup", error);
     }
-    return teardown;
+    return { stop: teardown, supported };
 }

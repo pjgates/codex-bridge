@@ -1,4 +1,4 @@
-import { createOverlay, overlayDependenciesFromWindow, type Overlay, type OverlayView } from "./overlay.js";
+import { createOverlay, field, overlayDependenciesFromWindow, type Overlay, type OverlayView } from "./overlay.js";
 import { runtimeDependenciesFromWindow, startRuntime, warn, type RuntimeDependencies } from "./runtime.js";
 import {
     COMMAND_EVENT,
@@ -8,8 +8,6 @@ import {
     type PageCommand,
 } from "../shared/protocol.js";
 import { decodeDetail, encodeDetail } from "../shared/wire.js";
-
-const OVERLAY_REFRESH_HOOKS = ["canvasPan", "updateToken", "refreshToken"] as const;
 
 interface ReadinessGlobals {
     Hooks?: unknown;
@@ -28,6 +26,7 @@ export function installPageAdapter(target: Window): () => void {
     let waitingForReady = false;
     let overlay: Overlay | null = null;
     let stopOverlayHooks: (() => void) | null = null;
+    let overlayEnabled = false;
 
     const emit = (observation: Observation): void => {
         target.dispatchEvent(new CustomEvent(OBSERVATION_EVENT, { detail: encodeDetail(observation) }));
@@ -42,19 +41,27 @@ export function installPageAdapter(target: Window): () => void {
             warn(`overlay ${context}`, error);
             try {
                 current.clear();
-            } catch {
-                return;
+            } catch (clearError) {
+                warn(`overlay ${context} fallback clear`, clearError);
             }
         }
     };
 
     const registerOverlayHooks = (hooks: RuntimeDependencies["hooks"]): (() => void) => {
         const registrations: { name: string; id: number }[] = [];
-        const register = (name: string, action: (current: Overlay) => void): void => {
-            registrations.push({ name, id: hooks.on(name, () => withOverlay(name, action)) });
+        const register = (name: string, action: (current: Overlay, subject: unknown) => void): void => {
+            registrations.push({
+                name,
+                id: hooks.on(name, (subject: unknown) => withOverlay(name, (current) => action(current, subject))),
+            });
+        };
+        const refreshIfCurrent = (current: Overlay, uuid: unknown): void => {
+            if (uuid !== null && uuid === current.currentTokenUuid()) current.refresh();
         };
         try {
-            for (const name of OVERLAY_REFRESH_HOOKS) register(name, (current) => current.refresh());
+            register("canvasPan", (current) => current.refresh());
+            register("refreshToken", (current, token) => refreshIfCurrent(current, field(field(token, "document"), "uuid")));
+            register("updateToken", (current, document) => refreshIfCurrent(current, field(document, "uuid")));
             register("canvasTearDown", (current) => current.clear());
         } catch (error) {
             warn("overlay hooks", error);
@@ -74,15 +81,19 @@ export function installPageAdapter(target: Window): () => void {
         if (!wanted || stopRuntime) return;
         try {
             const dependencies = runtimeDependenciesFromWindow(target);
-            stopRuntime = startRuntime(emit, dependencies);
-            stopOverlayHooks = registerOverlayHooks(dependencies.hooks);
+            const runtime = startRuntime(emit, dependencies);
+            stopRuntime = runtime.stop;
+            if (runtime.supported) {
+                overlayEnabled = true;
+                stopOverlayHooks = registerOverlayHooks(dependencies.hooks);
+            }
         } catch (error) {
             warn("activation", error);
         }
     };
 
     const renderOverlay = (view: OverlayView): void => {
-        if (!stopRuntime) return;
+        if (!overlayEnabled) return;
         if (overlay === null) {
             try {
                 const dependencies = overlayDependenciesFromWindow(target);
@@ -121,6 +132,7 @@ export function installPageAdapter(target: Window): () => void {
 
     const teardown = (): void => {
         wanted = false;
+        overlayEnabled = false;
         const stopHooks = stopOverlayHooks;
         stopOverlayHooks = null;
         stopHooks?.();

@@ -176,6 +176,15 @@ describe("targeted-token overlay", () => {
         expect(label.scale.set).toHaveBeenLastCalledWith(1);
     });
 
+    it("reports the currently rendered token uuid", () => {
+        const overlay = createOverlay(fakeDependencies());
+        expect(overlay.currentTokenUuid()).toBeNull();
+        overlay.render(view);
+        expect(overlay.currentTokenUuid()).toBe("Scene.s.Token.t");
+        overlay.clear();
+        expect(overlay.currentTokenUuid()).toBeNull();
+    });
+
     it("ignores render after destroy", () => {
         const overlay = createOverlay(fakeDependencies());
         overlay.destroy();

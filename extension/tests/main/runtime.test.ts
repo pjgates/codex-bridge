@@ -42,6 +42,7 @@ interface Harness {
     targets: unknown[];
     scope: { sceneId: string; combatId: string | null };
     teardown: () => void;
+    supported: boolean;
 }
 
 function start(overrides: Partial<{ systemVersion: string; targets: unknown[] }> = {}): Harness {
@@ -53,6 +54,7 @@ function start(overrides: Partial<{ systemVersion: string; targets: unknown[] }>
         targets: overrides.targets ?? [token("a")],
         scope: { sceneId: "s", combatId: null },
         teardown: () => undefined,
+        supported: false,
     };
     const dependencies: RuntimeDependencies = {
         hooks,
@@ -66,10 +68,12 @@ function start(overrides: Partial<{ systemVersion: string; targets: unknown[] }>
         scope: () => ({ ...harness.scope }),
         currentTargets: () => harness.targets,
     };
-    harness.teardown = startRuntime((observation) => {
+    const runtime = startRuntime((observation) => {
         expect(parseObservation(observation)).toEqual(observation);
         emitted.push(observation);
     }, dependencies);
+    harness.teardown = runtime.stop;
+    harness.supported = runtime.supported;
     return harness;
 }
 
@@ -106,6 +110,7 @@ describe("main-world runtime lifecycle", () => {
         });
         expect(lastTarget(harness.emitted)).toBe("Scene.s.Token.a");
         expect(harness.hooks.names()).toEqual(ALL_HOOKS);
+        expect(harness.supported).toBe(true);
     });
 
     it("emits one snapshot per target and a null target when several are selected", () => {
@@ -118,6 +123,7 @@ describe("main-world runtime lifecycle", () => {
         const harness = start({ systemVersion: "8.6.0" });
         expect(types(harness.emitted)).toEqual(["handshake"]);
         expect(harness.emitted[0]!.payload).toMatchObject({ status: "unsupported" });
+        expect(harness.supported).toBe(false);
         expect(harness.hooks.registrations.size).toBe(0);
         expect(() => harness.teardown()).not.toThrow();
         expect(harness.hooks.off).not.toHaveBeenCalled();
@@ -287,8 +293,10 @@ describe("runtimeDependenciesFromWindow", () => {
 
     it("drives startRuntime end to end from a fake window", () => {
         const emitted: Observation[] = [];
-        const teardown = startRuntime((observation) => emitted.push(observation), runtimeDependenciesFromWindow(fakeWindow()));
+        const runtime = startRuntime((observation) => emitted.push(observation), runtimeDependenciesFromWindow(fakeWindow()));
         expect(types(emitted)).toEqual(["handshake", "scope", "token-snapshot", "token-snapshot", "target"]);
-        teardown();
+        expect(runtime.supported).toBe(true);
+        runtime.stop();
+        runtime.stop();
     });
 });
