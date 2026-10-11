@@ -18,6 +18,7 @@ type StorageListener = (changes: Record<string, chrome.storage.StorageChange>, a
 
 interface FakeChrome extends ContentChrome {
     requests: unknown[];
+    held: ((response: unknown) => void)[];
     messageListeners: Set<MessageListener>;
     storageListeners: Set<StorageListener>;
 }
@@ -26,8 +27,10 @@ function fakeChrome(reply: (message: unknown) => unknown = () => ({ ok: true, en
     const messageListeners = new Set<MessageListener>();
     const storageListeners = new Set<StorageListener>();
     const requests: unknown[] = [];
+    const held: ((response: unknown) => void)[] = [];
     return {
         requests,
+        held,
         messageListeners,
         storageListeners,
         runtime: {
@@ -36,7 +39,10 @@ function fakeChrome(reply: (message: unknown) => unknown = () => ({ ok: true, en
             sendMessage(message, callback) {
                 requests.push(message);
                 const response = reply(message);
-                if (response === NO_REPLY) return;
+                if (response === NO_REPLY) {
+                    held.push(callback);
+                    return;
+                }
                 void Promise.resolve().then(() => callback(response));
             },
             onMessage: {
@@ -229,6 +235,26 @@ describe("content script fallback mode", () => {
 });
 
 describe("content script tab lifecycle", () => {
+    it.each([
+        ["a teardown tab message", (api: FakeChrome) => tabMessage(api, { type: "teardown" })],
+        ["origin removal from storage", (api: FakeChrome) => storageChange(api, { [ENABLED_ORIGINS_KEY]: { newValue: [] } })],
+        ["pagehide", () => window.dispatchEvent(new Event("pagehide"))],
+    ])("stops booting when %s arrives during the origin-status request", async (_label, trigger) => {
+        const api = fakeChrome(() => NO_REPLY);
+        const pending = boot(api);
+        expect(api.held).toHaveLength(1);
+        expect(api.messageListeners.size).toBe(1);
+        expect(api.storageListeners.size).toBe(1);
+        trigger(api);
+        api.held[0]!({ ok: true, enabled: true });
+        await expect(pending).resolves.toBeNull();
+        expect(host()).toBeNull();
+        expect(commands).toEqual([]);
+        expect(api.messageListeners.size).toBe(0);
+        expect(api.storageListeners.size).toBe(0);
+        expect(api.requests).toEqual([{ type: "origin-status", origin: ORIGIN }]);
+    });
+
     it("tears down once on a teardown tab message", async () => {
         const disconnect = vi.spyOn(MutationObserver.prototype, "disconnect");
         const api = fakeChrome(workerReply);

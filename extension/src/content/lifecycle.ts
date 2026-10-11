@@ -42,18 +42,6 @@ export interface ContentHandle {
     teardown(): Promise<void>;
 }
 
-interface TabLifecycleOptions {
-    chrome: ContentChrome;
-    window: Window;
-    origin: string;
-    controller: NotebookController;
-    sidebar(): Sidebar;
-    stopBridge(): void;
-    stopFallback(): (() => void) | null;
-    cancelHandshakeTimer(): void;
-    deactivate(): void;
-}
-
 type TabCommand = "toggle-sidebar" | "teardown";
 
 function parseTabCommand(message: unknown): TabCommand | null {
@@ -82,22 +70,36 @@ function adapterTimeoutHandshake(): Observation {
     };
 }
 
-export function registerTabLifecycle(options: TabLifecycleOptions): () => Promise<void> {
-    const { chrome: api, window: target, origin } = options;
+export async function bootContentScript(dependencies: ContentDependencies): Promise<ContentHandle | null> {
+    const { chrome: api, document, origin, window: target } = dependencies;
+
+    let active = true;
+    let activated = false;
     let finished: Promise<void> | null = null;
+    let sidebar: Sidebar | null = null;
+    let controller: NotebookController | null = null;
+    let stopBridge: (() => void) | null = null;
+    let stopFallback: (() => void) | null = null;
+    let handshakeTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const cancelHandshakeTimer = (): void => {
+        if (handshakeTimer !== null) clearTimeout(handshakeTimer);
+        handshakeTimer = null;
+    };
 
     const teardown = (): Promise<void> => {
         if (finished) return finished;
-        options.deactivate();
-        options.cancelHandshakeTimer();
+        active = false;
+        cancelHandshakeTimer();
         api.runtime.onMessage.removeListener(onMessage);
         api.storage.onChanged.removeListener(onStorageChanged);
         target.removeEventListener("pagehide", onPageHide);
-        options.stopBridge();
-        options.stopFallback()?.();
-        sendPageCommand({ protocol: PROTOCOL_VERSION, type: "teardown", payload: {} });
-        options.sidebar().destroy();
-        finished = options.controller.flush();
+        stopBridge?.();
+        stopFallback?.();
+        stopFallback = null;
+        if (activated) sendPageCommand({ protocol: PROTOCOL_VERSION, type: "teardown", payload: {} });
+        sidebar?.destroy();
+        finished = controller?.flush() ?? Promise.resolve();
         return finished;
     };
 
@@ -108,7 +110,7 @@ export function registerTabLifecycle(options: TabLifecycleOptions): () => Promis
             case null:
                 return;
             case "toggle-sidebar":
-                options.sidebar().toggle();
+                sidebar?.toggle();
                 return;
             case "teardown":
                 void teardown();
@@ -133,28 +135,28 @@ export function registerTabLifecycle(options: TabLifecycleOptions): () => Promis
     api.runtime.onMessage.addListener(onMessage);
     api.storage.onChanged.addListener(onStorageChanged);
     target.addEventListener("pagehide", onPageHide);
-    return teardown;
-}
 
-export async function bootContentScript(dependencies: ContentDependencies): Promise<ContentHandle | null> {
-    const { chrome: api, document, origin } = dependencies;
+    let enabled = false;
     try {
-        if (!await requestOriginStatus(api.runtime, origin)) return null;
+        enabled = await requestOriginStatus(api.runtime, origin);
     } catch {
+        enabled = false;
+    }
+    if (!enabled || !active) {
+        await teardown();
         return null;
     }
 
-    let active = true;
     let clearEncounter = (): void => undefined;
     const onClear = (): void => clearEncounter();
-    let sidebar = mountSidebar(document, onClear);
+    sidebar = mountSidebar(document, onClear);
     const renderSidebar = (state: NotebookState): void => {
         if (!active) return;
         if (!document.getElementById(HOST_ID)) sidebar = mountSidebar(document, onClear);
-        sidebar.render(state);
+        sidebar?.render(state);
     };
 
-    const controller = await createNotebookController({
+    const created = await createNotebookController({
         origin,
         load: (key) => loadNotebook(api.runtime, key),
         save: (key, state) => saveNotebook(api.runtime, key, state),
@@ -163,16 +165,17 @@ export async function bootContentScript(dependencies: ContentDependencies): Prom
             if (active) sendPageCommand(command);
         },
     });
-    clearEncounter = () => void controller.clear();
+    controller = created;
+    if (!active) return null;
+    clearEncounter = () => void created.clear();
 
-    let stopFallback: (() => void) | null = null;
     const syncFallback = (): void => {
         if (!active) return;
-        const wanted = controller.state().compatibility === "fallback";
+        const wanted = created.state().compatibility === "fallback";
         if (wanted && stopFallback === null) {
             stopFallback = observeRenderedChecks(
                 document.body ?? document.documentElement,
-                (observation) => void controller.accept(observation),
+                (observation) => void created.accept(observation),
             );
         } else if (!wanted && stopFallback !== null) {
             stopFallback();
@@ -180,39 +183,22 @@ export async function bootContentScript(dependencies: ContentDependencies): Prom
         }
     };
 
-    let handshakeTimer: ReturnType<typeof setTimeout> | null = null;
-    const cancelHandshakeTimer = (): void => {
-        if (handshakeTimer !== null) clearTimeout(handshakeTimer);
-        handshakeTimer = null;
-    };
     const acceptHandshake = (observation: Observation): void => {
         cancelHandshakeTimer();
-        void controller.accept(observation).then(syncFallback);
+        void created.accept(observation).then(syncFallback);
     };
 
-    const stopBridge = listenForObservations((observation) => {
+    stopBridge = listenForObservations((observation) => {
         if (!active) return;
         if (observation.type === "handshake") acceptHandshake(observation);
-        else void controller.accept(observation);
+        else void created.accept(observation);
     });
     handshakeTimer = setTimeout(() => {
         handshakeTimer = null;
         acceptHandshake(adapterTimeoutHandshake());
     }, HANDSHAKE_TIMEOUT_MS);
+    activated = true;
     sendPageCommand({ protocol: PROTOCOL_VERSION, type: "activate", payload: {} });
 
-    const teardown = registerTabLifecycle({
-        chrome: api,
-        window: dependencies.window,
-        origin,
-        controller,
-        sidebar: () => sidebar,
-        stopBridge,
-        stopFallback: () => stopFallback,
-        cancelHandshakeTimer,
-        deactivate: () => {
-            active = false;
-        },
-    });
-    return { controller, teardown };
+    return { controller: created, teardown };
 }
