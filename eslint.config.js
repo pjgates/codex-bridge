@@ -122,7 +122,7 @@ export default [
         },
     },
     {
-        files: ["plugin/src/**/*.ts", "extension/src/**/*.ts"],
+        files: ["plugin/src/**/*.ts", "extension/src/**/*.ts", "extension/tests/**/*.ts"],
         languageOptions: {
             parser: tsparser,
             parserOptions: {

@@ -25,6 +25,8 @@ await mkdir(outDir, { recursive: true });
 for (const entry of entries) {
     await build({
         configFile: false,
+        root,
+        publicDir: false,
         logLevel: "info",
         build: {
             outDir,

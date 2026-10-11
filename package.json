@@ -9,7 +9,7 @@
     "build": "vite build",
     "watch": "vite build --watch",
     "test": "vitest run",
-    "lint": "eslint src/ plugin/src/",
+    "lint": "eslint src/ plugin/src/ extension/src/ extension/tests/",
     "typecheck:runtime": "tsc --noEmit -p tsconfig.json",
     "typecheck:scripts": "tsc --noEmit -p tsconfig.scripts.json",
     "typecheck:plugin": "tsc --noEmit -p plugin/tsconfig.json",
@@ -19,8 +19,9 @@
     "extension:build": "tsx extension/build.ts",
     "extension:test": "vitest run --config extension/vitest.config.ts",
     "extension:typecheck": "tsc --noEmit -p extension/tsconfig.json",
-    "verify": "npm run typecheck && npm run lint && npm test && npm run build && npm run plugin:build",
-    "clean": "rm -rf dist",
+    "extension:smoke": "vitest run --config extension/vitest.smoke.config.ts",
+    "verify": "npm run typecheck && npm run extension:typecheck && npm run lint && npm test && npm run extension:test && npm run build && npm run plugin:build && npm run extension:build && npm run extension:smoke",
+    "clean": "rm -rf dist extension/dist",
     "link": "echo 'Symlink to your Foundry modules folder: ln -s $(pwd) <foundryData>/Data/modules/codex-foundry'"
   },
   "devDependencies": {
