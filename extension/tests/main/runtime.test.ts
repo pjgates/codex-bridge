@@ -217,6 +217,38 @@ describe("main-world runtime lifecycle", () => {
         }
     });
 
+    it("reports startup failure separately from support and success", () => {
+        vi.spyOn(console, "warn").mockImplementation(() => undefined);
+        expect(startRuntime(() => undefined, {
+            hooks: new FakeHooks(),
+            identity: () => {
+                throw new Error("no game");
+            },
+            scope: () => ({ sceneId: "s", combatId: null }),
+            currentTargets: () => [],
+        })).toMatchObject({ supported: false, failed: true });
+        expect(startRuntime(() => undefined, {
+            hooks: new FakeHooks(),
+            identity: () => ({
+                foundryGeneration: 14, systemId: "pf2e", systemVersion: "8.5.1", worldId: "w", userId: "u",
+            }),
+            scope: () => {
+                throw new Error("no scene");
+            },
+            currentTargets: () => [],
+        })).toMatchObject({ supported: true, failed: true });
+        const harness = start();
+        harness.teardown();
+        expect(startRuntime(() => undefined, {
+            hooks: new FakeHooks(),
+            identity: () => ({
+                foundryGeneration: 14, systemId: "pf2e", systemVersion: "8.6.0", worldId: "w", userId: "u",
+            }),
+            scope: () => ({ sceneId: "s", combatId: null }),
+            currentTargets: () => [],
+        })).toMatchObject({ supported: false, failed: false });
+    });
+
     it("does not emit after teardown even if a stale hook fires", () => {
         const harness = start();
         const stale = [...harness.hooks.registrations.values()].find((entry) => entry.name === "canvasReady")!;

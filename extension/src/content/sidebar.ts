@@ -8,7 +8,7 @@ export interface Sidebar {
     destroy(): void;
 }
 
-const HOST_ID = "pf2e-combat-notebook-host";
+export const HOST_ID = "pf2e-combat-notebook-host";
 const MAX_VISIBLE_EVIDENCE = 20;
 const MAX_VISIBLE_DIAGNOSTICS = 5;
 type ListKey = "evidence" | "disputed" | "diagnostics";

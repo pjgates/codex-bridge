@@ -124,6 +124,7 @@ export function runtimeDependenciesFromWindow(source: object): RuntimeDependenci
 export interface RuntimeHandle {
     stop(): void;
     supported: boolean;
+    failed: boolean;
 }
 
 export function startRuntime(
@@ -206,7 +207,7 @@ export function startRuntime(
         }));
         if (compatibility.status === "unsupported") {
             active = false;
-            return { stop: () => undefined, supported: false };
+            return { stop: () => undefined, supported: false, failed: false };
         }
         supported = true;
 
@@ -234,6 +235,7 @@ export function startRuntime(
         bootstrapTargets();
     } catch (error) {
         warn("startup", error);
+        return { stop: teardown, supported, failed: true };
     }
-    return { stop: teardown, supported };
+    return { stop: teardown, supported, failed: false };
 }

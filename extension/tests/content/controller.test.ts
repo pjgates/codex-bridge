@@ -423,4 +423,22 @@ describe("content controller", () => {
             payload: {},
         });
     });
+
+    it("re-sends the unchanged overlay after every scope and target observation", async () => {
+        const dependencies = harness();
+        const controller = await createNotebookController(dependencies);
+        for (const observation of [handshake, scope, snapshot, target(TOKEN)]) {
+            await controller.accept(observation);
+        }
+        dependencies.sendCommand.mockClear();
+        await controller.accept({ ...scope, eventId: "scope-again" });
+        await controller.accept(target(TOKEN, "target-again"));
+        const overlay = { protocol: 1, type: "render-overlay", payload: { tokenUuid: TOKEN, name: "Graveknight", ac: "28" } };
+        expect(dependencies.sendCommand.mock.calls).toEqual([[overlay], [overlay]]);
+
+        await controller.accept(target(null, "untarget"));
+        dependencies.sendCommand.mockClear();
+        await controller.accept({ ...scope, eventId: "scope-third" });
+        expect(dependencies.sendCommand).toHaveBeenCalledWith({ protocol: 1, type: "clear-overlay", payload: {} });
+    });
 });

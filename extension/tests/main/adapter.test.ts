@@ -19,6 +19,7 @@ const cleanups: (() => void)[] = [];
 
 afterEach(() => {
     for (const cleanup of cleanups.splice(0)) cleanup();
+    vi.useRealTimers();
 });
 
 function globals(ready: boolean): FakeGlobals {
@@ -191,12 +192,90 @@ describe("main-world page adapter", () => {
         expect(parsedTypes(observations)).toEqual(["handshake", "scope", "target"]);
     });
 
-    it("stays inert when Foundry is not ready and has no Hooks.once", () => {
+    it("retries while Hooks.once is unavailable and falls back after the retry window", () => {
+        vi.useFakeTimers();
         const fake = globals(false);
         delete fake.Hooks?.once;
         const { observations } = install(fake);
         expect(() => command("activate")).not.toThrow();
+        vi.advanceTimersByTime(29_000);
         expect(observations).toEqual([]);
+        vi.advanceTimersByTime(5_000);
+        expect(parsedTypes(observations)).toEqual(["handshake"]);
+        expect(JSON.parse(observations[0] as string)).toMatchObject({
+            payload: { status: "fallback", foundry: "unknown", worldId: "unknown", reason: expect.any(String) },
+        });
+        vi.advanceTimersByTime(60_000);
+        expect(observations).toHaveLength(1);
+        vi.useRealTimers();
+    });
+
+    it("retries until Foundry globals appear at document_start, then waits for ready once", () => {
+        vi.useFakeTimers();
+        const fake = globals(false);
+        const { observations } = install({});
+        command("activate");
+        vi.advanceTimersByTime(1_000);
+        Object.assign(window, fake);
+        vi.advanceTimersByTime(4_000);
+        expect(fake.Hooks?.once).toHaveBeenCalledOnce();
+        vi.advanceTimersByTime(60_000);
+        expect(fake.Hooks?.once).toHaveBeenCalledOnce();
+        expect(observations).toEqual([]);
+        (fake.game as { ready: boolean }).ready = true;
+        (fake.Hooks?.once?.mock.calls[0]?.[1] as Callback)();
+        expect(parsedTypes(observations)).toEqual(["handshake", "scope", "target"]);
+        expect(JSON.parse(observations[0] as string)).toMatchObject({ payload: { status: "active" } });
+        vi.useRealTimers();
+    });
+
+    it("cancels pending retries on teardown", () => {
+        vi.useFakeTimers();
+        const { observations } = install({});
+        command("activate");
+        vi.advanceTimersByTime(1_000);
+        command("teardown");
+        Object.assign(window, globals(true));
+        vi.advanceTimersByTime(60_000);
+        expect(observations).toEqual([]);
+        expect(vi.getTimerCount()).toBe(0);
+        vi.useRealTimers();
+    });
+
+    it("switches to fallback with the known identity when startup fails after compatibility passed", () => {
+        const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+        const fake = globals(true);
+        delete fake.canvas;
+        const { observations } = install(fake);
+        command("activate");
+        expect(parsedTypes(observations)).toEqual(["handshake", "handshake"]);
+        const [first, second] = observations.map((detail) => JSON.parse(detail as string) as {
+            payload: Record<string, unknown>;
+        });
+        expect(first?.payload.status).toBe("active");
+        expect(second?.payload).toMatchObject({
+            status: "fallback",
+            foundry: "14",
+            system: "pf2e",
+            systemVersion: "8.5.1",
+            worldId: "world",
+            userId: "me",
+            reason: expect.any(String),
+        });
+        expect(fake.Hooks?.off).toHaveBeenCalledTimes(fake.Hooks?.on.mock.calls.length ?? -1);
+        expect(warn).toHaveBeenCalled();
+    });
+
+    it("keeps an unsupported version unsupported without fallback", () => {
+        vi.useFakeTimers();
+        const fake = globals(true);
+        (fake.game?.system as { version: string }).version = "8.6.0";
+        const { observations } = install(fake);
+        command("activate");
+        vi.advanceTimersByTime(60_000);
+        expect(parsedTypes(observations)).toEqual(["handshake"]);
+        expect(JSON.parse(observations[0] as string)).toMatchObject({ payload: { status: "unsupported" } });
+        vi.useRealTimers();
     });
 
     it("tears down hook registrations idempotently", () => {
@@ -344,13 +423,14 @@ describe("main-world page adapter", () => {
         expect(String(warn.mock.calls[1]?.[0])).toContain("destroy broken");
     });
 
-    it("warns with a bounded message and stays inert when startup fails", () => {
+    it("warns with a bounded message and falls back when startup fails", () => {
         const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
         const fake = globals(true);
-        delete fake.Hooks;
+        fake.game!.system = null;
         const { observations } = install(fake);
         expect(() => command("activate")).not.toThrow();
-        expect(observations).toEqual([]);
+        expect(parsedTypes(observations)).toEqual(["handshake"]);
+        expect(JSON.parse(observations[0] as string)).toMatchObject({ payload: { status: "fallback" } });
         expect(warn).toHaveBeenCalledOnce();
         const message = String(warn.mock.calls[0]?.[0]);
         expect(message.startsWith("PF2e Combat Notebook:")).toBe(true);

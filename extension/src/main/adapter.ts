@@ -1,9 +1,12 @@
 import { createOverlay, field, overlayDependenciesFromWindow, type Overlay, type OverlayView } from "./overlay.js";
+import { nextEventId } from "./extract.js";
 import { runtimeDependenciesFromWindow, startRuntime, warn, type RuntimeDependencies } from "./runtime.js";
 import {
     COMMAND_EVENT,
     OBSERVATION_EVENT,
+    parseObservation,
     parsePageCommand,
+    PROTOCOL_VERSION,
     type Observation,
     type PageCommand,
 } from "../shared/protocol.js";
@@ -14,9 +17,23 @@ interface ReadinessGlobals {
     game?: unknown;
 }
 
+type HandshakePayload = Extract<Observation, { type: "handshake" }>["payload"];
+
+const RETRY_INITIAL_MS = 250;
+const RETRY_MAX_MS = 4_000;
+const RETRY_WINDOW_MS = 30_000;
+const UNKNOWN = "unknown";
+const UNAVAILABLE_REASON = "Foundry runtime was unavailable; reading rendered chat cards only.";
+const FAILED_REASON = "Foundry adapter failed; reading rendered chat cards only.";
+
 function isFoundryReady(globals: ReadinessGlobals): boolean {
     const game = globals.game;
     return typeof game === "object" && game !== null && (game as Record<string, unknown>).ready === true;
+}
+
+function hasRuntimeShape(globals: ReadinessGlobals): boolean {
+    return ["on", "off", "once"].every((name) => typeof field(globals.Hooks, name) === "function")
+        && typeof globals.game === "object" && globals.game !== null;
 }
 
 export function installPageAdapter(target: Window): () => void {
@@ -27,9 +44,42 @@ export function installPageAdapter(target: Window): () => void {
     let overlay: Overlay | null = null;
     let stopOverlayHooks: (() => void) | null = null;
     let overlayEnabled = false;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    let retryDelay = RETRY_INITIAL_MS;
+    let retryElapsed = 0;
+    let fellBack = false;
+    let lastHandshake: HandshakePayload | null = null;
 
     const emit = (observation: Observation): void => {
+        if (observation.type === "handshake") lastHandshake = observation.payload;
         target.dispatchEvent(new CustomEvent(OBSERVATION_EVENT, { detail: encodeDetail(observation) }));
+    };
+
+    const fallBack = (reason: string): void => {
+        if (fellBack) return;
+        fellBack = true;
+        const known = lastHandshake;
+        const observation = parseObservation({
+            protocol: PROTOCOL_VERSION,
+            eventId: nextEventId("handshake"),
+            timestamp: Date.now(),
+            type: "handshake",
+            payload: {
+                status: "fallback",
+                foundry: known?.foundry ?? UNKNOWN,
+                system: known?.system ?? UNKNOWN,
+                systemVersion: known?.systemVersion ?? UNKNOWN,
+                worldId: known?.worldId ?? UNKNOWN,
+                userId: known?.userId ?? UNKNOWN,
+                reason,
+            },
+        });
+        if (observation) emit(observation);
+    };
+
+    const cancelRetry = (): void => {
+        if (retryTimer !== null) clearTimeout(retryTimer);
+        retryTimer = null;
     };
 
     const withOverlay = (context: string, action: (current: Overlay) => void): void => {
@@ -78,10 +128,15 @@ export function installPageAdapter(target: Window): () => void {
     };
 
     const start = (): void => {
-        if (!wanted || stopRuntime) return;
+        if (!wanted || stopRuntime || fellBack) return;
         try {
             const dependencies = runtimeDependenciesFromWindow(target);
             const runtime = startRuntime(emit, dependencies);
+            if (runtime.failed) {
+                runtime.stop();
+                fallBack(FAILED_REASON);
+                return;
+            }
             stopRuntime = runtime.stop;
             if (runtime.supported) {
                 overlayEnabled = true;
@@ -89,6 +144,7 @@ export function installPageAdapter(target: Window): () => void {
             }
         } catch (error) {
             warn("activation", error);
+            fallBack(FAILED_REASON);
         }
     };
 
@@ -107,31 +163,56 @@ export function installPageAdapter(target: Window): () => void {
         withOverlay("render", (current) => current.render(view));
     };
 
-    const activate = (): void => {
-        wanted = true;
+    const scheduleRetry = (): void => {
+        if (retryElapsed >= RETRY_WINDOW_MS) {
+            fallBack(UNAVAILABLE_REASON);
+            return;
+        }
+        const delay = Math.min(retryDelay, RETRY_WINDOW_MS - retryElapsed);
+        retryDelay = Math.min(retryDelay * 2, RETRY_MAX_MS);
+        retryElapsed += delay;
+        retryTimer = setTimeout(() => {
+            retryTimer = null;
+            attempt();
+        }, delay);
+    };
+
+    const attempt = (): void => {
+        if (!wanted || stopRuntime || waitingForReady || fellBack) return;
+        cancelRetry();
+        if (!hasRuntimeShape(globals)) {
+            scheduleRetry();
+            return;
+        }
         if (isFoundryReady(globals)) {
             start();
             return;
         }
-        if (waitingForReady) return;
         const hooks = globals.Hooks;
-        const once = typeof hooks === "object" && hooks !== null
-            ? (hooks as Record<string, unknown>).once
-            : undefined;
-        if (typeof once !== "function") return;
         try {
-            once.call(hooks, "ready", () => {
+            (field(hooks, "once") as (...args: unknown[]) => unknown).call(hooks, "ready", () => {
                 waitingForReady = false;
                 start();
             });
             waitingForReady = true;
         } catch (error) {
             warn("waiting for Foundry ready", error);
+            scheduleRetry();
         }
+    };
+
+    const activate = (): void => {
+        wanted = true;
+        attempt();
     };
 
     const teardown = (): void => {
         wanted = false;
+        cancelRetry();
+        retryDelay = RETRY_INITIAL_MS;
+        retryElapsed = 0;
+        fellBack = false;
+        lastHandshake = null;
         overlayEnabled = false;
         const stopHooks = stopOverlayHooks;
         stopOverlayHooks = null;
