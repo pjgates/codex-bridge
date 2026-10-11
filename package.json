@@ -16,11 +16,15 @@
     "typecheck": "npm run typecheck:runtime && npm run typecheck:scripts && npm run typecheck:plugin",
     "plugin:build": "vite build --config plugin/vite.config.ts",
     "plugin:dev": "vite build --watch --config plugin/vite.config.ts",
+    "extension:build": "tsx extension/build.ts",
+    "extension:test": "vitest run --config extension/vitest.config.ts",
+    "extension:typecheck": "tsc --noEmit -p extension/tsconfig.json",
     "verify": "npm run typecheck && npm run lint && npm test && npm run build && npm run plugin:build",
     "clean": "rm -rf dist",
     "link": "echo 'Symlink to your Foundry modules folder: ln -s $(pwd) <foundryData>/Data/modules/codex-foundry'"
   },
   "devDependencies": {
+    "@types/chrome": "^0.3.5",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^22.10.0",
     "@typescript-eslint/eslint-plugin": "^8.54.0",

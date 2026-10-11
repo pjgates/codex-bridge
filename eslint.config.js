@@ -122,7 +122,7 @@ export default [
         },
     },
     {
-        files: ["plugin/src/**/*.ts"],
+        files: ["plugin/src/**/*.ts", "extension/src/**/*.ts"],
         languageOptions: {
             parser: tsparser,
             parserOptions: {
@@ -146,6 +146,6 @@ export default [
     },
     {
         // Ignore build output and config files
-        ignores: ["dist/**", "plugin/dist/**", "node_modules/**", "*.config.*"],
+        ignores: ["dist/**", "plugin/dist/**", "extension/dist/**", "node_modules/**", "*.config.*"],
     },
 ];
