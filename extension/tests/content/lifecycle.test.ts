@@ -314,9 +314,9 @@ describe("content script tab lifecycle", () => {
         tabMessage(api, { type: "launch" });
         tabMessage(api, "teardown");
         expect(host()).not.toBeNull();
-        expect(panel()?.classList.contains("pcn-collapsed")).toBe(false);
-        tabMessage(api, { type: "toggle-sidebar" });
         expect(panel()?.classList.contains("pcn-collapsed")).toBe(true);
+        tabMessage(api, { type: "toggle-sidebar" });
+        expect(panel()?.classList.contains("pcn-collapsed")).toBe(false);
         expect(commands.filter((command) => command.type === "teardown")).toHaveLength(0);
     });
 

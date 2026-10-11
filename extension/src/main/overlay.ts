@@ -1,7 +1,10 @@
+import { provenanceLabel, type Provenance } from "../shared/provenance.js";
+
 export interface OverlayView {
     tokenUuid: string;
     name: string;
     ac: string;
+    provenance: Provenance;
     health?: string;
 }
 
@@ -53,7 +56,8 @@ const FONT_SIZE = 14;
 const FONT_FAMILY = "sans-serif";
 
 function labelOf(view: OverlayView): string {
-    return `${view.name} · AC ${view.ac}${view.health ? ` · ${view.health}` : ""}`;
+    const ac = `AC ${view.ac} (${provenanceLabel(view.provenance)})`;
+    return `${view.name} · ${ac}${view.health ? ` · ${view.health}` : ""}`;
 }
 
 function scaleFor(zoom: number): number {

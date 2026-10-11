@@ -1,7 +1,8 @@
 import type { CandidateSet } from "./defense.js";
 import type { CompatibilityStatus, DefenseKind } from "../shared/protocol.js";
+import type { Provenance } from "../shared/provenance.js";
 
-export type Provenance = "exact-client" | "observed" | "inferred" | "possible";
+export type { Provenance } from "../shared/provenance.js";
 
 export interface DefenseFact {
     display: string;

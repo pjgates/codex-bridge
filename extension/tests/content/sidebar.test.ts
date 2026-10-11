@@ -83,7 +83,7 @@ describe("notebook sidebar", () => {
         first.render(other);
         first.toggle();
         expect(shadow().textContent).not.toContain("Stale Goblin");
-        expect(shadow().querySelector("[data-action=toggle]")?.getAttribute("aria-expanded")).toBe("true");
+        expect(shadow().querySelector("[data-action=toggle]")?.getAttribute("aria-expanded")).toBe("false");
         first.destroy();
         expect(document.querySelector(HOST)).not.toBeNull();
         second.destroy();
@@ -174,20 +174,39 @@ describe("notebook sidebar", () => {
         expect(labels).toEqual(["exact client data", "observed", "inferred", "possible"]);
     });
 
-    it("collapses and expands with aria-expanded, preserving state across renders", () => {
+    it("labels AC as a DC and saves and Perception as modifiers", () => {
+        const sidebar = mountSidebar(document, vi.fn());
+        const state = activeState();
+        const fact = { display: "+12", provenance: "observed" as const, contextKey: "base", evidenceIds: [] };
+        state.creatures.t = creature("t", "Goblin", {
+            defenses: {
+                ac: { ...fact, display: "18", provenance: "exact-client" },
+                fortitude: fact,
+                reflex: fact,
+                will: fact,
+                perception: fact,
+            },
+        });
+        sidebar.render(state);
+        const headings = [...shadow().querySelectorAll(".pcn-defenses th")].map((node) => node.textContent);
+        expect(headings).toEqual(["AC", "Fortitude modifier", "Reflex modifier", "Will modifier", "Perception modifier"]);
+    });
+
+    it("starts collapsed, then expands and collapses with aria-expanded, preserving state across renders", () => {
         const sidebar = mountSidebar(document, vi.fn());
         sidebar.render(activeState());
         const toggle = shadow().querySelector("[data-action=toggle]") as HTMLButtonElement;
         const panel = shadow().querySelector(".pcn-panel") as HTMLElement;
-        expect(toggle.getAttribute("aria-expanded")).toBe("true");
-        toggle.click();
         expect(toggle.getAttribute("aria-expanded")).toBe("false");
         expect(panel.classList.contains("pcn-collapsed")).toBe(true);
-        sidebar.render(activeState());
-        expect(toggle.getAttribute("aria-expanded")).toBe("false");
-        sidebar.toggle();
+        toggle.click();
         expect(toggle.getAttribute("aria-expanded")).toBe("true");
         expect(panel.classList.contains("pcn-collapsed")).toBe(false);
+        sidebar.render(activeState());
+        expect(toggle.getAttribute("aria-expanded")).toBe("true");
+        sidebar.toggle();
+        expect(toggle.getAttribute("aria-expanded")).toBe("false");
+        expect(panel.classList.contains("pcn-collapsed")).toBe(true);
     });
 
     it("contains errors thrown by the clear callback", () => {

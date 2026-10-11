@@ -22,7 +22,7 @@ const event = (overrides: Partial<Observation>): Observation => ({
 
 const TOKEN = "Scene.s.Token.t";
 
-const snapshot = (defenses: Partial<Record<"ac" | "will", number>>, eventId?: string): Observation => event({
+const snapshot = (defenses: Partial<Record<"ac" | "will" | "fortitude" | "perception", number>>, eventId?: string): Observation => event({
     ...(eventId ? { eventId } : {}),
     type: "token-snapshot",
     payload: { tokenUuid: TOKEN, actorUuid: "Actor.a", name: "Graveknight", defenses },
@@ -156,7 +156,20 @@ describe("notebook reducer", () => {
             tokenUuid: "Scene.s.Token.t",
             name: "Graveknight",
             ac: "28",
+            provenance: "exact-client",
         });
+    });
+
+    it("displays exact save and perception values as signed modifiers and AC as a DC", () => {
+        const first = applyObservation(emptyNotebook(), snapshot({ ac: 28, fortitude: 12, perception: -1 }));
+        const defenses = first.creatures[TOKEN].defenses;
+        expect(defenses.ac?.display).toBe("28");
+        expect(defenses.fortitude).toMatchObject({ display: "+12", provenance: "exact-client" });
+        expect(defenses.perception).toMatchObject({ display: "-1", provenance: "exact-client" });
+        expect(first.creatures[TOKEN].evidence[0]?.summary)
+            .toBe("Snapshot: AC 28, Fortitude +12, Perception -1 (exact client data)");
+        const again = applyObservation(first, snapshot({ ac: 28, fortitude: 12, perception: -1 }));
+        expect(again.creatures).toBe(first.creatures);
     });
 
     it("keeps the contradicted estimate and its provenance intact", () => {
@@ -319,7 +332,7 @@ describe("notebook reducer", () => {
 
         state = applyObservation(state, snapshot({ will: 30 }));
         state = applyObservation(state, save(20, TOKEN));
-        expect(state.creatures[TOKEN].defenses.will).toMatchObject({ display: "30", provenance: "exact-client" });
+        expect(state.creatures[TOKEN].defenses.will).toMatchObject({ display: "+30", provenance: "exact-client" });
         expect(state.creatures[TOKEN].evidence).toHaveLength(2);
     });
 

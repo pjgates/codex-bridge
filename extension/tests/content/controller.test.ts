@@ -159,6 +159,7 @@ describe("content controller", () => {
                 tokenUuid: "Scene.s.Token.t",
                 name: "Graveknight",
                 ac: "28",
+                provenance: "exact-client",
             },
         });
     });
@@ -188,7 +189,7 @@ describe("content controller", () => {
         expect(dependencies.sendCommand).toHaveBeenLastCalledWith({
             protocol: 1,
             type: "render-overlay",
-            payload: { tokenUuid: TOKEN, name: "Graveknight", ac: "28" },
+            payload: { tokenUuid: TOKEN, name: "Graveknight", ac: "28", provenance: "exact-client" },
         });
     });
 
@@ -433,7 +434,7 @@ describe("content controller", () => {
         dependencies.sendCommand.mockClear();
         await controller.accept({ ...scope, eventId: "scope-again" });
         await controller.accept(target(TOKEN, "target-again"));
-        const overlay = { protocol: 1, type: "render-overlay", payload: { tokenUuid: TOKEN, name: "Graveknight", ac: "28" } };
+        const overlay = { protocol: 1, type: "render-overlay", payload: { tokenUuid: TOKEN, name: "Graveknight", ac: "28", provenance: "exact-client" } };
         expect(dependencies.sendCommand.mock.calls).toEqual([[overlay], [overlay]]);
 
         await controller.accept(target(null, "untarget"));

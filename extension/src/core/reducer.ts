@@ -7,7 +7,7 @@ import {
     MAX_SEEN_EVENT_IDS,
 } from "./types.js";
 import type { CreatureRecord, DefenseFact, Evidence, NotebookState } from "./types.js";
-import type { DefenseKind, Observation } from "../shared/protocol.js";
+import type { DefenseKind, Observation, PageCommand } from "../shared/protocol.js";
 
 export { parseNotebookState } from "./state-parser.js";
 
@@ -102,8 +102,22 @@ function setDefense(record: CreatureRecord, kind: DefenseKind, fact: DefenseFact
     return { ...record, defenses: { ...record.defenses, [kind]: fact } };
 }
 
-function exactFact(value: number, contextKey: string, previous: DefenseFact | undefined, id: string): DefenseFact {
-    const display = String(value);
+function signed(value: number): string {
+    return value >= 0 ? `+${value}` : String(value);
+}
+
+function exactDisplay(kind: DefenseKind, value: number): string {
+    return kind === "ac" ? String(value) : signed(value);
+}
+
+function exactFact(
+    kind: DefenseKind,
+    value: number,
+    contextKey: string,
+    previous: DefenseFact | undefined,
+    id: string,
+): DefenseFact {
+    const display = exactDisplay(kind, value);
     const evidenceIds = previous?.provenance === "exact-client" && previous.display === display
         ? appendBounded(previous.evidenceIds, id, MAX_CREATURE_ENTRIES)
         : [id];
@@ -132,12 +146,8 @@ function isUnchangedSnapshot(
     if (!record || record.name !== payload.name || record.actorUuid !== payload.actorUuid) return false;
     return Object.entries(payload.defenses).every(([kind, value]) => {
         const fact = record.defenses[kind as DefenseKind];
-        return fact?.provenance === "exact-client" && fact.display === String(value);
+        return fact?.provenance === "exact-client" && fact.display === exactDisplay(kind as DefenseKind, value);
     });
-}
-
-function signed(value: number): string {
-    return value >= 0 ? `+${value}` : String(value);
 }
 
 function applySnapshot(
@@ -147,14 +157,14 @@ function applySnapshot(
     const { tokenUuid, actorUuid, name, defenses } = observation.payload;
     if (isUnchangedSnapshot(creatureAt(state, tokenUuid), observation.payload)) return state;
     const entries = Object.entries(defenses) as [DefenseKind, number][];
-    const described = entries.map(([kind, value]) => `${DEFENSE_LABELS[kind]} ${value}`).join(", ");
+    const described = entries.map(([kind, value]) => `${DEFENSE_LABELS[kind]} ${exactDisplay(kind, value)}`).join(", ");
     const summary = described
         ? `Snapshot: ${described} (exact client data)`
         : "Snapshot: no defenses visible (exact client data)";
     return updateCreature(state, tokenUuid, (record) => {
         let next: CreatureRecord = { ...record, actorUuid, name };
         for (const [kind, value] of entries) {
-            next = setDefense(next, kind, exactFact(value, BASE_CONTEXT, next.defenses[kind], observation.eventId));
+            next = setDefense(next, kind, exactFact(kind, value, BASE_CONTEXT, next.defenses[kind], observation.eventId));
         }
         return addEvidence(next, evidenceFor(observation, summary));
     });
@@ -183,7 +193,7 @@ function applyAttack(state: NotebookState, observation: CheckRoll): NotebookStat
             if (existing?.provenance === "exact-client" && existing.display !== String(exactDc)) {
                 return addContradiction(record, evidence);
             }
-            return addEvidence(setDefense(record, statistic, exactFact(exactDc, contextKey, existing, id)), evidence);
+            return addEvidence(setDefense(record, statistic, exactFact(statistic, exactDc, contextKey, existing, id)), evidence);
         }
 
         if (outcome === null) {
@@ -301,11 +311,11 @@ export function applyObservation(state: NotebookState, observation: Observation)
 
 export function currentOverlay(
     state: NotebookState,
-): { tokenUuid: string; name: string; ac: string; health?: string } | null {
+): Extract<PageCommand, { type: "render-overlay" }>["payload"] | null {
     const tokenUuid = state.selectedTokenUuid;
     if (tokenUuid === null) return null;
     const record = creatureAt(state, tokenUuid);
     const ac = record?.defenses.ac;
     if (!record || !ac) return null;
-    return { tokenUuid, name: record.name, ac: ac.display };
+    return { tokenUuid, name: record.name, ac: ac.display, provenance: ac.provenance };
 }

@@ -1,3 +1,5 @@
+import { PROVENANCES, type Provenance } from "./provenance.js";
+
 export const PROTOCOL_VERSION = 1 as const;
 export const OBSERVATION_EVENT = "pf2e-combat-notebook:observation";
 export const COMMAND_EVENT = "pf2e-combat-notebook:command";
@@ -54,7 +56,7 @@ export type PageCommand =
     | {
         protocol: typeof PROTOCOL_VERSION;
         type: "render-overlay";
-        payload: { tokenUuid: string; name: string; ac: string; health?: string };
+        payload: { tokenUuid: string; name: string; ac: string; provenance: Provenance; health?: string };
     }
     | {
         protocol: typeof PROTOCOL_VERSION;
@@ -280,11 +282,17 @@ export function parsePageCommand(value: unknown): PageCommand | null {
     const type: PageCommandType = value.type;
     switch (type) {
         case "render-overlay": {
-            if (!isId(payload.tokenUuid) || !isText(payload.name) || !isText(payload.ac)) return null;
+            if (
+                !isId(payload.tokenUuid)
+                || !isText(payload.name)
+                || !isText(payload.ac)
+                || !isOneOf(payload.provenance, PROVENANCES)
+            ) return null;
             const parsed: Extract<PageCommand, { type: "render-overlay" }>["payload"] = {
                 tokenUuid: payload.tokenUuid,
                 name: payload.name,
                 ac: payload.ac,
+                provenance: payload.provenance,
             };
             if (hasOwn(payload, "health")) {
                 if (!isText(payload.health)) return null;

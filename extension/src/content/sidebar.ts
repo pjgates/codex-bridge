@@ -1,5 +1,6 @@
 import type { CompatibilityStatus, DefenseKind } from "../shared/protocol.js";
-import type { CreatureRecord, DefenseFact, Evidence, NotebookState, Provenance } from "../core/types.js";
+import type { CreatureRecord, DefenseFact, Evidence, NotebookState } from "../core/types.js";
+import { provenanceLabel } from "../shared/provenance.js";
 import { SIDEBAR_CSS } from "./styles.js";
 
 export interface Sidebar {
@@ -18,29 +19,12 @@ const DEFENSE_ORDER: DefenseKind[] = ["ac", "fortitude", "reflex", "will", "perc
 const SHELL_HTML = `
 <section class="pcn-panel" aria-label="PF2e Combat Notebook">
     <header class="pcn-header">
-        <button type="button" data-action="toggle" aria-expanded="true" aria-controls="pcn-body" aria-label="Toggle notebook" title="Toggle notebook">☰</button>
+        <button type="button" data-action="toggle" aria-expanded="false" aria-controls="pcn-body" aria-label="Toggle notebook" title="Toggle notebook">☰</button>
         <h2 class="pcn-title">Combat Notebook</h2>
     </header>
     <div class="pcn-body" id="pcn-body"></div>
 </section>
 `;
-
-export function provenanceLabel(provenance: Provenance): string {
-    switch (provenance) {
-        case "exact-client":
-            return "exact client data";
-        case "observed":
-            return "observed";
-        case "inferred":
-            return "inferred";
-        case "possible":
-            return "possible";
-        default: {
-            const unreachable: never = provenance;
-            return unreachable;
-        }
-    }
-}
 
 function statusLabel(status: CompatibilityStatus): string {
     switch (status) {
@@ -62,13 +46,13 @@ function defenseLabel(kind: DefenseKind): string {
         case "ac":
             return "AC";
         case "fortitude":
-            return "Fortitude";
+            return "Fortitude modifier";
         case "reflex":
-            return "Reflex";
+            return "Reflex modifier";
         case "will":
-            return "Will";
+            return "Will modifier";
         case "perception":
-            return "Perception";
+            return "Perception modifier";
         default: {
             const unreachable: never = kind;
             return unreachable;
@@ -97,7 +81,7 @@ export function mountSidebar(document: Document, onClear: () => void): Sidebar {
     const toggleButton = root.querySelector("[data-action=toggle]") as HTMLButtonElement;
     const body = root.querySelector(".pcn-body") as HTMLElement;
 
-    let collapsed = false;
+    let collapsed = true;
     let confirmingClear = false;
     let localSelection: string | null = null;
     let lastSelectedTokenUuid: string | null = null;

@@ -49,8 +49,21 @@ describe("page protocol", () => {
                 tokenUuid: "Scene.s.Token.t",
                 name: "Graveknight",
                 ac: "27–28",
+                provenance: "inferred",
             },
         })).not.toBeNull();
+        for (const provenance of [undefined, "guessed", 3]) {
+            expect(parsePageCommand({
+                protocol: PROTOCOL_VERSION,
+                type: "render-overlay",
+                payload: {
+                    tokenUuid: "Scene.s.Token.t",
+                    name: "Graveknight",
+                    ac: "27–28",
+                    ...(provenance === undefined ? {} : { provenance }),
+                },
+            })).toBeNull();
+        }
         expect(parsePageCommand({
             protocol: PROTOCOL_VERSION,
             type: "invoke",

@@ -73,7 +73,7 @@ function renderOverlay(tokenUuid = "Scene.s.Token.t"): void {
         detail: JSON.stringify({
             protocol: 1,
             type: "render-overlay",
-            payload: { tokenUuid, name: "Graveknight", ac: "28" },
+            payload: { tokenUuid, name: "Graveknight", ac: "28", provenance: "observed" },
         }),
     }));
 }
@@ -365,7 +365,7 @@ describe("main-world page adapter", () => {
         command("activate");
         renderOverlay();
         const label = labelOf(layer);
-        expect(label?.text).toBe("Graveknight · AC 28");
+        expect(label?.text).toBe("Graveknight · AC 28 (observed)");
         command("clear-overlay");
         expect(label?.destroy).toHaveBeenCalledOnce();
         renderOverlay();

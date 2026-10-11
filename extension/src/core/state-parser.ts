@@ -4,8 +4,9 @@ import {
     MAX_DIAGNOSTICS,
     MAX_SEEN_EVENT_IDS,
 } from "./types.js";
-import type { CreatureRecord, DefenseFact, Evidence, NotebookState, Provenance } from "./types.js";
+import type { CreatureRecord, DefenseFact, Evidence, NotebookState } from "./types.js";
 import type { CompatibilityStatus, DefenseKind } from "../shared/protocol.js";
+import { PROVENANCES } from "../shared/provenance.js";
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -14,7 +15,6 @@ const SCOPE_ID_MAX_LENGTH = ID_MAX_LENGTH * 2 + 1;
 const TEXT_MAX_LENGTH = 2_000;
 const MAX_CANDIDATE_RANGES = 8;
 
-const PROVENANCES: readonly Provenance[] = ["exact-client", "observed", "inferred", "possible"];
 const CERTAINTIES: readonly CandidateSet["certainty"][] = ["inferred", "possible"];
 const DEFENSE_KINDS: readonly DefenseKind[] = ["ac", "fortitude", "reflex", "will", "perception"];
 const COMPATIBILITY_STATUSES: readonly CompatibilityStatus[] = ["active", "fallback", "unsupported"];

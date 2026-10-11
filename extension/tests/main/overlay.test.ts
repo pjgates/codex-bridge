@@ -50,7 +50,7 @@ let texts: FakeText[];
 let textNode: FakeText;
 let label: FakeText;
 
-const view: OverlayView = { tokenUuid: "Scene.s.Token.t", name: "Graveknight", ac: "27–28" };
+const view: OverlayView = { tokenUuid: "Scene.s.Token.t", name: "Graveknight", ac: "27–28", provenance: "inferred" };
 
 beforeEach(() => {
     interfaceLayer = new FakeContainer();
@@ -86,10 +86,11 @@ describe("targeted-token overlay", () => {
             tokenUuid: "Scene.s.Token.t",
             name: "Graveknight",
             ac: "27–28",
+            provenance: "inferred",
         });
         expect(interfaceLayer.children).toHaveLength(1);
         expect(interfaceLayer.children[0].eventMode).toBe("none");
-        expect(textNode.text).toBe("Graveknight · AC 27–28");
+        expect(textNode.text).toBe("Graveknight · AC 27–28 (inferred)");
         expect(textNode.eventMode).toBe("none");
         expect(textNode.anchor.set).toHaveBeenCalledWith(0.5, 1);
     });
@@ -109,7 +110,7 @@ describe("targeted-token overlay", () => {
     it("appends the health suffix when provided", () => {
         const overlay = createOverlay(fakeDependencies());
         overlay.render({ ...view, health: "Wounded" });
-        expect(textNode.text).toBe("Graveknight · AC 27–28 · Wounded");
+        expect(textNode.text).toBe("Graveknight · AC 27–28 (inferred) · Wounded");
     });
 
     it("updates the existing text instead of recreating it and moves to a new token", () => {
@@ -118,9 +119,9 @@ describe("targeted-token overlay", () => {
         overlay.render(view);
         overlay.render(view);
         overlay.render({ ...view, ac: "28" });
-        overlay.render({ tokenUuid: "Scene.s.Token.u", name: "Lich", ac: "30" });
+        overlay.render({ tokenUuid: "Scene.s.Token.u", name: "Lich", ac: "30", provenance: "exact-client" });
         expect(texts).toHaveLength(1);
-        expect(textNode.text).toBe("Lich · AC 30");
+        expect(textNode.text).toBe("Lich · AC 30 (exact client data)");
         expect(textNode.position.set).toHaveBeenLastCalledWith(300, 308);
         const root = interfaceLayer.children[0] as FakeContainer;
         expect(root.children).toHaveLength(1);
