@@ -12,6 +12,7 @@ interface FakeGlobals {
     };
     game?: Record<string, unknown>;
     canvas?: Record<string, unknown>;
+    PIXI?: Record<string, unknown>;
 }
 
 const cleanups: (() => void)[] = [];
@@ -55,6 +56,7 @@ function install(fake: FakeGlobals): { observations: unknown[] } {
         delete target.Hooks;
         delete target.game;
         delete target.canvas;
+        delete target.PIXI;
     });
     return { observations };
 }
@@ -63,6 +65,71 @@ function command(type: PageCommand["type"]): void {
     window.dispatchEvent(new CustomEvent(COMMAND_EVENT, {
         detail: JSON.stringify({ protocol: 1, type, payload: {} }),
     }));
+}
+
+function renderOverlay(tokenUuid = "Scene.s.Token.t"): void {
+    window.dispatchEvent(new CustomEvent(COMMAND_EVENT, {
+        detail: JSON.stringify({
+            protocol: 1,
+            type: "render-overlay",
+            payload: { tokenUuid, name: "Graveknight", ac: "28" },
+        }),
+    }));
+}
+
+class FakeNode {
+    eventMode = "auto";
+    parent: FakeContainer | null = null;
+    destroyed = false;
+    position = { set: vi.fn() };
+    scale = { set: vi.fn() };
+    anchor = { set: vi.fn() };
+    destroy = vi.fn(() => {
+        this.destroyed = true;
+        if (this.parent) this.parent.children = this.parent.children.filter((child) => child !== this);
+        this.parent = null;
+    });
+}
+
+class FakeContainer extends FakeNode {
+    children: FakeNode[] = [];
+
+    addChild(child: FakeNode): void {
+        child.parent = this;
+        this.children.push(child);
+    }
+}
+
+class FakeText extends FakeNode {
+    text: string;
+
+    constructor(options: { text: string }) {
+        super();
+        this.text = options.text;
+    }
+}
+
+function withCanvas(fake: FakeGlobals): { layer: FakeContainer; token: Record<string, unknown> } {
+    const layer = new FakeContainer();
+    const token = { document: { uuid: "Scene.s.Token.t" }, center: { x: 10, y: 20 }, y: 5 };
+    fake.canvas = {
+        scene: { id: "scene" },
+        interface: layer,
+        tokens: { placeables: [token] },
+        stage: { scale: { x: 1 } },
+    };
+    fake.PIXI = { VERSION: "8.6.6", Container: FakeContainer, Text: FakeText };
+    return { layer, token };
+}
+
+function hookCallback(fake: FakeGlobals, name: string): Callback {
+    const call = fake.Hooks?.on.mock.calls.find((entry) => entry[0] === name);
+    if (!call) throw new Error(`${name} not registered`);
+    return call[1] as Callback;
+}
+
+function labelOf(layer: FakeContainer): FakeText | undefined {
+    return (layer.children[0] as FakeContainer | undefined)?.children[0] as FakeText | undefined;
 }
 
 function parsedTypes(observations: unknown[]): string[] {
@@ -156,7 +223,7 @@ describe("main-world page adapter", () => {
         expect(observations).toEqual([]);
     });
 
-    it("accepts overlay commands without effects", () => {
+    it("accepts overlay commands without effects when PIXI is unavailable", () => {
         const fake = globals(true);
         const { observations } = install(fake);
         command("clear-overlay");
@@ -168,6 +235,70 @@ describe("main-world page adapter", () => {
             }),
         }));
         expect(observations).toEqual([]);
+    });
+
+    it("ignores render-overlay before activation", () => {
+        const fake = globals(true);
+        const { layer } = withCanvas(fake);
+        install(fake);
+        renderOverlay();
+        expect(layer.children).toHaveLength(0);
+    });
+
+    it("routes render-overlay and clear-overlay to the overlay and destroys it on teardown", () => {
+        const fake = globals(true);
+        const { layer } = withCanvas(fake);
+        install(fake);
+        command("activate");
+        renderOverlay();
+        const label = labelOf(layer);
+        expect(label?.text).toBe("Graveknight · AC 28");
+        command("clear-overlay");
+        expect(label?.destroy).toHaveBeenCalledOnce();
+        renderOverlay();
+        const root = layer.children[0] as FakeContainer;
+        command("teardown");
+        expect(root.destroy).toHaveBeenCalledOnce();
+        expect(layer.children).toHaveLength(0);
+        renderOverlay();
+        expect(layer.children).toHaveLength(0);
+    });
+
+    it("refreshes on canvas hooks, clears on canvas teardown, and unregisters on teardown", () => {
+        const fake = globals(true);
+        const { layer, token } = withCanvas(fake);
+        install(fake);
+        command("activate");
+        renderOverlay();
+        (token.center as { x: number }).x = 99;
+        hookCallback(fake, "refreshToken")();
+        expect(labelOf(layer)?.position.set).toHaveBeenLastCalledWith(99, -7);
+        hookCallback(fake, "canvasPan")();
+        hookCallback(fake, "updateToken")();
+        hookCallback(fake, "canvasTearDown")();
+        expect((layer.children[0] as FakeContainer).children).toHaveLength(0);
+        const overlayHookNames = ["canvasPan", "updateToken", "refreshToken", "canvasTearDown"];
+        command("teardown");
+        const removed = fake.Hooks?.off.mock.calls.map((entry) => entry[0]) ?? [];
+        expect(removed).toEqual(expect.arrayContaining(overlayHookNames));
+    });
+
+    it("swallows overlay hook errors, warns, and clears", () => {
+        const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+        const fake = globals(true);
+        const { layer } = withCanvas(fake);
+        install(fake);
+        command("activate");
+        renderOverlay();
+        const label = labelOf(layer);
+        (fake.canvas as Record<string, unknown>).stage = {
+            get scale(): never {
+                throw new Error("stage broken");
+            },
+        };
+        expect(() => hookCallback(fake, "canvasPan")()).not.toThrow();
+        expect(warn).toHaveBeenCalledOnce();
+        expect(label?.destroy).toHaveBeenCalledOnce();
     });
 
     it("warns with a bounded message and stays inert when startup fails", () => {
