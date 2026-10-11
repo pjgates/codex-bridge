@@ -82,7 +82,10 @@ export async function createNotebookController(
 
     const enqueue = (task: () => Promise<void>): Promise<void> => {
         const run = pending.then(task).catch(() => {
-            state = withDiagnosticOnce(state, UPDATE_FAILED_DIAGNOSTIC);
+            const noted = withDiagnosticOnce(state, UPDATE_FAILED_DIAGNOSTIC);
+            if (noted === state) return;
+            state = noted;
+            render();
         });
         pending = run;
         return run;

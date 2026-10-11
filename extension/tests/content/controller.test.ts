@@ -4,6 +4,7 @@ import {
     LOAD_FAILED_DIAGNOSTIC,
     RENDER_FAILED_DIAGNOSTIC,
     SAVE_FAILED_DIAGNOSTIC,
+    UPDATE_FAILED_DIAGNOSTIC,
     type ControllerDependencies,
 } from "../../src/content/controller.js";
 import {
@@ -300,6 +301,17 @@ describe("content controller", () => {
         expect(count(state.diagnostics, SAVE_FAILED_DIAGNOSTIC)).toBe(1);
         expect(save).toHaveBeenLastCalledWith(KEY, expect.objectContaining({ selectedTokenUuid: TOKEN }));
         expect(dependencies.renderSidebar).toHaveBeenLastCalledWith(state);
+    });
+
+    it("renders the diagnostic when an update fails outside a publish", async () => {
+        const dependencies = harness();
+        const controller = await createNotebookController(dependencies);
+        await controller.accept(handshake);
+        await controller.accept({ ...snapshot, eventId: "broken", payload: null } as unknown as Observation);
+        expect(controller.state().diagnostics).toContain(UPDATE_FAILED_DIAGNOSTIC);
+        expect(dependencies.renderSidebar).toHaveBeenLastCalledWith(
+            expect.objectContaining({ diagnostics: expect.arrayContaining([UPDATE_FAILED_DIAGNOSTIC]) }),
+        );
     });
 
     it("does not repeat the same storage diagnostic on consecutive failures", async () => {
