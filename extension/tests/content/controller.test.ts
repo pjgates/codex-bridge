@@ -1,5 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
-import { createNotebookController, type ControllerDependencies } from "../../src/content/controller.js";
+import {
+    createNotebookController,
+    LOAD_FAILED_DIAGNOSTIC,
+    RENDER_FAILED_DIAGNOSTIC,
+    SAVE_FAILED_DIAGNOSTIC,
+    type ControllerDependencies,
+} from "../../src/content/controller.js";
 import {
     applyObservation,
     emptyNotebook,
@@ -56,11 +62,10 @@ const target = (tokenUuid: string | null, eventId = "target"): Observation => ({
     payload: { tokenUuid },
 });
 
-function harness(overrides: Partial<ControllerDependencies> = {}): ControllerDependencies & {
-    save: ReturnType<typeof vi.fn>;
-    renderSidebar: ReturnType<typeof vi.fn>;
-    sendCommand: ReturnType<typeof vi.fn>;
-} {
+type Mock = ReturnType<typeof vi.fn>;
+type Harness = ControllerDependencies & { save: Mock; renderSidebar: Mock; sendCommand: Mock };
+
+function harness(overrides: Partial<ControllerDependencies> = {}): Harness {
     return {
         origin: ORIGIN,
         load: async () => null,
@@ -68,11 +73,19 @@ function harness(overrides: Partial<ControllerDependencies> = {}): ControllerDep
         renderSidebar: vi.fn(),
         sendCommand: vi.fn(),
         ...overrides,
-    } as ControllerDependencies & {
-        save: ReturnType<typeof vi.fn>;
-        renderSidebar: ReturnType<typeof vi.fn>;
-        sendCommand: ReturnType<typeof vi.fn>;
-    };
+    } as Harness;
+}
+
+const otherSnapshot: Observation = {
+    protocol: 1,
+    eventId: "snapshot-other",
+    timestamp: 3,
+    type: "token-snapshot",
+    payload: { tokenUuid: "Scene.s.Token.o", actorUuid: null, name: "Ghoul", defenses: { ac: 16 } },
+};
+
+function count(list: readonly string[], entry: string): number {
+    return list.filter((item) => item === entry).length;
 }
 
 function storedScope(): NotebookState {
@@ -184,6 +197,7 @@ describe("content controller", () => {
         const controller = await createNotebookController(dependencies);
         await controller.accept(handshake);
         await controller.accept(scope);
+        await controller.flush();
         const state = controller.state();
         expect(state.creatures).toEqual({});
         expect(state.scopeId).toBe("scene:combat");
@@ -203,15 +217,57 @@ describe("content controller", () => {
         expect(controller.state().diagnostics).toEqual([STORED_STATE_INVALID_DIAGNOSTIC]);
     });
 
-    it("keeps accepting observations when a load rejects", async () => {
+    it("keeps accepting observations without saving when a load rejects", async () => {
         const dependencies = harness({ load: async () => Promise.reject(new Error("worker gone")) });
         const controller = await createNotebookController(dependencies);
         await controller.accept(handshake);
         await controller.accept(scope);
         await controller.accept(snapshot);
+        await controller.flush();
         const state = controller.state();
         expect(state.creatures[TOKEN]?.name).toBe("Graveknight");
-        expect(state.diagnostics).toContain("Stored encounter data could not be loaded.");
+        expect(count(state.diagnostics, LOAD_FAILED_DIAGNOSTIC)).toBe(1);
+        expect(dependencies.save).not.toHaveBeenCalled();
+    });
+
+    it("retries a failed load and replays buffered observations onto the stored scope", async () => {
+        const stored = JSON.parse(JSON.stringify(storedScope())) as unknown;
+        const load = vi.fn()
+            .mockRejectedValueOnce(new Error("worker gone"))
+            .mockRejectedValueOnce(new Error("still gone"))
+            .mockResolvedValue(stored);
+        const dependencies = harness({ load });
+        const controller = await createNotebookController(dependencies);
+        await controller.accept({ ...handshake, eventId: "handshake-2" });
+        await controller.accept({ ...scope, eventId: "scope-2" });
+        await controller.accept(otherSnapshot);
+        expect(count(controller.state().diagnostics, LOAD_FAILED_DIAGNOSTIC)).toBe(1);
+        expect(dependencies.save).not.toHaveBeenCalled();
+        await controller.accept(target("Scene.s.Token.o", "target-o"));
+        await controller.flush();
+        expect(load).toHaveBeenCalledTimes(3);
+        const state = controller.state();
+        expect(state.creatures[TOKEN]?.name).toBe("Graveknight");
+        expect(state.creatures["Scene.s.Token.o"]?.name).toBe("Ghoul");
+        expect(state.selectedTokenUuid).toBe("Scene.s.Token.o");
+        expect(state.compatibility).toBe("active");
+        expect(dependencies.save).toHaveBeenLastCalledWith(KEY, state);
+    });
+
+    it("keeps only the newest buffered observations while unloaded and notes the overflow once", async () => {
+        const load = vi.fn().mockRejectedValue(new Error("worker gone"));
+        const controller = await createNotebookController(harness({ load }));
+        await controller.accept(handshake);
+        await controller.accept(scope);
+        for (let index = 0; index < 205; index += 1) {
+            await controller.accept(target(index % 2 === 0 ? TOKEN : null, `target-${index}`));
+        }
+        load.mockResolvedValue(null);
+        await controller.accept(snapshot);
+        await controller.flush();
+        const diagnostics = controller.state().diagnostics;
+        expect(count(diagnostics, "Some encounter observations were dropped while storage was unavailable.")).toBe(1);
+        expect(controller.state().creatures[TOKEN]?.name).toBe("Graveknight");
     });
 
     it("keeps accepting observations after a save rejects", async () => {
@@ -225,10 +281,10 @@ describe("content controller", () => {
         await controller.accept(snapshot);
         await controller.accept(target(TOKEN));
         await controller.flush();
-        expect(save).toHaveBeenCalledTimes(3);
         const state = controller.state();
         expect(state.selectedTokenUuid).toBe(TOKEN);
-        expect(state.diagnostics).toEqual(["Encounter checkpoint could not be saved."]);
+        expect(count(state.diagnostics, SAVE_FAILED_DIAGNOSTIC)).toBe(1);
+        expect(save).toHaveBeenLastCalledWith(KEY, expect.objectContaining({ selectedTokenUuid: TOKEN }));
         expect(dependencies.renderSidebar).toHaveBeenLastCalledWith(state);
     });
 
@@ -238,19 +294,72 @@ describe("content controller", () => {
         await controller.accept(handshake);
         await controller.accept(scope);
         await controller.accept(snapshot);
-        expect(controller.state().diagnostics).toEqual(["Encounter checkpoint could not be saved."]);
+        await controller.flush();
+        expect(controller.state().diagnostics).toEqual([SAVE_FAILED_DIAGNOSTIC]);
     });
 
-    it("keeps the queue alive when a renderer throws", async () => {
+    it("coalesces saves to one in flight plus the latest pending state", async () => {
+        const releases: (() => void)[] = [];
+        const save = vi.fn(() => new Promise<void>((resolve) => {
+            releases.push(resolve);
+        }));
+        const dependencies = harness({ save });
+        const controller = await createNotebookController(dependencies);
+        await controller.accept(handshake);
+        await controller.accept(scope);
+        await controller.accept(snapshot);
+        await controller.accept(target(TOKEN));
+        expect(dependencies.renderSidebar).toHaveBeenLastCalledWith(
+            expect.objectContaining({ selectedTokenUuid: TOKEN }),
+        );
+        expect(save).toHaveBeenCalledOnce();
+        expect(save).toHaveBeenCalledWith(KEY, expect.objectContaining({ creatures: {} }));
+        let flushed = false;
+        const flushing = controller.flush().then(() => {
+            flushed = true;
+        });
+        await Promise.resolve();
+        expect(flushed).toBe(false);
+        releases[0]?.();
+        await vi.waitFor(() => expect(save).toHaveBeenCalledTimes(2));
+        expect(save).toHaveBeenLastCalledWith(KEY, controller.state());
+        expect(flushed).toBe(false);
+        releases[1]?.();
+        await flushing;
+        expect(save).toHaveBeenCalledTimes(2);
+    });
+
+    it("clear discards an unloadable checkpoint and saves the empty scope", async () => {
+        const load = vi.fn().mockRejectedValue(new Error("worker gone"));
+        const dependencies = harness({ load });
+        const controller = await createNotebookController(dependencies);
+        await controller.accept(handshake);
+        await controller.accept(scope);
+        await controller.accept(snapshot);
+        expect(load).toHaveBeenCalledTimes(2);
+        await controller.clear();
+        await controller.accept(target(TOKEN));
+        await controller.flush();
+        expect(load).toHaveBeenCalledTimes(2);
+        expect(dependencies.save).toHaveBeenLastCalledWith(KEY, controller.state());
+        expect(controller.state().creatures).toEqual({});
+    });
+
+    it("still checkpoints and resolves when the renderer throws", async () => {
         const renderSidebar = vi.fn()
             .mockImplementationOnce(() => undefined)
-            .mockImplementationOnce(() => {
+            .mockImplementation(() => {
                 throw new Error("render");
             });
-        const controller = await createNotebookController(harness({ renderSidebar }));
-        await expect(controller.accept(handshake)).rejects.toThrow("render");
+        const dependencies = harness({ renderSidebar });
+        const controller = await createNotebookController(dependencies);
+        await expect(controller.accept(handshake)).resolves.toBeUndefined();
         await controller.accept(scope);
+        await expect(controller.clear()).resolves.toBeUndefined();
+        await controller.flush();
         expect(controller.state().scopeId).toBe("scene:combat");
+        expect(count(controller.state().diagnostics, RENDER_FAILED_DIAGNOSTIC)).toBe(1);
+        expect(dependencies.save).toHaveBeenCalledWith(KEY, expect.anything());
     });
 
     it("serializes accepts so scope restoration precedes later observations", async () => {
@@ -278,6 +387,7 @@ describe("content controller", () => {
             await controller.accept(observation);
         }
         await controller.clear();
+        await controller.flush();
         const state = controller.state();
         expect(state).toMatchObject({
             compatibility: "active",

@@ -49,11 +49,15 @@ export function installPageAdapter(target: Window): () => void {
             ? (hooks as Record<string, unknown>).once
             : undefined;
         if (typeof once !== "function") return;
-        waitingForReady = true;
-        once.call(hooks, "ready", () => {
-            waitingForReady = false;
-            start();
-        });
+        try {
+            once.call(hooks, "ready", () => {
+                waitingForReady = false;
+                start();
+            });
+            waitingForReady = true;
+        } catch (error) {
+            warn("waiting for Foundry ready", error);
+        }
     };
 
     const teardown = (): void => {

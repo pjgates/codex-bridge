@@ -109,6 +109,21 @@ describe("main-world page adapter", () => {
         expect(observations).toEqual([]);
     });
 
+    it("allows a later activation to wait again after Hooks.once throws", () => {
+        vi.spyOn(console, "warn").mockImplementation(() => undefined);
+        const fake = globals(false);
+        fake.Hooks?.once?.mockImplementationOnce(() => {
+            throw new Error("hooks broken");
+        });
+        const { observations } = install(fake);
+        expect(() => command("activate")).not.toThrow();
+        command("activate");
+        expect(fake.Hooks?.once).toHaveBeenCalledTimes(2);
+        const ready = fake.Hooks?.once?.mock.calls[1]?.[1] as Callback;
+        ready();
+        expect(parsedTypes(observations)).toEqual(["handshake", "scope", "target"]);
+    });
+
     it("stays inert when Foundry is not ready and has no Hooks.once", () => {
         const fake = globals(false);
         delete fake.Hooks?.once;
