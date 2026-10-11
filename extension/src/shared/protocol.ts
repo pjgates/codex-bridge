@@ -119,6 +119,10 @@ function isFiniteNumber(value: unknown): value is number {
     return typeof value === "number" && Number.isFinite(value);
 }
 
+function isSafeInteger(value: unknown): value is number {
+    return Number.isSafeInteger(value);
+}
+
 function isNatural(value: unknown): value is number {
     return Number.isInteger(value) && (value as number) >= 1 && (value as number) <= 20;
 }
@@ -139,7 +143,7 @@ function parseDefenses(value: unknown): Partial<Record<DefenseKind, number>> | n
     if (!isRecord(value)) return null;
     const defenses: Partial<Record<DefenseKind, number>> = {};
     for (const [key, entry] of Object.entries(value)) {
-        if (!isOneOf(key, DEFENSE_KINDS) || !isFiniteNumber(entry)) return null;
+        if (!isOneOf(key, DEFENSE_KINDS) || !isSafeInteger(entry)) return null;
         defenses[key] = entry;
     }
     return defenses;
@@ -220,7 +224,7 @@ export function parseObservation(value: unknown): Observation | null {
             if (
                 !isOneOf(payload.checkType, CHECK_TYPES)
                 || !isOneOf(payload.statistic, DEFENSE_KINDS)
-                || !isFiniteNumber(payload.total)
+                || !isSafeInteger(payload.total)
                 || !isNatural(payload.natural)
                 || !isNullableDegree(payload.outcome)
                 || !isDegreeAdjustment(payload.degreeAdjustment)
@@ -242,7 +246,7 @@ export function parseObservation(value: unknown): Observation | null {
                 parsed.rollerTokenUuid = payload.rollerTokenUuid;
             }
             if (hasOwn(payload, "exactDc")) {
-                if (!isFiniteNumber(payload.exactDc)) return null;
+                if (!isSafeInteger(payload.exactDc)) return null;
                 parsed.exactDc = payload.exactDc;
             }
             return envelope(value, type, parsed);
@@ -250,7 +254,7 @@ export function parseObservation(value: unknown): Observation | null {
         case "unassigned-check": {
             if (
                 !isId(payload.messageId)
-                || !isFiniteNumber(payload.total)
+                || !isSafeInteger(payload.total)
                 || !isNullableDegree(payload.outcome)
             ) return null;
             return envelope(value, type, {

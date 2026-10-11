@@ -81,7 +81,7 @@ function parseList<T>(value: unknown, limit: number, parseItem: (item: unknown) 
 
 function parseBound(value: unknown): number | null | undefined {
     if (value === null) return null;
-    return Number.isSafeInteger(value) ? value as number : undefined;
+    return Number.isInteger(value) ? value as number : undefined;
 }
 
 function parseRange(value: unknown): IntegerRange | null {

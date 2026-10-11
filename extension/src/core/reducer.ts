@@ -13,6 +13,7 @@ export { parseNotebookState } from "./state-parser.js";
 
 export const STORED_STATE_INVALID_DIAGNOSTIC = "Stored encounter data was invalid and was reset.";
 
+const AWAITING_HANDSHAKE_REASON = "Waiting for the Foundry adapter handshake.";
 const UNKNOWN_CREATURE = "Unknown creature";
 const BASE_CONTEXT = "base";
 
@@ -28,8 +29,8 @@ const DEFENSE_LABELS: Record<DefenseKind, string> = {
 
 export function emptyNotebook(): NotebookState {
     return {
-        compatibility: "fallback",
-        compatibilityReason: null,
+        compatibility: "unsupported",
+        compatibilityReason: AWAITING_HANDSHAKE_REASON,
         worldId: null,
         userId: null,
         sceneId: null,
@@ -119,6 +120,22 @@ function candidateFact(candidates: CandidateSet, evidenceIds: string[]): Defense
     };
 }
 
+function containsValue(candidates: CandidateSet, value: number): boolean {
+    return candidates.ranges.some((range) =>
+        (range.min === null || value >= range.min) && (range.max === null || value <= range.max));
+}
+
+function isUnchangedSnapshot(
+    record: CreatureRecord | undefined,
+    payload: Extract<Observation, { type: "token-snapshot" }>["payload"],
+): boolean {
+    if (!record || record.name !== payload.name || record.actorUuid !== payload.actorUuid) return false;
+    return Object.entries(payload.defenses).every(([kind, value]) => {
+        const fact = record.defenses[kind as DefenseKind];
+        return fact?.provenance === "exact-client" && fact.display === String(value);
+    });
+}
+
 function signed(value: number): string {
     return value >= 0 ? `+${value}` : String(value);
 }
@@ -128,6 +145,7 @@ function applySnapshot(
     observation: Extract<Observation, { type: "token-snapshot" }>,
 ): NotebookState {
     const { tokenUuid, actorUuid, name, defenses } = observation.payload;
+    if (isUnchangedSnapshot(creatureAt(state, tokenUuid), observation.payload)) return state;
     const entries = Object.entries(defenses) as [DefenseKind, number][];
     const described = entries.map(([kind, value]) => `${DEFENSE_LABELS[kind]} ${value}`).join(", ");
     const summary = described
@@ -145,6 +163,9 @@ function applySnapshot(
 function applyAttack(state: NotebookState, observation: CheckRoll): NotebookState {
     const { statistic, total, natural, outcome, degreeAdjustment, targetTokenUuid, exactDc, contextKey } =
         observation.payload;
+    if (statistic !== "ac") {
+        return withDiagnostic(state, `Attack ${total} against ${DEFENSE_LABELS[statistic]} was not recorded.`);
+    }
     if (targetTokenUuid === null) {
         return withDiagnostic(state, `Attack ${total} had no reliable target and was not recorded.`);
     }
@@ -175,7 +196,14 @@ function applyAttack(state: NotebookState, observation: CheckRoll): NotebookStat
             return addContradiction(record, evidenceFor(observation, `${summary} (impossible ${label} result)`));
         }
         const evidence = evidenceFor(observation, summary);
-        if (!isBase || existing?.provenance === "exact-client") return addEvidence(record, evidence);
+        if (!isBase) return addEvidence(record, evidence);
+        if (existing?.provenance === "exact-client") {
+            if (!containsValue(candidates, Number(existing.display))) {
+                return addContradiction(record, evidenceFor(observation, `${summary} (contradicts ${label} ${existing.display})`));
+            }
+            const supported = { ...existing, evidenceIds: appendBounded(existing.evidenceIds, id, MAX_CREATURE_ENTRIES) };
+            return addEvidence(setDefense(record, statistic, supported), evidence);
+        }
 
         const previous = existing?.candidates;
         const merged = previous ? intersectCandidates(previous, candidates) : candidates;
@@ -192,6 +220,9 @@ function applyAttack(state: NotebookState, observation: CheckRoll): NotebookStat
 function applyModifierRoll(state: NotebookState, observation: CheckRoll): NotebookState {
     const { checkType, statistic, total, natural, rollerTokenUuid, contextKey } = observation.payload;
     const label = DEFENSE_LABELS[statistic];
+    if (statistic === "ac") {
+        return withDiagnostic(state, `${checkType} ${total} reported an AC modifier and was not recorded.`);
+    }
     if (rollerTokenUuid === undefined) {
         return withDiagnostic(state, `${label} ${checkType} ${total} had no reliable roller and was not recorded.`);
     }
@@ -199,7 +230,9 @@ function applyModifierRoll(state: NotebookState, observation: CheckRoll): Notebo
     const evidence = evidenceFor(observation, `${label} ${checkType} ${total} (natural ${natural}): modifier ${display} (observed)`);
     return updateCreature(state, rollerTokenUuid, (record) => {
         const existing = record.defenses[statistic];
-        if (existing?.provenance === "exact-client") return addEvidence(record, evidence);
+        if (contextKey !== BASE_CONTEXT || existing?.provenance === "exact-client") {
+            return addEvidence(record, evidence);
+        }
         const evidenceIds = existing?.provenance === "observed" && existing.display === display
             ? appendBounded(existing.evidenceIds, observation.eventId, MAX_CREATURE_ENTRIES)
             : [observation.eventId];

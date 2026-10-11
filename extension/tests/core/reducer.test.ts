@@ -32,7 +32,9 @@ const attack = (
     natural: number,
     outcome: "criticalFailure" | "failure" | "success" | "criticalSuccess" | null,
     extra: Partial<Extract<Observation, { type: "check-roll" }>["payload"]> = {},
+    eventId?: string,
 ): Observation => event({
+    ...(eventId ? { eventId } : {}),
     type: "check-roll",
     payload: {
         checkType: "attack",
@@ -165,19 +167,82 @@ describe("notebook reducer", () => {
         expect(before).toMatchObject({ display: "11–20", provenance: "inferred" });
     });
 
-    it("never lets later attacks replace an exact snapshot", () => {
+    it("never lets later attacks replace an exact snapshot and flags conflicting ones", () => {
         let state = applyObservation(emptyNotebook(), snapshot({ ac: 28 }, "snap"));
-        state = applyObservation(state, attack(27, 12, "success"));
-        state = applyObservation(state, attack(40, 10, "failure"));
+        state = applyObservation(state, attack(28, 12, "success", {}, "hit"));
+        state = applyObservation(state, attack(40, 10, "failure", {}, "miss"));
+        state = applyObservation(state, attack(27, 12, "success", {}, "low-hit"));
         const record = state.creatures[TOKEN];
         expect(record.defenses.ac).toEqual({
             display: "28",
             provenance: "exact-client",
             contextKey: "base",
-            evidenceIds: ["snap"],
+            evidenceIds: ["snap", "hit"],
         });
-        expect(record.evidence).toHaveLength(3);
-        expect(record.contradictions).toHaveLength(0);
+        expect(record.evidence.map((entry) => entry.id)).toEqual(["snap", "hit"]);
+        expect(record.contradictions.map((entry) => entry.id)).toEqual(["miss", "low-hit"]);
+    });
+
+    it("only infers AC from attacks against AC", () => {
+        const state = applyObservation(emptyNotebook(), attack(27, 12, "success", { statistic: "will" }));
+        expect(state.creatures).toEqual({});
+        expect(state.diagnostics).toHaveLength(1);
+    });
+
+    it("does not record an AC modifier from a save or perception roll", () => {
+        const state = applyObservation(emptyNotebook(), event({
+            type: "check-roll",
+            payload: {
+                checkType: "perception",
+                statistic: "ac",
+                total: 20,
+                natural: 5,
+                outcome: null,
+                degreeAdjustment: null,
+                targetTokenUuid: null,
+                rollerTokenUuid: TOKEN,
+                contextKey: "base",
+            },
+        }));
+        expect(state.creatures).toEqual({});
+        expect(state.diagnostics).toHaveLength(1);
+    });
+
+    it("keeps non-base save contexts out of the modifier fact", () => {
+        const save = (total: number, contextKey: string): Observation => event({
+            type: "check-roll",
+            payload: {
+                checkType: "save",
+                statistic: "reflex",
+                total,
+                natural: 10,
+                outcome: null,
+                degreeAdjustment: null,
+                targetTokenUuid: null,
+                rollerTokenUuid: TOKEN,
+                contextKey,
+            },
+        });
+        let state = applyObservation(emptyNotebook(), save(22, "base"));
+        state = applyObservation(state, save(30, "frightened"));
+        expect(state.creatures[TOKEN].defenses.reflex?.display).toBe("+12");
+        expect(state.creatures[TOKEN].evidence).toHaveLength(2);
+    });
+
+    it("skips evidence for a snapshot that changes nothing", () => {
+        let state = applyObservation(emptyNotebook(), snapshot({ ac: 28 }, "first"));
+        state = applyObservation(state, snapshot({ ac: 28 }, "second"));
+        expect(state.creatures[TOKEN].evidence.map((entry) => entry.id)).toEqual(["first"]);
+        expect(state.seenEventIds).toContain("second");
+        state = applyObservation(state, snapshot({ ac: 29 }, "third"));
+        expect(state.creatures[TOKEN].evidence.map((entry) => entry.id)).toEqual(["first", "third"]);
+    });
+
+    it("starts unsupported until the adapter handshake arrives", () => {
+        expect(emptyNotebook()).toMatchObject({
+            compatibility: "unsupported",
+            compatibilityReason: "Waiting for the Foundry adapter handshake.",
+        });
     });
 
     it("lets a fresh exact snapshot replace an inferred estimate", () => {

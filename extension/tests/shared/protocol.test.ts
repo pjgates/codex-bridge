@@ -82,6 +82,42 @@ describe("page protocol", () => {
         })).toBeNull();
     });
 
+    it.each([27.5, 1e20])("rejects non-safe-integer numeric values %s", (value) => {
+        const check = {
+            protocol: PROTOCOL_VERSION,
+            eventId: "event-int",
+            timestamp: 3,
+            type: "check-roll",
+            payload: {
+                checkType: "attack",
+                statistic: "ac",
+                total: 27,
+                natural: 12,
+                outcome: "success",
+                degreeAdjustment: 0,
+                targetTokenUuid: "Scene.s.Token.t",
+                contextKey: "base",
+            },
+        };
+        expect(parseObservation(check)).not.toBeNull();
+        expect(parseObservation({ ...check, payload: { ...check.payload, total: value } })).toBeNull();
+        expect(parseObservation({ ...check, payload: { ...check.payload, exactDc: value } })).toBeNull();
+        expect(parseObservation({
+            protocol: PROTOCOL_VERSION,
+            eventId: "event-unassigned",
+            timestamp: 3,
+            type: "unassigned-check",
+            payload: { messageId: "m", total: value, outcome: null },
+        })).toBeNull();
+        expect(parseObservation({
+            protocol: PROTOCOL_VERSION,
+            eventId: "event-snapshot",
+            timestamp: 3,
+            type: "token-snapshot",
+            payload: { tokenUuid: "Scene.s.Token.t", actorUuid: null, name: "G", defenses: { ac: value } },
+        })).toBeNull();
+    });
+
     it.each([0, 21, 1.5])("rejects natural %s", (natural) => {
         expect(parseObservation({
             protocol: PROTOCOL_VERSION,
