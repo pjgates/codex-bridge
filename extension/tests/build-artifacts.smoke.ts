@@ -78,6 +78,9 @@ describe("built extension", () => {
             files: bundles,
         },
         { label: "fetch(", pattern: /\bfetch\s*\(/, files: bundles },
+        { label: "socket.emit", pattern: /\bsocket\??\.emit\b/, files: bundles },
+        { label: "game.settings.set", pattern: /\bsettings\??\.set\s*\(/, files: bundles },
+        { label: "Hooks.call(", pattern: /\bHooks\??\.call(?:All)?\s*\(/, files: bundles },
         {
             label: "other network APIs",
             pattern: /\bXMLHttpRequest\b|\bWebSocket\b|\bsendBeacon\b|\bEventSource\b/,
