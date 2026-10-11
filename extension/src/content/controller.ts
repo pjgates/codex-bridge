@@ -167,12 +167,15 @@ export async function createNotebookController(
         const base = restored === null || !sameIdentity(restored, current)
             ? withDiagnostic(emptyScope(current), STORED_STATE_INVALID_DIAGNOSTIC)
             : restored;
-        const replayed: NotebookState = {
-            ...replay.reduce(applyObservation, base),
+        const identity = {
             compatibility: current.compatibility,
             compatibilityReason: current.compatibilityReason,
             worldId: current.worldId,
             userId: current.userId,
+        };
+        const replayed: NotebookState = {
+            ...replay.reduce(applyObservation, { ...base, ...identity }),
+            ...identity,
         };
         return overflowNoted && !replayed.diagnostics.includes(BUFFER_OVERFLOW_DIAGNOSTIC)
             ? withDiagnostic(replayed, BUFFER_OVERFLOW_DIAGNOSTIC)

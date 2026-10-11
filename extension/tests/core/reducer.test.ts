@@ -63,9 +63,48 @@ function deepFreeze<T>(value: T): T {
     return value;
 }
 
+const handshake = (status: "active" | "fallback" | "unsupported"): Observation => event({
+    type: "handshake",
+    payload: { status, foundry: "14", system: "pf2e", systemVersion: "8.5.1", worldId: "w", userId: "u" },
+});
+
+const activeNotebook = (): NotebookState => applyObservation(emptyNotebook(), handshake("active"));
+
+describe("compatibility gate", () => {
+    const unassigned = (): Observation => event({
+        type: "unassigned-check",
+        payload: { messageId: "m1", total: 21, outcome: "failure" },
+    });
+
+    it.each(["unsupported", "fallback"] as const)("ignores snapshots and checks while %s", (status) => {
+        const base = applyObservation(emptyNotebook(), handshake(status));
+        expect(applyObservation(base, snapshot({ ac: 28 }))).toBe(base);
+        expect(applyObservation(base, attack(27, 12, "success"))).toBe(base);
+    });
+
+    it("ignores unassigned checks only while unsupported", () => {
+        const unsupported = applyObservation(emptyNotebook(), handshake("unsupported"));
+        expect(applyObservation(unsupported, unassigned())).toBe(unsupported);
+        expect(applyObservation(emptyNotebook(), unassigned())).toEqual(emptyNotebook());
+        for (const status of ["fallback", "active"] as const) {
+            const base = applyObservation(emptyNotebook(), handshake(status));
+            expect(applyObservation(base, unassigned()).diagnostics).toHaveLength(1);
+        }
+    });
+
+    it("always applies handshake, scope, and target", () => {
+        let state = applyObservation(emptyNotebook(), scope("s", null));
+        state = applyObservation(state, event({ type: "target", payload: { tokenUuid: TOKEN } }));
+        expect(state).toMatchObject({ compatibility: "unsupported", scopeId: "s:exploration", selectedTokenUuid: TOKEN });
+        state = applyObservation(state, handshake("active"));
+        expect(state.compatibility).toBe("active");
+        expect(applyObservation(state, snapshot({ ac: 28 })).creatures[TOKEN]?.defenses.ac?.display).toBe("28");
+    });
+});
+
 describe("notebook reducer", () => {
     it("prefers an exact snapshot and retains its evidence", () => {
-        let state = emptyNotebook();
+        let state = activeNotebook();
         state = applyObservation(state, event({
             type: "token-snapshot",
             payload: {
@@ -83,7 +122,7 @@ describe("notebook reducer", () => {
     });
 
     it("intersects attack evidence for the target and ignores duplicates", () => {
-        let state = applyObservation(emptyNotebook(), event({
+        let state = applyObservation(activeNotebook(), event({
             eventId: "snapshot",
             type: "token-snapshot",
             payload: {
@@ -114,7 +153,7 @@ describe("notebook reducer", () => {
     });
 
     it("records contradictions without replacing the previous estimate", () => {
-        let state = emptyNotebook();
+        let state = activeNotebook();
         for (const [eventId, total, outcome] of [
             ["one", 20, "success"],
             ["two", 40, "failure"],
@@ -138,7 +177,7 @@ describe("notebook reducer", () => {
     });
 
     it("builds the calm overlay only for the current target", () => {
-        let state = emptyNotebook();
+        let state = activeNotebook();
         state = applyObservation(state, event({
             type: "token-snapshot",
             payload: {
@@ -161,7 +200,7 @@ describe("notebook reducer", () => {
     });
 
     it("displays exact save and perception values as signed modifiers and AC as a DC", () => {
-        const first = applyObservation(emptyNotebook(), snapshot({ ac: 28, fortitude: 12, perception: -1 }));
+        const first = applyObservation(activeNotebook(), snapshot({ ac: 28, fortitude: 12, perception: -1 }));
         const defenses = first.creatures[TOKEN].defenses;
         expect(defenses.ac?.display).toBe("28");
         expect(defenses.fortitude).toMatchObject({ display: "+12", provenance: "exact-client" });
@@ -173,7 +212,7 @@ describe("notebook reducer", () => {
     });
 
     it("keeps the contradicted estimate and its provenance intact", () => {
-        let state = applyObservation(emptyNotebook(), attack(20, 10, "success"));
+        let state = applyObservation(activeNotebook(), attack(20, 10, "success"));
         const before = state.creatures[TOKEN].defenses.ac;
         state = applyObservation(state, attack(40, 10, "failure"));
         expect(state.creatures[TOKEN].defenses.ac).toEqual(before);
@@ -182,7 +221,7 @@ describe("notebook reducer", () => {
     });
 
     it("never lets later attacks replace an exact snapshot and flags conflicting ones", () => {
-        let state = applyObservation(emptyNotebook(), snapshot({ ac: 28 }, "snap"));
+        let state = applyObservation(activeNotebook(), snapshot({ ac: 28 }, "snap"));
         state = applyObservation(state, attack(28, 12, "success", {}, "hit"));
         state = applyObservation(state, attack(40, 10, "failure", {}, "miss"));
         state = applyObservation(state, attack(27, 12, "success", {}, "low-hit"));
@@ -198,13 +237,13 @@ describe("notebook reducer", () => {
     });
 
     it("only infers AC from attacks against AC", () => {
-        const state = applyObservation(emptyNotebook(), attack(27, 12, "success", { statistic: "will" }));
+        const state = applyObservation(activeNotebook(), attack(27, 12, "success", { statistic: "will" }));
         expect(state.creatures).toEqual({});
         expect(state.diagnostics).toHaveLength(1);
     });
 
     it("does not record an AC modifier from a save or perception roll", () => {
-        const state = applyObservation(emptyNotebook(), event({
+        const state = applyObservation(activeNotebook(), event({
             type: "check-roll",
             payload: {
                 checkType: "perception",
@@ -237,14 +276,14 @@ describe("notebook reducer", () => {
                 contextKey,
             },
         });
-        let state = applyObservation(emptyNotebook(), save(22, "base"));
+        let state = applyObservation(activeNotebook(), save(22, "base"));
         state = applyObservation(state, save(30, "frightened"));
         expect(state.creatures[TOKEN].defenses.reflex?.display).toBe("+12");
         expect(state.creatures[TOKEN].evidence).toHaveLength(2);
     });
 
     it("skips evidence for a snapshot that changes nothing", () => {
-        let state = applyObservation(emptyNotebook(), snapshot({ ac: 28 }, "first"));
+        let state = applyObservation(activeNotebook(), snapshot({ ac: 28 }, "first"));
         state = applyObservation(state, snapshot({ ac: 28 }, "second"));
         expect(state.creatures[TOKEN].evidence.map((entry) => entry.id)).toEqual(["first"]);
         expect(state.seenEventIds).toContain("second");
@@ -260,7 +299,7 @@ describe("notebook reducer", () => {
     });
 
     it("lets a fresh exact snapshot replace an inferred estimate", () => {
-        let state = applyObservation(emptyNotebook(), attack(27, 12, "success"));
+        let state = applyObservation(activeNotebook(), attack(27, 12, "success"));
         state = applyObservation(state, snapshot({ ac: 25 }));
         expect(state.creatures[TOKEN].defenses.ac).toMatchObject({ display: "25", provenance: "exact-client" });
         expect(state.creatures[TOKEN].name).toBe("Graveknight");
@@ -268,14 +307,14 @@ describe("notebook reducer", () => {
 
     it("marks attack-derived AC possible when the degree adjustment is unknown", () => {
         const state = applyObservation(
-            emptyNotebook(),
+            activeNotebook(),
             attack(27, 12, "criticalSuccess", { degreeAdjustment: null }),
         );
         expect(state.creatures[TOKEN].defenses.ac?.provenance).toBe("possible");
     });
 
     it("treats an impossible attack observation as a contradiction", () => {
-        let state = applyObservation(emptyNotebook(), attack(27, 12, "success"));
+        let state = applyObservation(activeNotebook(), attack(27, 12, "success"));
         const before = state.creatures[TOKEN].defenses.ac;
         state = applyObservation(state, attack(27, 20, "criticalFailure"));
         expect(state.creatures[TOKEN].defenses.ac).toEqual(before);
@@ -284,19 +323,19 @@ describe("notebook reducer", () => {
     });
 
     it("records an exact attack DC as exact client data", () => {
-        const state = applyObservation(emptyNotebook(), attack(27, 12, "success", { exactDc: 26 }));
+        const state = applyObservation(activeNotebook(), attack(27, 12, "success", { exactDc: 26 }));
         expect(state.creatures[TOKEN].defenses.ac).toMatchObject({ display: "26", provenance: "exact-client" });
     });
 
     it("keeps non-base attack contexts out of the base AC fact", () => {
-        let state = applyObservation(emptyNotebook(), attack(27, 12, "success"));
+        let state = applyObservation(activeNotebook(), attack(27, 12, "success"));
         state = applyObservation(state, attack(10, 12, "success", { contextKey: "flanked" }));
         expect(state.creatures[TOKEN].defenses.ac?.display).toBe("18–27");
         expect(state.creatures[TOKEN].evidence).toHaveLength(2);
     });
 
     it("needs a target and an outcome before inferring attack AC", () => {
-        let state = applyObservation(emptyNotebook(), attack(27, 12, "success", { targetTokenUuid: null }));
+        let state = applyObservation(activeNotebook(), attack(27, 12, "success", { targetTokenUuid: null }));
         expect(state.creatures).toEqual({});
         expect(state.diagnostics).toHaveLength(1);
         state = applyObservation(state, attack(27, 12, null));
@@ -319,7 +358,7 @@ describe("notebook reducer", () => {
                 ...(rollerTokenUuid ? { rollerTokenUuid } : {}),
             },
         });
-        let state = applyObservation(emptyNotebook(), save(25, "Scene.s.Token.r"));
+        let state = applyObservation(activeNotebook(), save(25, "Scene.s.Token.r"));
         expect(state.creatures["Scene.s.Token.r"].defenses.will).toMatchObject({
             display: "+18",
             provenance: "observed",
@@ -337,7 +376,7 @@ describe("notebook reducer", () => {
     });
 
     it("formats a negative observed modifier with its sign", () => {
-        const state = applyObservation(emptyNotebook(), event({
+        const state = applyObservation(activeNotebook(), event({
             type: "check-roll",
             payload: {
                 checkType: "perception",
@@ -355,7 +394,7 @@ describe("notebook reducer", () => {
     });
 
     it("clears encounter data only when the scope changes", () => {
-        let state = applyObservation(emptyNotebook(), event({
+        let state = applyObservation(activeNotebook(), event({
             type: "handshake",
             payload: {
                 status: "active",
@@ -391,7 +430,7 @@ describe("notebook reducer", () => {
     });
 
     it("updates compatibility from the handshake", () => {
-        const state = applyObservation(emptyNotebook(), event({
+        const state = applyObservation(activeNotebook(), event({
             type: "handshake",
             payload: {
                 status: "unsupported",
@@ -412,14 +451,14 @@ describe("notebook reducer", () => {
     });
 
     it("does not mutate the previous state", () => {
-        const frozen = deepFreeze(applyObservation(emptyNotebook(), snapshot({ ac: 28 })));
+        const frozen = deepFreeze(applyObservation(activeNotebook(), snapshot({ ac: 28 })));
         expect(() => applyObservation(frozen, attack(27, 12, "success"))).not.toThrow();
         expect(() => applyObservation(frozen, scope("x", null))).not.toThrow();
         expect(frozen.creatures[TOKEN].evidence).toHaveLength(1);
     });
 
     it("bounds seen events, diagnostics, evidence, and contradictions", () => {
-        let state = emptyNotebook();
+        let state = activeNotebook();
         for (let index = 0; index < 2_050; index += 1) {
             state = applyObservation(state, event({
                 eventId: `u${index}`,
@@ -444,7 +483,7 @@ describe("notebook reducer", () => {
     });
 
     it("hides the overlay without a selected, recorded, AC-bearing target", () => {
-        let state = applyObservation(emptyNotebook(), snapshot({ will: 30 }));
+        let state = applyObservation(activeNotebook(), snapshot({ will: 30 }));
         expect(currentOverlay(state)).toBeNull();
         state = applyObservation(state, event({ type: "target", payload: { tokenUuid: "Scene.s.Token.other" } }));
         expect(currentOverlay(state)).toBeNull();
@@ -464,7 +503,7 @@ describe("parseNotebookState", () => {
     });
 
     it("round-trips a populated notebook into a fresh object", () => {
-        let state = applyObservation(emptyNotebook(), scope("s", "c"));
+        let state = applyObservation(activeNotebook(), scope("s", "c"));
         state = applyObservation(state, snapshot({ will: 30 }));
         state = applyObservation(state, attack(27, 12, "success"));
         state = applyObservation(state, attack(40, 10, "failure"));
@@ -477,7 +516,7 @@ describe("parseNotebookState", () => {
     });
 
     it("rejects mismatched keys, unknown provenance, unknown keys, and oversized arrays", () => {
-        const state = applyObservation(emptyNotebook(), snapshot({ ac: 28 }));
+        const state = applyObservation(activeNotebook(), snapshot({ ac: 28 }));
         const clone = (): NotebookState => JSON.parse(JSON.stringify(state)) as NotebookState;
 
         const mismatched = clone();
@@ -513,7 +552,7 @@ describe("parseNotebookState", () => {
     });
 
     it("treats prototype-like token keys as ordinary records", () => {
-        let state = emptyNotebook();
+        let state = activeNotebook();
         expect(currentOverlay(applyObservation(state, event({
             type: "target",
             payload: { tokenUuid: "__proto__" },
@@ -534,7 +573,7 @@ describe("parseNotebookState", () => {
             diagnostics: [STORED_STATE_INVALID_DIAGNOSTIC],
         });
         expect(STORED_STATE_INVALID_DIAGNOSTIC).toBe("Stored encounter data was invalid and was reset.");
-        const state = applyObservation(emptyNotebook(), snapshot({ ac: 28 }));
+        const state = applyObservation(activeNotebook(), snapshot({ ac: 28 }));
         expect(restoreNotebookState(JSON.parse(JSON.stringify(state)))).toEqual(state);
     });
 

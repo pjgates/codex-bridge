@@ -300,8 +300,26 @@ function reduce(state: NotebookState, observation: Observation): NotebookState {
     }
 }
 
+function isPermitted(state: NotebookState, observation: Observation): boolean {
+    switch (observation.type) {
+        case "handshake":
+        case "scope":
+        case "target":
+            return true;
+        case "token-snapshot":
+        case "check-roll":
+            return state.compatibility === "active";
+        case "unassigned-check":
+            return state.compatibility === "active" || state.compatibility === "fallback";
+        default: {
+            const exhaustive: never = observation;
+            return exhaustive;
+        }
+    }
+}
+
 export function applyObservation(state: NotebookState, observation: Observation): NotebookState {
-    if (state.seenEventIds.includes(observation.eventId)) return state;
+    if (state.seenEventIds.includes(observation.eventId) || !isPermitted(state, observation)) return state;
     const next = reduce(state, observation);
     return {
         ...next,

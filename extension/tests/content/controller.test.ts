@@ -255,6 +255,19 @@ describe("content controller", () => {
         expect(dependencies.save).toHaveBeenLastCalledWith(KEY, state);
     });
 
+    it("replays buffered observations under the current compatibility, not the stored one", async () => {
+        const stored = JSON.parse(JSON.stringify({ ...storedScope(), compatibility: "fallback" })) as unknown;
+        const load = vi.fn().mockRejectedValueOnce(new Error("worker gone")).mockResolvedValue(stored);
+        const controller = await createNotebookController(harness({ load }));
+        await controller.accept(handshake);
+        await controller.accept(scope);
+        await controller.accept(otherSnapshot);
+        await controller.accept(target("Scene.s.Token.o", "target-o"));
+        await controller.flush();
+        expect(controller.state().compatibility).toBe("active");
+        expect(controller.state().creatures["Scene.s.Token.o"]?.name).toBe("Ghoul");
+    });
+
     it("keeps only the newest buffered observations while unloaded and notes the overflow once", async () => {
         const load = vi.fn().mockRejectedValue(new Error("worker gone"));
         const controller = await createNotebookController(harness({ load }));
